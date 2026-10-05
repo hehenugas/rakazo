@@ -45,7 +45,7 @@ Local `main` (fork), pushed to `origin/main`.
 
 | Suite | Command | Result |
 |---|---|---|
-| Canonical states | `pnpm test:e2e -- --spec=apps/web/e2e/parity/canonical-states.spec.ts` | 18/18 passed against committed baselines (repeated runs, 2026-10-05) |
+| Canonical states | `pnpm test:e2e -- --spec=apps/web/e2e/parity/canonical-states.spec.ts` | 18/18 passed against committed baselines (repeated runs locally, 2026-10-05); full web e2e 198 passed / 0 failed on CI runner in run 37341763047 — local baselines hold on CI |
 | Typecheck | `pnpm --filter @rakazo/web exec tsc --noEmit` | clean |
 | Lint | `pnpm exec biome check` on touched paths | clean |
 | Visual-diff script | identical-image smoke + `--help` shape | exit 0, JSON report correct |
