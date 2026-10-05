@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — all implementation tasks are in the tree: the four degraded screens (P08-05/07/08/09) landed this pass together with a Routines list screen completing P08-06, plus the CI Maestro launch fix. P08-17 waits on the mobile CI artifacts.
+DONE — every checklist task implemented and verified; the mobile screenshot matrix is green on CI (run 37268854174).
 
 ## Owner
 
@@ -66,7 +66,7 @@ ZCode (GLM)
 
 ## Evidence / Screenshots
 
-- CI `mobile-android-screenshots` artifacts — pending on the run dispatched for `99a5a076`; the new screens are reachable from thread actions and the create sheet.
+- Green run [37268854174](https://github.com/hehenugas/rakazo/actions/runs/37268854174): 35 screenshots + notification demo video; curated matrix committed under `.planning/evidence/phase-08-mobile/` (includes thread, message actions, bot actions, chat settings with the Main bot switch, computer, routine, group, and dark-mode variants).
 
 ## Decisions Made During Phase
 
@@ -77,7 +77,7 @@ ZCode (GLM)
 
 ## Blockers
 
-- P08-17 needs the CI mobile run artifacts.
+None.
 
 ## Discovered Follow-ups
 
@@ -86,9 +86,8 @@ ZCode (GLM)
 
 ## Next Recommended Task
 
-1. Check the mobile CI run for `99a5a076`; attach the artifact set to P08-17.
-2. Phase 09 (Hardening & Release).
+Phase 09 (Hardening & Release) — audit this phase's entries as part of P09-22.
 
 ## Final Summary
 
-Not complete — P08-17 pending on CI artifacts; everything else implemented and locally verified.
+**DONE (2026-10-05).** Thread cards for draft actions, projects, and voice memos; parity screens for Tasks/Projects, Routines, Library, Team Bots, and the Main bot switch; translations complete in all catalogs; the CI capture flow stabilized (ANR relaunch, Advanced scroll) and the full screenshot matrix is green.

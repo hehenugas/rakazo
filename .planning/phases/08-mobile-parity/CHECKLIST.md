@@ -2,7 +2,7 @@
 
 ## Status
 
-**DOING — ZCode (GLM)**
+**DONE — ZCode (GLM)**
 
 ## Tasks
 
@@ -22,17 +22,17 @@
 - [x] P08-14 Add mobile offline/loading/error states. (Upstream loading/error patterns; new cards add play-failure and submit-error states.)
 - [x] P08-15 Add critical-flow mobile integration/E2E. (Maestro flows in `.maestro/` + the CI `mobile-android-screenshots` run cover the critical path; new cards ride the same flows.)
 - [x] P08-16 Accessibility: touch targets, labels, screen-reader semantics. (New cards use `accessibilityRole`/`accessibilityLabel` and selectable text; upstream screens keep their semantics.)
-- [ ] P08-17 Capture mobile screenshot matrix. (CI `mobile-android-screenshots` run dispatched on the baseline; artifacts pending.)
+- [x] P08-17 Capture mobile screenshot matrix. (2026-10-05: green run 37268854174 — 35 screenshots + notification video, curated set under `.planning/evidence/phase-08-mobile/`.)
 
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-01 All mandatory tasks above are checked.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (Mobile unit 396/396 on the pushed tree; the Maestro capture run is green; the web/mobile unit failures documented in the fork baseline do not touch mobile code.)
+- [x] VERIFY-03 No unresolved P0/P1 regression remains. (The three CI capture failures were upstream-flow staleness plus this fork's new-settings length; all fixed and green.)
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 
-- [ ] Phase marked **DONE** only after all verification items pass.
+- [x] Phase marked **DONE** — all mandatory tasks and verification items pass (2026-10-05). Voice-memo recording on mobile remains an explicit, documented M1 degradation (dictation covers the composer).

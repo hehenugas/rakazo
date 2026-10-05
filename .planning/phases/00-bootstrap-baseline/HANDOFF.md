@@ -113,7 +113,7 @@ The working tree contains ~2.6k lines of uncommitted fork work from a previous s
 
 ## Blockers
 
-- P00-10: waiting on the CI `mobile-android-screenshots` run for the pushed baseline (no local Maestro/Android emulator). Unblocks when the workflow artifacts are downloaded and referenced here.
+None — P00-10 closed on 2026-10-05.
 
 ## Discovered Follow-ups
 
@@ -122,9 +122,8 @@ The working tree contains ~2.6k lines of uncommitted fork work from a previous s
 
 ## Next Recommended Task
 
-1. When the CI mobile-screenshots run finishes: download artifacts, reference them under Evidence, check P00-10, VERIFY-01..05, mark Phase 00 DONE, update STATE.md.
-2. Then claim Phase 01: verify/land the shell-related WIP against `CHECKLIST.md` tasks P01-01…P01-17, starting with P01-01 (inventory of Shell/sidebar/header responsibilities). The planned WIP is already restored and verified in the working tree (see "Pre-existing uncommitted WIP"), so phase landing is now split-and-commit per owning phase (01/02/04/05/06/07) instead of re-implementing.
+Phase 00 is DONE; follow the roadmap's phase order.
 
 ## Final Summary
 
-Not complete — pending P00-10 CI artifacts.
+**DONE (2026-10-05).** Baseline `fd356375` recorded; web/desktop baseline screenshots under `.planning/evidence/phase-00/`; mobile baseline matrix captured by the green CI run [37268854174](https://github.com/hehenugas/rakazo/actions/runs/37268854174) (35 screenshots + notification video, curated under `.planning/evidence/phase-08-mobile/`). Baseline failures documented and unchanged since. The fork now lives at `hehenugas/rakazo` (origin moved per the maintainer); the pre-existing WIP referenced above has since landed as phase commits on `phase/00-bootstrap`.
