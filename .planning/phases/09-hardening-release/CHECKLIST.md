@@ -6,13 +6,13 @@
 
 ## Tasks
 
-- [ ] P09-01 Run full lint/typecheck/unit suite. (2026-10-05: lint 0 errors + typecheck 22/22 on the current tree; full unit ran before the last additions — final full run pending push.)
+- [x] P09-01 Run full lint/typecheck/unit suite. (2026-10-05 on the pushed tree: `turbo check` 22/22; lint 0 errors + 19 pre-existing warnings; unit 5849 passed / 6 failed / 174 skipped — the 6 are the documented baseline failures.)
 - [ ] P09-02 Run full integration suite.
 - [ ] P09-03 Run full web E2E suite.
 - [ ] P09-04 Run desktop E2E in supported environment.
 - [ ] P09-05 Run mobile critical-flow tests.
-- [ ] P09-06 Test migration from representative upstream database.
-- [ ] P09-07 Test fresh install/bootstrap.
+- [x] P09-06 Test migration from representative upstream database. (2026-10-05: throwaway Postgres 16 built from the baseline commit's 91 migrations, seeded with organization/space/user/bot/thread/message rows, fork `migrate deploy` applied exactly the 3 fork migrations, all rows re-read intact, new TeamBot/Project/mainBotId writes verified. See HANDOFF work log.)
+- [ ] P09-07 Test fresh install/bootstrap. (The e2e/integration harness boots a fresh container per run: `migrate deploy` on an empty database then API health check — verified continuously by the running suites; CI `ci.yml` exercises the same path.)
 - [x] P09-08 Security review Team Bot authorization/isolation. (Member scoping + foreign-membership refusal pinned in `team-bots.test.ts`; user/space scoping on all new handlers.)
 - [x] P09-09 Security review template redaction. (Exact-key whitelist test on `export.template`.)
 - [x] P09-10 Security review connector/credential boundaries. (Upstream isolation unchanged; X rides the connector path with no first-party credentials.)
