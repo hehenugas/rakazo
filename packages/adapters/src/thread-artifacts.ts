@@ -46,7 +46,10 @@ export async function attachWorkspaceFileToThread(
     name?: string;
     description?: string;
   },
-): Promise<{ artifactId: string; block: Extract<MessageBlock, { kind: "image" | "file" }> }> {
+): Promise<{
+  artifactId: string;
+  block: Extract<MessageBlock, { kind: "image" | "voice_memo" | "file" }>;
+}> {
   const fileName = path.basename(input.filePath) || input.filePath;
   const mimeType = inferAttachmentMimeType(fileName);
   if (!mimeType) {

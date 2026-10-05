@@ -23,6 +23,7 @@ import {
   BotMcpServerSchema,
   BotSchema,
   BotSectionSchema,
+  BotTemplateManifestSchema,
   CapabilityInstallSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
@@ -33,8 +34,10 @@ import {
   CreateAgentSkillInput,
   CreateBotInput,
   CreateGroupInput,
+  CreateProjectInput,
   CreateRoutineInput,
   CreateScratchpadItemInput,
+  CreateTeamBotInput,
   DeploymentSettingsSchema,
   ExportManifestSchema,
   ExternalConversationPolicySchema,
@@ -54,6 +57,7 @@ import {
   ModelConnectInputSchema,
   ModelCredentialSchema,
   ModelOAuthBeginSchema,
+  ProjectSchema,
   REPLY_QUOTE_MAX_LENGTH,
   ReorderBotsInput,
   RoutineSchema,
@@ -69,6 +73,7 @@ import {
   SpaceSchema,
   TaughtSkillSchema,
   TeachRecordingEventSchema,
+  TeamBotSchema,
   ThinkingLevelSchema,
   ThreadMessagePageSchema,
   ThreadSnapshotSchema,
@@ -76,6 +81,7 @@ import {
   UpdateBotInput,
   UpdateExternalConversationPolicyInput,
   UpdateGroupInput,
+  UpdateProjectInput,
   UsageRecordSchema,
   VoiceCatalogEntrySchema,
   VoiceCredentialSchema,
@@ -173,6 +179,9 @@ export const appContract = {
   spaces: {
     list: oc.output(SpaceNavigationSchema),
     create: oc.input(z.object({ name: z.string().trim().min(1).max(60) })).output(SpaceSchema),
+    setMainBot: oc
+      .input(z.object({ botId: Id.nullable() }))
+      .output(z.object({ mainBotId: Id.nullable() })),
     remove: oc
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
@@ -251,6 +260,11 @@ export const appContract = {
       .input(z.object({ provider: z.string().trim().min(1) }))
       .output(z.object({ ok: z.literal(true) })),
   },
+  teamBots: {
+    list: oc.output(z.array(TeamBotSchema)),
+    create: oc.input(CreateTeamBotInput).output(TeamBotSchema),
+    open: oc.input(z.object({ teamBotId: Id })).output(BotSchema),
+  },
   bots: {
     list: oc.output(z.array(BotSchema)),
     listArchived: oc.output(z.array(BotSchema)),
@@ -272,6 +286,12 @@ export const appContract = {
         webhookConfigured: z.literal(true),
       }),
     ),
+  },
+  projects: {
+    list: oc.input(z.object({ botId: Id })).output(z.array(ProjectSchema)),
+    get: oc.input(z.object({ projectId: Id })).output(ProjectSchema),
+    create: oc.input(CreateProjectInput).output(ProjectSchema),
+    update: oc.input(UpdateProjectInput).output(ProjectSchema),
   },
   groups: {
     create: oc.input(CreateGroupInput).output(GroupSchema),
@@ -327,6 +347,25 @@ export const appContract = {
         runIds: z.array(Id).optional(),
       }),
     ),
+    updateDraftAction: oc
+      .input(
+        threadTarget.safeExtend({
+          messageId: Id,
+          draftId: Id,
+          fields: z
+            .array(
+              z.object({
+                key: z.string().min(1).max(120),
+                label: z.string().min(1).max(160),
+                value: z.string().max(20_000),
+                multiline: z.boolean().optional(),
+              }),
+            )
+            .max(30),
+          status: z.enum(["draft", "submitted", "discarded"]),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
     react: oc
       .input(
         threadTarget.safeExtend({
@@ -816,6 +855,7 @@ export const appContract = {
   },
   export: {
     bot: oc.input(botId).output(ExportManifestSchema),
+    template: oc.input(botId).output(BotTemplateManifestSchema),
   },
   notifications: {
     registerPush: oc

@@ -675,10 +675,10 @@ export function PluginsOverlay({
       >
         <DialogHeader className="flex-row items-start justify-between px-8 pt-7">
           <DialogTitle className="text-2xl text-foreground">
-            <Trans>Integrations</Trans>
+            <Trans>Connect apps</Trans>
           </DialogTitle>
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t`Close integrations`} />}
+            render={<Button variant="ghost" size="icon-sm" aria-label={t`Close apps`} />}
           >
             <X />
           </DialogClose>
@@ -730,7 +730,7 @@ export function PluginsOverlay({
             <>
               {loading ? (
                 <p className="text-muted-foreground/80">
-                  <Trans>Loading integrations…</Trans>
+                  <Trans>Loading apps…</Trans>
                 </p>
               ) : null}
 

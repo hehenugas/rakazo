@@ -1,16 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
   AttachmentValidationError,
+  attachmentKindForMimeType,
   attachmentsForBot,
   blocksToAgentHistoryText,
   decodeAttachmentBase64,
   inferAttachmentMimeType,
+  messageBlockForArtifact,
   promptTextForAttachments,
   userTurnMessageForRun,
   validateAttachmentMimeType,
 } from "./attachments.js";
 
 describe("attachment helpers", () => {
+  it("maps audio mime types to voice_memo blocks", () => {
+    expect(attachmentKindForMimeType("audio/mpeg")).toBe("voice_memo");
+    expect(attachmentKindForMimeType("audio/webm")).toBe("voice_memo");
+    expect(attachmentKindForMimeType("image/png")).toBe("image");
+    expect(attachmentKindForMimeType("application/pdf")).toBe("file");
+    expect(
+      messageBlockForArtifact({
+        id: "art_9",
+        name: "memo.mp3",
+        mimeType: "audio/mpeg",
+        size: 4096,
+      }),
+    ).toMatchObject({ kind: "voice_memo", artifactId: "art_9", size: 4096 });
+  });
+
   it("rejects unsupported mime types and empty payloads", () => {
     expect(() => validateAttachmentMimeType("application/zip")).toThrow(AttachmentValidationError);
     expect(() => decodeAttachmentBase64("")).toThrow(AttachmentValidationError);

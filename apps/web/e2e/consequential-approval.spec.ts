@@ -3,6 +3,7 @@ import {
   activeBotId,
   captureScreenshot,
   completeOnboarding,
+  openBotSettings,
   openUserSettings,
   rpc,
   signup,
@@ -21,8 +22,7 @@ test("actions run by default while optional confirmations live in advanced user 
   await expect(page.getByRole("button", { name: "Allow once", exact: true })).toHaveCount(0);
   await captureScreenshot(page, testInfo, "50-actions-run-without-confirmation");
 
-  await page.getByTestId("bot-settings-trigger").click();
-  await expect(page.getByTestId("bot-settings")).toBeVisible();
+  await openBotSettings(page);
   await expect(page.getByTestId("bot-settings").getByText("Action confirmations")).toHaveCount(0);
   await page.getByRole("button", { name: "Close panel" }).click();
 

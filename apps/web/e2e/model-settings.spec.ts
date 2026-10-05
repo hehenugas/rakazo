@@ -1,7 +1,14 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
+import {
+  captureScreenshot,
+  completeOnboarding,
+  openBotSettings,
+  openUserSettings,
+  rpc,
+  signup,
+} from "./helpers";
 
 const LOCAL_MODEL_ID = "rakazo-e2e-local";
 const LOCAL_MODEL_REPLY = "OpenAI-compatible endpoint verified end to end.";
@@ -78,9 +85,7 @@ test("custom connections persist reasoning support and bot thinking", async ({
     clearedCredentials.find((entry) => entry.modelId === "arbitrary-model")?.maxImagesPerPrompt,
   ).toBeUndefined();
   await page.getByRole("button", { name: "Close model settings" }).click();
-  await page.locator("main").getByRole("button", { name: "Chief", exact: true }).click();
-  const settings = page.getByTestId("bot-settings");
-  await expect(settings).toBeVisible();
+  const settings = await openBotSettings(page);
   const advanced = settings.getByTestId("bot-settings-advanced");
   await advanced.evaluate((element) => {
     (element as HTMLDetailsElement).open = true;
@@ -104,7 +109,7 @@ test("custom connections persist reasoning support and bot thinking", async ({
   await settings.getByRole("button", { name: "Save", exact: true }).click();
   await saved;
   await page.reload();
-  await page.locator("main").getByRole("button", { name: "Chief", exact: true }).click();
+  await openBotSettings(page);
   await expect(settings).toBeVisible();
   await advanced.evaluate((element) => {
     (element as HTMLDetailsElement).open = true;

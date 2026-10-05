@@ -77,6 +77,109 @@ function ComputerModePicker({
   );
 }
 
+export function CreateTeamBotForm({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (input: { name: string; title: string; description: string }) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const { t } = useLingui();
+  const ids = useId();
+  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (!name.trim() || submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await onCreate({
+        name: name.trim(),
+        title: title.trim(),
+        description: description.trim(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t`Could not create Team Bot`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div data-testid="create-team-bot-form">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-[13.5px] text-muted-foreground">
+          <Trans>New Team Bot</Trans>
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t`Cancel new Team Bot`}
+          onClick={onCancel}
+        >
+          <X size={16} strokeWidth={1.8} />
+        </Button>
+      </div>
+      <p className="mb-4 text-[12.5px] leading-5 text-muted-foreground">
+        <Trans>
+          Shared identity and setup, with a private conversation and private computer for each
+          teammate.
+        </Trans>
+      </p>
+      {error ? (
+        <p role="alert" className="mb-3 text-[13px] text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <label htmlFor={`${ids}-team-name`} className="block text-[14px] text-muted-foreground">
+        <Trans>Name</Trans>
+        <Input
+          id={`${ids}-team-name`}
+          value={name}
+          maxLength={BOT_NAME_MAX_LENGTH}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t`Name this Team Bot`}
+          className="mt-2"
+        />
+      </label>
+      <label htmlFor={`${ids}-team-title`} className={fieldLabelClass}>
+        <Trans>Title</Trans>
+        <Input
+          id={`${ids}-team-title`}
+          value={title}
+          maxLength={BOT_TITLE_MAX_LENGTH}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={t`Describe its role for the team`}
+          className="mt-2"
+        />
+      </label>
+      <label htmlFor={`${ids}-team-description`} className={fieldLabelClass}>
+        <Trans>Description</Trans>
+        <Textarea
+          id={`${ids}-team-description`}
+          value={description}
+          maxLength={BOT_DESCRIPTION_MAX_LENGTH}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t`What teammates should use this Bot for`}
+          rows={5}
+          className="mt-2"
+        />
+      </label>
+      <Button
+        className="mt-5"
+        disabled={!name.trim() || submitting}
+        onClick={() => void handleSubmit()}
+      >
+        {submitting ? <Trans>Creating…</Trans> : <Trans>Create Team Bot</Trans>}
+      </Button>
+    </div>
+  );
+}
+
 export function CreateBotForm({
   onCreate,
   onCancel,

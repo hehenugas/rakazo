@@ -29,6 +29,16 @@ describe("right panel preferences", () => {
       expect(readRightPanelState("state")).toEqual({ panel: null });
     },
   );
+  it("persists conversation details as a durable panel", () => {
+    const entries = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => entries.set(key, value),
+    });
+    writeRightPanelState("state", "details");
+    expect(readRightPanelState("state")).toEqual({ panel: "details" });
+  });
+
   it("keeps working when browser storage is unavailable", () => {
     vi.stubGlobal("localStorage", {
       getItem: () => {

@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot, TeamBot } from "@rakazo/contracts";
 import {
   BotAvatar,
   Command,
@@ -14,16 +14,22 @@ import { useMemo, useState } from "react";
 
 export function BotCreatePicker({
   bots,
+  teamBots,
   onCreateBot,
+  onCreateTeamBot,
   onOpenBot,
+  onOpenTeamBot,
   onCreateGroup,
   onCreateSpace,
   onShowGroupInfo,
   onShowSpaceInfo,
 }: {
   bots: Bot[];
+  teamBots: TeamBot[];
   onCreateBot: () => void;
+  onCreateTeamBot: () => void;
   onOpenBot: (botId: string) => void;
+  onOpenTeamBot: (teamBotId: string) => void;
   onCreateGroup: () => void;
   onCreateSpace: () => void;
   onShowGroupInfo: () => void;
@@ -38,10 +44,20 @@ export function BotCreatePicker({
       (bot) => bot.name.toLowerCase().includes(needle) || bot.title.toLowerCase().includes(needle),
     );
   }, [bots, needle]);
+  const matchedTeamBots = useMemo(() => {
+    if (!needle) return teamBots;
+    return teamBots.filter(
+      (bot) => bot.name.toLowerCase().includes(needle) || bot.title.toLowerCase().includes(needle),
+    );
+  }, [needle, teamBots]);
   const showCreate =
     !needle ||
     "create new bot".includes(needle) ||
     needle.split(/\s+/).every((part) => "create new bot".includes(part));
+  const showCreateTeam =
+    !needle ||
+    "create team bot".includes(needle) ||
+    needle.split(/\s+/).every((part) => "create team bot".includes(part));
 
   return (
     <div data-testid="bot-create-picker" className="w-[min(320px,calc(100vw-2rem))]">
@@ -87,8 +103,41 @@ export function BotCreatePicker({
               </CommandItem>
             ))}
           </CommandGroup>
+          {matchedTeamBots.length > 0 ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={t`Team Bots`}>
+                {matchedTeamBots.map((bot) => (
+                  <CommandItem
+                    key={bot.id}
+                    value={`team-${bot.id}`}
+                    data-testid={`picker-team-bot-${bot.id}`}
+                    onSelect={() => onOpenTeamBot(bot.id)}
+                    className="gap-2"
+                  >
+                    <BotAvatar color={bot.color} identity={bot.id} size={22} status="idle" />
+                    <span className="min-w-0 flex-1 truncate">{bot.name}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      <Trans>Team</Trans>
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          ) : null}
           <CommandSeparator />
           <CommandGroup>
+            {showCreateTeam ? (
+              <CommandItem
+                value="create-team-bot"
+                data-testid="create-new-team-bot"
+                onSelect={() => onCreateTeamBot()}
+                className="gap-2"
+              >
+                <Users size={16} strokeWidth={1.8} aria-hidden="true" />
+                <Trans>Create Team Bot</Trans>
+              </CommandItem>
+            ) : null}
             <CommandItem
               value="create-group"
               data-testid="create-new-group"

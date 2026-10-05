@@ -5,6 +5,7 @@ import {
   activeBotId,
   captureScreenshot,
   completeOnboarding,
+  openBotSettings,
   openUserSettings,
   rpc,
   signup,
@@ -77,11 +78,7 @@ test("memory and skills are readable and editable in the app", async ({ page }, 
   await expect(page.getByLabel("Close memory settings")).toHaveCount(0);
 
   // The bot's Knowledge section lives under Advanced in its settings panel.
-  await page
-    .locator("main")
-    .getByRole("button", { name: /^Chief/ })
-    .click();
-  const settings = page.getByTestId("bot-settings");
+  const settings = await openBotSettings(page);
   await expect(settings.getByRole("button", { name: "Save", exact: true })).toBeVisible();
   await settings.getByText("Advanced", { exact: true }).click();
   const knowledge = settings.getByTestId("bot-knowledge");

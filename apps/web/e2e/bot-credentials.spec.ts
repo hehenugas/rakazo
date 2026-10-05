@@ -1,6 +1,13 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, createNamedBot, rpc, signup } from "./helpers";
+import {
+  captureScreenshot,
+  completeOnboarding,
+  createNamedBot,
+  openBotSettings,
+  rpc,
+  signup,
+} from "./helpers";
 
 // Fake values only: this spec proves the UI and API never echo a saved credential.
 const SENTINEL = "fake-bot-credential-values-never-leak";
@@ -16,9 +23,7 @@ test("bot credentials list, add, replace and remove without leaking values", asy
   const botName = `Credentials ${stamp}`;
   const botId = await createNamedBot(page, botName);
 
-  await page.locator("main").getByRole("button", { name: botName, exact: true }).click();
-  const settings = page.getByTestId("bot-settings");
-  await expect(settings).toBeVisible();
+  const settings = await openBotSettings(page);
   // The Advanced <details> mounts the Credentials section on first open, not on render.
   await settings.getByTestId("bot-settings-advanced").evaluate((element) => {
     (element as HTMLDetailsElement).open = true;

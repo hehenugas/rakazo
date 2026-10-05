@@ -58,6 +58,7 @@ function mapBot(
     teamChatRules?: string;
     webhookSecretId?: string | null;
     spawnKey?: string | null;
+    teamBotId?: string | null;
   },
   preview = "",
   status = "idle",
@@ -95,6 +96,7 @@ function mapBot(
     teamChatRules: bot.teamChatRules ?? "",
     webhookConfigured: Boolean(bot.webhookSecretId),
     spawnKey: bot.spawnKey ?? null,
+    teamBotId: bot.teamBotId ?? null,
   };
 }
 
@@ -388,6 +390,7 @@ export function createRepos(prisma: PrismaClient) {
         modelProvider?: string | null;
         modelId?: string | null;
         thinkingLevel?: string | null;
+        teamBotId?: string | null;
         initialMessage?: {
           role: "user" | "bot" | "system";
           blocks: MessageBlock[];
@@ -457,6 +460,7 @@ export function createRepos(prisma: PrismaClient) {
               modelProvider,
               modelId,
               thinkingLevel,
+              teamBotId: input.teamBotId ?? null,
             },
           });
           const thread = await tx.thread.create({

@@ -207,6 +207,64 @@ export function inferScript(
       },
     ];
   }
+  if (lower.includes("draft an email")) {
+    return [
+      {
+        assistant: "here is a draft you can edit before sending.",
+        toolCalls: [
+          {
+            name: "draft_action_create",
+            args: {
+              provider: "gmail",
+              action: "send_email",
+              title: "Intro call follow-up",
+              fields: [
+                { key: "to", label: "To", value: "client@example.test" },
+                { key: "subject", label: "Subject", value: "Intro call follow-up" },
+                {
+                  key: "body",
+                  label: "Body",
+                  value: "Thanks for the call today.",
+                  multiline: true,
+                },
+              ],
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.includes("draft a slack message")) {
+    return [
+      {
+        assistant: "here is a Slack draft you can edit before sending.",
+        toolCalls: [
+          {
+            name: "draft_action_create",
+            args: {
+              provider: "slack",
+              action: "send_message",
+              title: "Standup note",
+              fields: [
+                { key: "channel", label: "Channel", value: "#team" },
+                {
+                  key: "text",
+                  label: "Message",
+                  value: "Shipping the report today.",
+                  multiline: true,
+                },
+              ],
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.includes("execute this submitted draft action")) {
+    return [{ assistant: "done. the submitted action went out through the connected provider." }];
+  }
   if (lower.includes("show a login card")) {
     return [
       {

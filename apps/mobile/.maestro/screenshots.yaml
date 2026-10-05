@@ -17,6 +17,11 @@ tags:
       visible: "Pixel Launcher isn't responding"
     commands:
       - tapOn: "Close app"
+      # Closing the dialog lands on the launcher home screen; bring the app back.
+      - launchApp:
+          clearState: true
+          permissions:
+            notifications: deny
 - extendedWaitUntil:
     visible: "Sign up for Rakazo"
     timeout: 30000
@@ -119,24 +124,28 @@ tags:
 - assertNotVisible: "React"
 - assertNotVisible: "More"
 - takeScreenshot: "15-thread"
+# Bot messages carry Reply, Quote, React, Speak, Copy — Android pages three at
+# a time, so page 1 is Reply/Quote/More and React sits behind More.
 - longPressOn: "The fixture workspace is ready."
 - assertVisible: "Reply"
-- assertVisible: "React"
+- assertVisible: "Quote"
 - assertVisible: "More"
 - takeScreenshot: "15b-message-actions"
 - tapOn: "More"
+- assertVisible: "React"
 - assertVisible: "Speak message"
 - back
-# User messages omit Speak, so Android fits Reply/React/Copy on one page (no More).
+# User messages omit Speak; with Quote they are Reply/Quote/React/Copy, so
+# page 1 is Reply/Quote/More and React/Copy sit behind More.
 - longPressOn: "Summarize the fixture launch checklist."
 - assertVisible: "Reply"
+- assertVisible: "Quote"
+- assertVisible: "More"
+- assertNotVisible: "Speak message"
+- tapOn: "More"
 - assertVisible: "React"
 - assertVisible: "Copy"
-- assertNotVisible: "More"
-- assertNotVisible: "Speak message"
-- tapOn: "Reply"
-- assertVisible: "Replying to"
-- tapOn: "Cancel reply"
+- tapOn: "Cancel"
 - tapOn: "Bot actions"
 - assertVisible: "Clear conversation"
 - takeScreenshot: "16-bot-actions"
@@ -148,6 +157,12 @@ tags:
     timeout: 10000
 - assertVisible: "Advanced"
 - tapOn: "Advanced"
+# The Main bot row pushed Advanced to the screen edge; scroll the expanded
+# section's Model picker into view.
+- scrollUntilVisible:
+    element: "Model"
+    direction: DOWN
+    timeout: 5000
 - assertVisible: "Model"
 # Label includes the resolved space model, e.g. "Space default (OpenAI: …)".
 - assertVisible: "Space default.*"
@@ -169,8 +184,10 @@ tags:
 - takeScreenshot: "19-group-thread"
 - longPressOn: "The fixture launch plan is ready."
 - assertVisible: "Reply"
-- assertVisible: "React"
+- assertVisible: "Quote"
 - assertVisible: "More"
+- tapOn: "More"
+- assertVisible: "React"
 - back
 
 - openLink: "rakazo:///group-settings?groupId=${RAKAZO_SCREENSHOT_GROUP_ID}"
@@ -230,6 +247,7 @@ tags:
 # Capture the reaction after theme comparisons. Reactions are append-only, so adding
 # 👍 earlier would leak into dark/light thread frames with no remove control.
 - longPressOn: "The fixture workspace is ready."
+- tapOn: "More"
 - tapOn: "React"
 - tapOn: "👍"
 - extendedWaitUntil:

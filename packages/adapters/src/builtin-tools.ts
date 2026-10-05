@@ -870,6 +870,83 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "draft_action_create",
+    description:
+      "Create an editable draft for an outbound action such as an email or message. Drafting does not execute the external action; the user can edit, submit, or discard the card.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        provider: { type: "string", description: "Provider, for example gmail or slack." },
+        action: {
+          type: "string",
+          description: "Action name, for example send_email or send_message.",
+        },
+        title: { type: "string", description: "Human-readable draft title." },
+        fields: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              key: { type: "string" },
+              label: { type: "string" },
+              value: { type: "string" },
+              multiline: { type: "boolean" },
+            },
+            required: ["key", "label", "value"],
+          },
+        },
+      },
+      required: ["provider", "action", "title", "fields"],
+    },
+  },
+  {
+    name: "project_create",
+    description:
+      "Create a durable Project for multi-step work that should be visible in the user's Tasks view. Use when the user asks for a project, plan with tracked stages, or longer-running coordinated work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short project title." },
+        objective: { type: "string", description: "What successful completion means." },
+        plan: {
+          type: "array",
+          description: "Optional ordered high-level plan.",
+          items: { type: "string" },
+        },
+      },
+      required: ["title", "objective"],
+    },
+  },
+  {
+    name: "project_task_add",
+    description:
+      "Add a planned child task to an existing Project. This tracks the task in the Project; use normal tools/subagents/cloud agents to actually perform the work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", description: "Project id returned by project_create." },
+        prompt: { type: "string", description: "Concrete task or deliverable." },
+      },
+      required: ["project_id", "prompt"],
+    },
+  },
+  {
+    name: "project_update",
+    description: "Update a Project's status or plan as work progresses.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["planned", "running", "waiting", "completed", "failed", "cancelled"],
+        },
+        plan: { type: "array", items: { type: "string" } },
+      },
+      required: ["project_id"],
+    },
+  },
+  {
     name: "create_space",
     description:
       "Propose a new space in the current organization when the user asks for a separate data boundary. A space can contain many bots and groups, but its chats, files, memory, tools, and integrations stay isolated from other spaces. This always shows the user a confirmation card before creation. Creating the space is the whole action; do not create bots in it unless the user asks later.",

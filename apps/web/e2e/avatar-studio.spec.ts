@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openBotSettings, signup } from "./helpers";
 
 test("bot settings open Avatar Studio on the Bot tab", async ({ page }, testInfo) => {
   const stamp = Date.now();
@@ -8,9 +8,7 @@ test("bot settings open Avatar Studio on the Bot tab", async ({ page }, testInfo
   await page.goto("/app");
   await page.waitForURL(/\/app\/[^/]+$/);
 
-  await page.getByTestId("bot-settings-trigger").click();
-  const settings = page.getByTestId("bot-settings");
-  await expect(settings).toBeVisible();
+  const settings = await openBotSettings(page);
 
   await settings.getByTestId("avatar-studio-trigger").click();
   const studio = page.getByTestId("avatar-studio");

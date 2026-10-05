@@ -65,10 +65,22 @@ test("shows peer chips in transcript and opens view-only peer chat", async ({ pa
     const chipBox = await chip.boundingBox();
     expect(transcriptBox).not.toBeNull();
     expect(chipBox).not.toBeNull();
-    // Transcript padding is 16px mobile / 28px desktop; centering must fail this assertion.
-    expect(chipBox!.x - transcriptBox!.x).toBeLessThanOrEqual(32);
-    // Stay under 75% of the transcript width so the chip cannot become a full-width bar.
-    expect(chipBox!.width).toBeLessThan(transcriptBox!.width * 0.75);
+    // Chips align to the left edge of the message column. The column is the
+    // transcript's content box (centered via padding on wide screens), so
+    // measure from there rather than the scroll container edge.
+    const { contentLeft, contentWidth } = await transcript.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      const paddingLeft = parseFloat(style.paddingLeft);
+      const paddingRight = parseFloat(style.paddingRight);
+      return {
+        contentLeft: box.left + paddingLeft,
+        contentWidth: box.width - paddingLeft - paddingRight,
+      };
+    });
+    expect(chipBox!.x - contentLeft).toBeLessThanOrEqual(32);
+    // Stay under 75% of the column width so the chip cannot become a full-width bar.
+    expect(chipBox!.width).toBeLessThan(contentWidth * 0.75);
   };
 
   await assertChipLeftAligned();

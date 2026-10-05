@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openSidebarSearch, signup } from "./helpers";
 
 /** Activity rows sit above `[data-sidebar-group]` bots; match their aria-label. */
 function activityRow(page: Page, botName: string) {
@@ -89,11 +89,12 @@ test("sidebar Now and Recent surface active and terminal runs", async ({ page },
   await expect(aside.getByText("Now", { exact: true })).toHaveCount(0);
   await captureActivitySidebar(page, testInfo, "59-activity-recent");
 
-  await page.getByPlaceholder("Search").fill("Chief");
+  const searchInput = await openSidebarSearch(page);
+  await searchInput.fill("Chief");
   await expect(aside.getByText("Recent", { exact: true })).toHaveCount(0);
   await expect(activityRow(page, "Chief")).toHaveCount(0);
 
-  await page.getByPlaceholder("Search").fill("");
+  await searchInput.fill("");
   await expect(aside.getByText("Recent", { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(activityRow(page, "Chief")).toBeVisible();
 });

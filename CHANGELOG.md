@@ -29,6 +29,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Grok-parity shell (M1): the sidebar becomes a coworker roster with presence, unread and activity previews, a collapsible Hidden Bots section, top Search and New chat actions, a simplified centered conversation header, and a Connect apps footer; wide screens center the transcript and composer in one column.
+- Conversation Details hub behind the header identity pill: identity and computer status, Tasks, Routines, Library, Bot settings, Share template, and the Main bot toggle in one panel. Tasks and Projects deep-link via `?panel=` / `?project=` and survive reloads.
+- Projects: durable multi-step work with objective, plan, and per-task status, driven by the bot through `project_create` / `project_task_add` / `project_update` tools and rendered as transcript cards on web and mobile.
+- Team Bots: one shared definition, per-user private bot instances with their own thread and computer. Member roles are owner/editor/member, sharing exports a sanitized template JSON, and the create picker lists Team Bots on web and mobile.
+- Main Bot: each space can name one bot as the Main Bot; it gains a roster star and can run opt-in proactive check-ins on a 4-hour-minimum routine cadence with quiet hours handled by the schedule itself.
+- Draft actions: bots can prepare an editable form (email, Slack message, more over time) in the transcript; you edit the fields and send or discard, and consequential sends still pass the normal approval gates.
+- Voice memos: record audio in the web composer, optionally auto-transcribed, playable from the thread as a voice card on web and mobile.
+- Connect apps gains an X (Twitter) toolkit through the connector catalog; actions follow the same approval policy as other connector tools.
+- Mobile parity for the new model: Tasks/Projects screens, a Routines list, a per-bot Library, Team Bot discovery in the create sheet, a Main bot switch in chat settings, and draft-action and voice-memo cards in the thread.
 - Voice mode: spoken replies, hold-to-talk dictation, and half-duplex calls with ElevenLabs, OpenAI, Cartesia, or Fish Audio.
 - Desktop owners using Docker can opt into running bot shell commands directly on their computer. This grants access under the owner's OS account; see [computer providers](docs/self-host.md#choosing-a-computer-provider).
 - GitHub Copilot and SuperGrok / X Premium sign-in for model access.
@@ -44,6 +53,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Nonfunctional Grant folder picker in the desktop app.
 
 ### Messaging upgrade notes
+
+### Migration notes
+
+- Three additive Prisma migrations ship with this milestone (`space_main_bot`, `team_bots`, `projects`). `prisma migrate deploy` applies them automatically on upgrade; existing rows and bots are untouched, and no manual SQL or new environment variables are required.
 
 - Webhooks use `/api/v1/messaging/webhook/<provider>`; the previous Sendblue path remains supported.
 - Configure credentials for each messaging provider in `.env`; see [.env.example](.env.example).

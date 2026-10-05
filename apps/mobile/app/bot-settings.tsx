@@ -17,6 +17,7 @@ import {
   type MobileMe,
   type MobileModel,
   type MobileModelCredential,
+  type MobileSpaceNavigation,
   rpc,
 } from "../lib/api";
 import { COMPUTER_LIFECYCLE_TIMEOUT_MS } from "../lib/computer";
@@ -59,6 +60,7 @@ export default function BotSettingsScreen() {
   const [credentials, setCredentials] = useState<MobileModelCredential[]>([]);
   const [catalog, setCatalog] = useState<MobileModel[]>([]);
   const [me, setMe] = useState<MobileMe | null>(null);
+  const [mainBotId, setMainBotId] = useState<string | null | undefined>(undefined);
   const [modelMetaReady, setModelMetaReady] = useState(false);
   const [modelMetaError, setModelMetaError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,11 +92,13 @@ export default function BotSettingsScreen() {
       rpc<MobileMe>("me"),
       rpc<MobileModel[]>("models/list"),
       rpc<MobileModelCredential[]>("models/credentials"),
+      rpc<MobileSpaceNavigation>("spaces/list"),
     ])
-      .then(([nextMe, nextCatalog, nextCredentials]) => {
+      .then(([nextMe, nextCatalog, nextCredentials, nextSpace]) => {
         setMe(nextMe);
         setCatalog(nextCatalog);
         setCredentials(nextCredentials);
+        setMainBotId(nextSpace.current.mainBotId ?? null);
         setModelMetaError(null);
         setModelMetaReady(true);
       })
@@ -380,6 +384,37 @@ export default function BotSettingsScreen() {
           ))}
         </ScrollView>
         <ComputerModePicker value={computerMode} onChange={setComputerMode} />
+        <View
+          style={{
+            marginTop: 20,
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <Text style={{ color: tokens.mutedForeground, fontSize: 14, flex: 1 }}>
+            {t("Main bot")}
+          </Text>
+          <Switch
+            accessibilityLabel={t("Main bot")}
+            value={mainBotId === botId}
+            disabled={mainBotId === undefined || !bot}
+            onValueChange={(next) => {
+              const previous = mainBotId;
+              setMainBotId(next ? botId : null);
+              void rpc<{ mainBotId: string | null }>("spaces/setMainBot", {
+                botId: next ? botId : null,
+              })
+                .then(({ mainBotId: nextId }) => setMainBotId(nextId ?? null))
+                .catch(() => {
+                  setMainBotId(previous ?? null);
+                  setError(t("Could not update Main Bot"));
+                });
+            }}
+          />
+        </View>
         <View
           style={{
             marginTop: 20,

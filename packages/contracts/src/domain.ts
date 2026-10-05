@@ -71,8 +71,38 @@ export const BotSchema = z.object({
   webhookConfigured: z.boolean(),
   /** Present when created with an idempotency key (e.g. onboarding:first). */
   spawnKey: z.string().nullable(),
+  /** Shared Team Bot definition backing this actor-private Bot instance. */
+  teamBotId: Id.nullable().optional(),
 });
 export type Bot = z.infer<typeof BotSchema>;
+
+export const TeamBotRoleSchema = z.enum(["owner", "editor", "member"]);
+export type TeamBotRole = z.infer<typeof TeamBotRoleSchema>;
+
+export const TeamBotSchema = z.object({
+  id: Id,
+  spaceId: Id,
+  ownerUserId: Id,
+  name: z.string(),
+  title: z.string(),
+  description: z.string(),
+  instructions: z.string(),
+  color: z.string(),
+  role: TeamBotRoleSchema,
+  instanceBotId: Id.nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type TeamBot = z.infer<typeof TeamBotSchema>;
+
+export const CreateTeamBotInput = z.object({
+  name: z.string().trim().min(1).max(80),
+  title: z.string().trim().max(500).default(""),
+  description: z.string().trim().max(4000).default(""),
+  instructions: z.string().trim().max(20000).default(""),
+  color: BotAvatarValueSchema.optional(),
+});
+export type CreateTeamBotInput = z.infer<typeof CreateTeamBotInput>;
 
 export const ReorderBotsInput = z.object({
   botIds: z
@@ -259,6 +289,7 @@ export const SpaceSchema = z.object({
   id: Id,
   name: z.string(),
   isDefault: z.boolean(),
+  mainBotId: Id.nullable().optional(),
   /** True when the space has any bot or group, including archived. */
   hasContent: z.boolean(),
   /** True only when the current member may delete this non-default space. */
@@ -274,6 +305,7 @@ export const SpaceNavigationSchema = z.object({
   current: z.object({
     id: Id,
     name: z.string(),
+    mainBotId: Id.nullable().optional(),
     bots: z.array(BotSchema),
     groups: z.array(GroupSchema),
     externalConversations: z.array(ExternalConversationSchema),
@@ -357,6 +389,46 @@ export const UpdateBotInput = z
       });
     }
   });
+
+export const ProjectTaskSchema = z.object({
+  id: Id,
+  prompt: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type ProjectTask = z.infer<typeof ProjectTaskSchema>;
+
+export const ProjectSchema = z.object({
+  id: Id,
+  botId: Id,
+  title: z.string(),
+  objective: z.string(),
+  plan: z.array(z.string()),
+  status: z.enum(["planned", "running", "waiting", "completed", "failed", "cancelled"]),
+  tasks: z.array(ProjectTaskSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().nullable(),
+});
+export type Project = z.infer<typeof ProjectSchema>;
+
+export const CreateProjectInput = z.object({
+  botId: Id,
+  title: z.string().trim().min(1).max(120),
+  objective: z.string().trim().min(1).max(8000),
+  plan: z.array(z.string().trim().min(1).max(1000)).max(100).default([]),
+});
+export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
+
+export const UpdateProjectInput = z.object({
+  projectId: Id,
+  title: z.string().trim().min(1).max(120).optional(),
+  objective: z.string().trim().min(1).max(8000).optional(),
+  plan: z.array(z.string().trim().min(1).max(1000)).max(100).optional(),
+  status: z.enum(["planned", "running", "waiting", "completed", "failed", "cancelled"]).optional(),
+});
+export type UpdateProjectInput = z.infer<typeof UpdateProjectInput>;
 
 export const RoutineSchema = z.object({
   id: Id,
@@ -1256,3 +1328,34 @@ export const ExportManifestSchema = z.object({
   history: z.array(ThreadMessageSchema),
 });
 export type ExportManifest = z.infer<typeof ExportManifestSchema>;
+
+export const BotTemplateManifestSchema = z.object({
+  version: z.literal(1),
+  exportedAt: z.string(),
+  bot: BotSchema.pick({
+    name: true,
+    title: true,
+    description: true,
+    instructions: true,
+    color: true,
+    computerMode: true,
+    memoryScope: true,
+    modelProvider: true,
+    modelId: true,
+    thinkingLevel: true,
+  }),
+  routines: z.array(
+    RoutineSchema.pick({
+      name: true,
+      prompt: true,
+      crons: true,
+      timezone: true,
+      active: true,
+      notify: true,
+      webhookEnabled: true,
+      githubEnabled: true,
+      messageProvider: true,
+    }),
+  ),
+});
+export type BotTemplateManifest = z.infer<typeof BotTemplateManifestSchema>;

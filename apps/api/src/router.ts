@@ -121,10 +121,12 @@ import type {
 import {
   ATTACHMENT_MAX_BYTES,
   appContract,
+  BOT_COLORS,
   BotSecretAuth,
   ComputerCommandSchema,
   foldComputerCommands,
   IntegrationProviderIdSchema,
+  MessageBlock as MessageBlockSchema,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   usableModelId,
 } from "@rakazo/contracts";
@@ -771,6 +773,7 @@ export function createRouter(deps: RouterDeps) {
           id: space.id,
           name: space.name,
           isDefault: false,
+          mainBotId: null,
           hasContent: false,
           canDelete: true,
           bots: [],
@@ -778,6 +781,28 @@ export function createRouter(deps: RouterDeps) {
           externalConversations: [],
           botSections: [],
         };
+      }),
+      setMainBot: authed.spaces.setMainBot.handler(async ({ context, input }) => {
+        if (input.botId) {
+          const bot = await deps.prisma.bot.findFirst({
+            where: {
+              id: input.botId,
+              spaceId: context.actor.spaceId,
+              archivedAt: null,
+            },
+            select: { id: true },
+          });
+          if (!bot) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Main Bot must be an active Bot in this space.",
+            });
+          }
+        }
+        await deps.prisma.space.update({
+          where: { id: context.actor.spaceId },
+          data: { mainBotId: input.botId },
+        });
+        return { mainBotId: input.botId };
       }),
       remove: authed.spaces.remove.handler(async ({ context, input }) => {
         let claimId: string | null = null;
@@ -1350,6 +1375,153 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
     },
+    teamBots: {
+      list: authed.teamBots.list.handler(async ({ context }) => {
+        const rows = await deps.prisma.teamBot.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            members: { some: { userId: context.actor.userId } },
+          },
+          include: {
+            members: {
+              where: { userId: context.actor.userId },
+              select: { role: true },
+            },
+            botInstances: {
+              where: { userId: context.actor.userId, archivedAt: null },
+              select: { id: true },
+              take: 1,
+            },
+          },
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          spaceId: row.spaceId,
+          ownerUserId: row.ownerUserId,
+          name: row.name,
+          title: row.title,
+          description: row.description,
+          instructions: row.instructions,
+          color: row.color,
+          role: (row.members[0]?.role ?? "member") as "owner" | "editor" | "member",
+          instanceBotId: row.botInstances[0]?.id ?? null,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        }));
+      }),
+      create: authed.teamBots.create.handler(async ({ context, input }) => {
+        const [count, spaceMembers] = await Promise.all([
+          deps.prisma.teamBot.count({ where: { spaceId: context.actor.spaceId } }),
+          deps.prisma.spaceMember.findMany({
+            where: { spaceId: context.actor.spaceId },
+            select: { userId: true },
+          }),
+        ]);
+        const color = input.color ?? BOT_COLORS[count % BOT_COLORS.length] ?? BOT_COLORS[0];
+        const row = await deps.prisma.$transaction(async (tx) => {
+          const created = await tx.teamBot.create({
+            data: {
+              spaceId: context.actor.spaceId,
+              ownerUserId: context.actor.userId,
+              name: input.name,
+              title: input.title,
+              description: input.description,
+              instructions: input.instructions || input.description,
+              color,
+            },
+          });
+          await tx.teamBotMember.createMany({
+            data: spaceMembers.map((member) => ({
+              teamBotId: created.id,
+              userId: member.userId,
+              role: member.userId === context.actor.userId ? "owner" : "member",
+            })),
+          });
+          return created;
+        });
+        return {
+          id: row.id,
+          spaceId: row.spaceId,
+          ownerUserId: row.ownerUserId,
+          name: row.name,
+          title: row.title,
+          description: row.description,
+          instructions: row.instructions,
+          color: row.color,
+          role: "owner" as const,
+          instanceBotId: null,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }),
+      open: authed.teamBots.open.handler(async ({ context, input }) => {
+        const membership = await deps.prisma.teamBotMember.findFirst({
+          where: {
+            teamBotId: input.teamBotId,
+            userId: context.actor.userId,
+            teamBot: { spaceId: context.actor.spaceId },
+          },
+          include: { teamBot: true },
+        });
+        if (!membership) throw new IsolationError();
+
+        const existing = await deps.prisma.bot.findFirst({
+          where: {
+            teamBotId: input.teamBotId,
+            userId: context.actor.userId,
+            spaceId: context.actor.spaceId,
+          },
+          select: { id: true, archivedAt: true, computerId: true },
+        });
+        if (existing?.archivedAt) {
+          try {
+            if (existing.computerId) {
+              await restoreBotUnderComputerQuota(deps.prisma, {
+                userId: context.actor.userId,
+                botId: existing.id,
+                computerId: existing.computerId,
+              });
+            } else {
+              await deps.prisma.bot.update({
+                where: { id: existing.id },
+                data: { archivedAt: null },
+              });
+            }
+          } catch (error) {
+            throw mapSpaceLifecycleError(error);
+          }
+        }
+        if (existing) {
+          const reopened = (await repos.listBots(context.actor)).find(
+            (bot) => bot.id === existing.id,
+          );
+          if (!reopened) throw new IsolationError();
+          return reopened;
+        }
+
+        try {
+          return await repos.createBot(context.actor, {
+            name: membership.teamBot.name,
+            title: membership.teamBot.title,
+            description: membership.teamBot.description,
+            instructions: membership.teamBot.instructions,
+            notifyOnFinish: true,
+            color: membership.teamBot.color,
+            computerMode: "dedicated",
+            teamBotId: membership.teamBot.id,
+          });
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+            const winner = (await repos.listBots(context.actor)).find(
+              (bot) => bot.teamBotId === input.teamBotId,
+            );
+            if (winner) return winner;
+          }
+          throw mapSpaceLifecycleError(error);
+        }
+      }),
+    },
     bots: {
       list: authed.bots.list.handler(async ({ context }) => repos.listBots(context.actor)),
       listArchived: authed.bots.listArchived.handler(async ({ context }) =>
@@ -1719,6 +1891,111 @@ export function createRouter(deps: RouterDeps) {
         };
       }),
     },
+    projects: {
+      list: authed.projects.list.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        const rows = await deps.prisma.project.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            botId: input.botId,
+          },
+          include: {
+            tasks: {
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                prompt: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        });
+        return rows.map(projectDto);
+      }),
+      get: authed.projects.get.handler(async ({ context, input }) => {
+        const row = await deps.prisma.project.findFirst({
+          where: {
+            id: input.projectId,
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+          },
+          include: {
+            tasks: {
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                prompt: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        });
+        if (!row) throw new IsolationError();
+        return projectDto(row);
+      }),
+      create: authed.projects.create.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        const row = await deps.prisma.project.create({
+          data: {
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+            botId: input.botId,
+            title: input.title,
+            objective: input.objective,
+            plan: input.plan,
+            status: "planned",
+          },
+          include: { tasks: true },
+        });
+        return projectDto(row);
+      }),
+      update: authed.projects.update.handler(async ({ context, input }) => {
+        const existing = await deps.prisma.project.findFirst({
+          where: {
+            id: input.projectId,
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+          },
+          select: { id: true, status: true },
+        });
+        if (!existing) throw new IsolationError();
+        const nextStatus = input.status ?? existing.status;
+        const row = await deps.prisma.project.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.title === undefined ? {} : { title: input.title }),
+            ...(input.objective === undefined ? {} : { objective: input.objective }),
+            ...(input.plan === undefined ? {} : { plan: input.plan }),
+            ...(input.status === undefined ? {} : { status: input.status }),
+            completedAt:
+              nextStatus === "completed"
+                ? existing.status === "completed"
+                  ? undefined
+                  : new Date()
+                : null,
+          },
+          include: {
+            tasks: {
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                prompt: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        });
+        return projectDto(row);
+      }),
+    },
     groups: {
       create: authed.groups.create.handler(async ({ context, input }) => {
         try {
@@ -1930,6 +2207,34 @@ export function createRouter(deps: RouterDeps) {
           await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
         }
         return sendThreadMessage(deps, context.actor, target, input);
+      }),
+      updateDraftAction: authed.threads.updateDraftAction.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        const message = await deps.prisma.message.findFirst({
+          where: { id: input.messageId, threadId: target.threadId, role: "bot" },
+          select: { id: true, blocks: true },
+        });
+        if (!message) throw new IsolationError();
+        const parsed = MessageBlockSchema.array().safeParse(message.blocks);
+        if (!parsed.success) {
+          throw new ORPCError("BAD_REQUEST", { message: "Message blocks are not editable." });
+        }
+        let changed = false;
+        const blocks = parsed.data.map((block) => {
+          if (block.kind !== "draft_action" || block.draftId !== input.draftId) return block;
+          changed = true;
+          return {
+            ...block,
+            fields: input.fields,
+            status: input.status,
+          };
+        });
+        if (!changed) throw new IsolationError();
+        await deps.prisma.message.update({
+          where: { id: message.id },
+          data: { blocks: blocks as Prisma.InputJsonValue },
+        });
+        return { ok: true as const };
       }),
       react: authed.threads.react.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -3042,6 +3347,12 @@ export function createRouter(deps: RouterDeps) {
             type: "routine.created",
             payload: { name: row.name },
           });
+          await appendRoutineTranscriptNotice(
+            deps,
+            context.actor,
+            bot,
+            `Routine "${row.name}" created`,
+          );
         }
         if (row.active && row.nextRunAt) {
           await deps.jobs.enqueue(routineWakeupJob(row.id, row.nextRunAt));
@@ -3155,6 +3466,14 @@ export function createRouter(deps: RouterDeps) {
             type: "routine.updated",
             payload: { routineId: row.id, active: row.active },
           });
+          if (scheduleChanged || (input.active !== undefined && input.active !== existing.active)) {
+            await appendRoutineTranscriptNotice(
+              deps,
+              context.actor,
+              bot,
+              `Routine "${row.name}" ${row.active ? "active" : "paused"}`,
+            );
+          }
         }
         const scheduleNeedsSync =
           existing.active !== row.active ||
@@ -5355,6 +5674,40 @@ export function createRouter(deps: RouterDeps) {
       }),
     },
     export: {
+      template: authed.export.template.handler(async ({ context, input }) => {
+        const bot = await repos.getBot(context.actor, input.botId);
+        const routines = await deps.prisma.routine.findMany({
+          where: { botId: input.botId, spaceId: context.actor.spaceId },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+        return {
+          version: 1 as const,
+          exportedAt: new Date().toISOString(),
+          bot: {
+            name: bot.name,
+            title: bot.title,
+            description: bot.description,
+            instructions: bot.instructions,
+            color: bot.color,
+            computerMode: bot.computer ? parseComputerMode(bot.computer.scope) : "team",
+            memoryScope: bot.memoryScope as Bot["memoryScope"],
+            modelProvider: bot.modelProvider,
+            modelId: bot.modelId,
+            thinkingLevel: bot.thinkingLevel as Bot["thinkingLevel"],
+          },
+          routines: routines.map((routine) => ({
+            name: routine.name,
+            prompt: routine.prompt,
+            crons: routine.crons,
+            timezone: routine.timezone,
+            active: routine.active,
+            notify: routine.notify,
+            webhookEnabled: routine.webhookEnabled,
+            githubEnabled: routine.githubEnabled,
+            messageProvider: routine.messageProvider,
+          })),
+        };
+      }),
       bot: authed.export.bot.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
         if (!bot.thread || !bot.computer) throw new IsolationError();
@@ -5529,6 +5882,85 @@ function updaterConfig(deps: RouterDeps): UpdaterProxyConfig {
   };
 }
 
+async function appendRoutineTranscriptNotice(
+  deps: RouterDeps,
+  actor: Actor,
+  bot: { id: string; thread: { id: string } | null },
+  text: string,
+) {
+  if (!bot.thread) return;
+  try {
+    const message = await deps.prisma.$transaction(async (tx) => {
+      const created = await createThreadMessageInTransaction(tx, {
+        threadId: bot.thread!.id,
+        role: "bot",
+        botId: bot.id,
+        blocks: [{ kind: "meta", text }],
+        clientNonce: `routine-notice:${randomUUID()}`,
+      });
+      await appendEventInTransaction(tx, {
+        spaceId: actor.spaceId,
+        threadId: bot.thread!.id,
+        botId: bot.id,
+        type: "thread.message.created",
+        payload: {
+          messageId: created.id,
+          role: "bot",
+          blocks: [{ kind: "meta", text }],
+        },
+      });
+      return created;
+    });
+    return message;
+  } catch (error) {
+    getLogger().error("routine transcript notice", error);
+  }
+}
+
+function projectDto(row: {
+  id: string;
+  botId: string;
+  title: string;
+  objective: string;
+  plan: unknown;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
+  tasks: Array<{ id: string; prompt: string; status: string; createdAt: Date; updatedAt: Date }>;
+}) {
+  const plan = Array.isArray(row.plan)
+    ? row.plan.filter((step): step is string => typeof step === "string")
+    : [];
+  const allowedStatuses = new Set([
+    "planned",
+    "running",
+    "waiting",
+    "completed",
+    "failed",
+    "cancelled",
+  ]);
+  const status = allowedStatuses.has(row.status) ? row.status : "planned";
+  return {
+    id: row.id,
+    botId: row.botId,
+    title: row.title,
+    objective: row.objective,
+    plan,
+    status: status as "planned" | "running" | "waiting" | "completed" | "failed" | "cancelled",
+    tasks: row.tasks.map((task) => ({
+      id: task.id,
+      prompt: task.prompt,
+      status: task.status,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+    })),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? null,
+  };
+}
+
 function mapUpdaterError(error: unknown): never {
   if (error instanceof UpdaterProxyError) {
     if (error.status === 401 || error.status === 403) {
@@ -5552,7 +5984,7 @@ async function spaceNavigationDto(
 ): Promise<SpaceNavigation> {
   const currentSpace = await deps.prisma.space.findUnique({
     where: { id: actor.spaceId },
-    select: { organizationId: true },
+    select: { organizationId: true, mainBotId: true },
   });
   if (!currentSpace) throw new IsolationError();
   const memberships = await deps.prisma.spaceMember.findMany({
@@ -5560,7 +5992,7 @@ async function spaceNavigationDto(
     select: {
       spaceId: true,
       role: true,
-      space: { select: { name: true, isDefault: true, deletingAt: true } },
+      space: { select: { name: true, isDefault: true, deletingAt: true, mainBotId: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -5614,6 +6046,7 @@ async function spaceNavigationDto(
     current: {
       id: actor.spaceId,
       name: currentMembership.space.name,
+      mainBotId: currentSpace.mainBotId,
       bots: currentBots,
       groups: currentGroups,
       externalConversations: externalConversations.filter(
@@ -5628,6 +6061,7 @@ async function spaceNavigationDto(
         id: membership.spaceId,
         name: membership.space.name,
         isDefault: membership.space.isDefault,
+        mainBotId: membership.space.mainBotId,
         hasContent: spacesWithContent.has(membership.spaceId),
         canDelete:
           membership.role === "owner" &&

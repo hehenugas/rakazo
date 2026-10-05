@@ -91,12 +91,12 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
       message: "the second protected-input run must be ready for takeover",
     })
     .toBe("waiting_takeover");
-  // Agent computer toggles the panel. Re-open when closed so Open can refresh computer status.
+  // The header computer toggle flips the panel. Re-open when closed so Open can refresh status.
   const sidePanel = page.getByTestId("side-panel");
   if ((await sidePanel.getAttribute("data-panel")) === "computer") {
-    await page.getByTitle("Agent computer").click();
+    await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   }
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await expect(sidePanel).toHaveAttribute("data-panel", "computer");
   await expect(sidePanel).toHaveCSS("width", "384px");
   const [mainBox, panelBox] = await Promise.all([
@@ -118,6 +118,8 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   });
   await captureScreenshot(page, testInfo, "09a-computer-takeover-skipped");
 
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-routines").click();
   await page.getByRole("button", { name: "Create Routine" }).click();
   await page.locator("label:has-text('Name') input").fill("Monday briefing");
   await page
@@ -136,7 +138,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await expect(page.getByText("Monday briefing")).toBeVisible();
   await captureScreenshot(page, testInfo, "10-routine-created");
 
-  await page.getByText("Integrations").click();
+  await page.getByRole("button", { name: "Connect apps" }).click();
   await expect(page.getByPlaceholder("Search apps")).toBeVisible();
   const featured = page.getByTestId("featured-connectors");
   await expect(featured).toContainText(
@@ -181,7 +183,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await captureScreenshot(page, testInfo, "11a2-multi-account-plugins");
 
   await page.getByRole("button", { name: "Close integrations" }).click();
-  await page.getByText("Integrations").click();
+  await page.getByRole("button", { name: "Connect apps" }).click();
   await expect(page.getByPlaceholder("Search apps")).toBeVisible();
   const gmailTileAgain = page.getByTestId("connection-tile-gmail");
   await expect(gmailTileAgain.getByRole("button", { name: "Added", exact: true })).toBeVisible();
@@ -303,7 +305,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await page.getByText("Chief").first().click();
   const gear = page.getByRole("button", { name: "Show settings" });
   if (!(await gear.isVisible().catch(() => false))) {
-    await page.getByTitle("Agent computer").click();
+    await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   }
   await gear.click();
   const downloadPromise = page.waitForEvent("download");

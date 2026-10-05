@@ -501,6 +501,7 @@ export default function Home() {
               if (spaceActionRef.current.busy || spaceActionRef.current.recoveryId) return;
               Alert.alert(t("Create"), undefined, [
                 { text: t("New bot"), onPress: () => void createQuickBot() },
+                { text: t("Team bot"), onPress: () => router.push("/new-team-bot") },
                 { text: t("New group"), onPress: () => router.push("/new-group") },
                 { text: t("New space"), onPress: () => router.push("/new-space") },
                 { text: t("Cancel"), style: "cancel" },
