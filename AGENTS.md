@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Fork planning workflow
+
+- Before Grok-parity work, read `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/AGENT-PROTOCOL.md`, and the active phase's `SPEC.md`, `CHECKLIST.md`, and `HANDOFF.md`.
+- Treat phase checkboxes as verified state, not implementation claims. Update the active phase handoff before stopping and update `.planning/STATE.md` when phase status changes.
+- Preserve upstream-syncability: prefer additive contracts, adapters, and isolated UI modules over invasive rewrites when behavior can remain compatible.
+
 - This is a public repository: assume all tracked content and diffs are public. Never commit secrets, `.env` files, private URLs, personal/customer data, or real production data; use fake placeholders. Review `git status` and the staged diff before committing, and never force-add ignored files. If private data appears, stop and alert the maintainer.
 - Rakazo is one product across web, Electron desktop, and Expo mobile; Electron hosts the web UI. Put shared behavior, contracts, API logic, and reusable UI in packages. Keep only genuinely native navigation, storage, permissions, and interactions platform-specific. Core workflows must cover every applicable surface or degrade safely for an explicit reason.
 - No hosted vendor is required to run the core product. Keep LLMs, sandboxes, memory, voice, integrations, and future external services optional and behind provider-neutral interfaces. Vendor SDKs, configuration, and translation belong only in adapters and composition roots. New providers must reuse shared contracts and deterministic offline conformance tests.
