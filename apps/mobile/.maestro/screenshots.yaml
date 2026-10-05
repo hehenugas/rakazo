@@ -173,8 +173,10 @@ tags:
 - takeScreenshot: "19-group-thread"
 - longPressOn: "The fixture launch plan is ready."
 - assertVisible: "Reply"
-- assertVisible: "React"
+- assertVisible: "Quote"
 - assertVisible: "More"
+- tapOn: "More"
+- assertVisible: "React"
 - back
 
 - openLink: "rakazo:///group-settings?groupId=${RAKAZO_SCREENSHOT_GROUP_ID}"
@@ -234,6 +236,7 @@ tags:
 # Capture the reaction after theme comparisons. Reactions are append-only, so adding
 # 👍 earlier would leak into dark/light thread frames with no remove control.
 - longPressOn: "The fixture workspace is ready."
+- tapOn: "More"
 - tapOn: "React"
 - tapOn: "👍"
 - extendedWaitUntil:
