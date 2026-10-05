@@ -17,7 +17,10 @@ const updateSnapshotsArg = process.argv.find(
   (arg) => arg === "--update-snapshots" || arg.startsWith("--update-snapshots="),
 );
 const updateSnapshots = updateSnapshotsArg
-  ? ["--update-snapshots", ...(updateSnapshotsArg.includes("=") ? [updateSnapshotsArg.split("=")[1]] : [])]
+  ? [
+      "--update-snapshots",
+      ...(updateSnapshotsArg.includes("=") ? [updateSnapshotsArg.split("=")[1]] : []),
+    ]
   : [];
 const runtimeArg = process.argv.find((arg) => arg.startsWith("--runtime="));
 const sandboxProvider = sandboxArg?.slice("--sandbox=".length) ?? "fake";
