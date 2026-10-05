@@ -22,6 +22,7 @@ const DEFAULT_CATALOG: ReadonlyArray<Omit<ComposioCatalogItem, "connected">> = [
   { slug: "SLACK", name: "Slack", logo: null, noAuth: false },
   { slug: "GITHUB", name: "GitHub", logo: null, noAuth: false },
   { slug: "NOTION", name: "Notion", logo: null, noAuth: false },
+  { slug: "X", name: "X", logo: null, noAuth: false },
 ];
 
 type MailMessage = {

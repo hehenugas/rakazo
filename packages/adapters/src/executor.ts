@@ -5696,6 +5696,211 @@ export function createRunExecutor(deps: ExecutorDeps) {
               result: String(args.task ?? "done."),
             };
           }
+          if (name === "draft_action_create") {
+            const provider = String(args.provider ?? "")
+              .trim()
+              .slice(0, 120);
+            const action = String(args.action ?? "")
+              .trim()
+              .slice(0, 160);
+            const title = String(args.title ?? "")
+              .trim()
+              .slice(0, 240);
+            const rawFields = Array.isArray(args.fields) ? args.fields : [];
+            const fields = rawFields
+              .map((value) => {
+                if (!value || typeof value !== "object") return null;
+                const field = value as Record<string, unknown>;
+                const key = String(field.key ?? "")
+                  .trim()
+                  .slice(0, 120);
+                const label = String(field.label ?? "")
+                  .trim()
+                  .slice(0, 160);
+                const fieldValue = String(field.value ?? "").slice(0, 20_000);
+                if (!key || !label) return null;
+                return {
+                  key,
+                  label,
+                  value: fieldValue,
+                  multiline: field.multiline === true,
+                };
+              })
+              .filter(
+                (
+                  field,
+                ): field is {
+                  key: string;
+                  label: string;
+                  value: string;
+                  multiline: boolean;
+                } => field !== null,
+              )
+              .slice(0, 30);
+            if (!provider || !action || !title || fields.length === 0) {
+              return finish({
+                error: "provider, action, title, and at least one field are required.",
+              });
+            }
+            await publishMessage(deps, run, "bot", [
+              {
+                kind: "draft_action",
+                draftId: executionId,
+                provider,
+                action,
+                title,
+                fields,
+                status: "draft",
+              },
+            ]);
+            return finish({ ok: true, draftId: executionId, status: "draft" });
+          }
+          if (name === "project_create") {
+            const title = String(args.title ?? "")
+              .trim()
+              .slice(0, 120);
+            const objective = String(args.objective ?? "")
+              .trim()
+              .slice(0, 8_000);
+            if (!title || !objective) {
+              return finish({ error: "title and objective are required." });
+            }
+            const plan = Array.isArray(args.plan)
+              ? args.plan
+                  .filter((step): step is string => typeof step === "string")
+                  .map((step) => step.trim().slice(0, 1_000))
+                  .filter(Boolean)
+                  .slice(0, 100)
+              : [];
+            const project = await deps.prisma.project.create({
+              data: {
+                spaceId: run.spaceId,
+                userId: run.userId,
+                botId: bot.id,
+                title,
+                objective,
+                plan,
+                status: "planned",
+              },
+            });
+            try {
+              await publishMessage(deps, run, "bot", [
+                {
+                  kind: "project",
+                  projectId: project.id,
+                  title: project.title,
+                  objective: project.objective,
+                  status: "planned",
+                },
+              ]);
+            } catch (error) {
+              getLogger().error("project create transcript card", error);
+            }
+            return finish({
+              ok: true,
+              projectId: project.id,
+              title: project.title,
+              status: project.status,
+            });
+          }
+          if (name === "project_task_add") {
+            const projectId = String(args.project_id ?? "").trim();
+            const prompt = String(args.prompt ?? "").trim();
+            if (!projectId || !prompt) {
+              return finish({ error: "project_id and prompt are required." });
+            }
+            const project = await deps.prisma.project.findFirst({
+              where: {
+                id: projectId,
+                spaceId: run.spaceId,
+                userId: run.userId,
+                botId: bot.id,
+              },
+              select: { id: true },
+            });
+            if (!project) return finish({ error: "Project not found." });
+            const task = await deps.prisma.task.create({
+              data: {
+                spaceId: run.spaceId,
+                userId: run.userId,
+                botId: bot.id,
+                threadId: run.threadId,
+                projectId: project.id,
+                prompt: prompt.slice(0, 8_000),
+                status: "planned",
+              },
+            });
+            await deps.prisma.project.update({
+              where: { id: project.id },
+              data: { status: "running" },
+            });
+            return finish({ ok: true, projectId: project.id, taskId: task.id });
+          }
+          if (name === "project_update") {
+            const projectId = String(args.project_id ?? "").trim();
+            if (!projectId) return finish({ error: "project_id is required." });
+            const allowed = new Set([
+              "planned",
+              "running",
+              "waiting",
+              "completed",
+              "failed",
+              "cancelled",
+            ]);
+            const statusArg = args.status == null ? undefined : String(args.status);
+            if (statusArg !== undefined && !allowed.has(statusArg)) {
+              return finish({ error: "Invalid project status." });
+            }
+            const plan = Array.isArray(args.plan)
+              ? args.plan
+                  .filter((step): step is string => typeof step === "string")
+                  .map((step) => step.trim().slice(0, 1_000))
+                  .filter(Boolean)
+                  .slice(0, 100)
+              : undefined;
+            const existing = await deps.prisma.project.findFirst({
+              where: {
+                id: projectId,
+                spaceId: run.spaceId,
+                userId: run.userId,
+                botId: bot.id,
+              },
+            });
+            if (!existing) return finish({ error: "Project not found." });
+            const updated = await deps.prisma.project.update({
+              where: { id: existing.id },
+              data: {
+                ...(statusArg ? { status: statusArg } : {}),
+                ...(plan ? { plan } : {}),
+                completedAt:
+                  statusArg === "completed"
+                    ? (existing.completedAt ?? new Date())
+                    : statusArg
+                      ? null
+                      : undefined,
+              },
+            });
+            try {
+              await publishMessage(deps, run, "bot", [
+                {
+                  kind: "project",
+                  projectId: updated.id,
+                  title: updated.title,
+                  objective: updated.objective,
+                  status: (allowed.has(updated.status) ? updated.status : "planned") as
+                    | "planned"
+                    | "running"
+                    | "waiting"
+                    | "completed"
+                    | "failed"
+                    | "cancelled",
+                },
+              ]);
+            } catch (error) {
+              getLogger().error("project update transcript card", error);
+            }
+            return finish({ ok: true, projectId: updated.id, status: updated.status });
+          }
           if (name === "create_space") {
             try {
               const space = await createSpaceForMember(deps.prisma, {
