@@ -71,3 +71,7 @@ M1 default recommendation: template import creates an independent snapshot with 
 ### P-005 — Proactive Main Bot cadence — RESOLVED for M1 2026-10-05
 
 Chosen: proactive check-ins are an opt-in Routine on the Main Bot, not a new scheduler. Details offers a "Proactive check-ins" toggle that creates `MAIN_BOT_CHECKIN_ROUTINE_NAME` with `0 */4 * * *` in the user's timezone (`notify: true`), editable with every existing Routine control. Cooldown = the routine cadence (4h floor); quiet hours = timezone-aware scheduling (no overnight crons by default); disable = pause the routine. The check-in prompt reviews active Projects, recent task outcomes, blocked work, and other Bots' activity, and surfaces only items needing attention — keeping proactivity summary-first and approval-gated like any run.
+
+### P-006 — M2 reference source until authenticated captures exist — RESOLVED 2026-10-05
+
+Chosen: M2 parity work proceeds from the pinned public reference set (docs.x.ai Grok Bot overview + release notes, captured 2026-10-05) plus the recorded delta observations in each phase SPEC, until the maintainer supplies authenticated Grok captures per the procedure in `PARITY-MATRIX.md`. Geometry or copy that neither source pins stays marked `?` in the matrix and is NOT implemented from memory; visual-fidelity work on those rows waits for the captures. Direct consequence: phase 11 implements the recorded deltas (compact round Search/New chat controls) and verifies behavior, while avatar-shape and featured-logo treatments stay pending reference assets.

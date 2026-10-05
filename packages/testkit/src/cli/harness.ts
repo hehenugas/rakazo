@@ -13,7 +13,12 @@ const e2e = process.argv.includes("--e2e");
 const sandboxArg = process.argv.find((arg) => arg.startsWith("--sandbox="));
 const specArg = process.argv.find((arg) => arg.startsWith("--spec="));
 const grepArg = process.argv.find((arg) => arg.startsWith("--grep="));
-const updateSnapshots = process.argv.includes("--update-snapshots");
+const updateSnapshotsArg = process.argv.find(
+  (arg) => arg === "--update-snapshots" || arg.startsWith("--update-snapshots="),
+);
+const updateSnapshots = updateSnapshotsArg
+  ? ["--update-snapshots", ...(updateSnapshotsArg.includes("=") ? [updateSnapshotsArg.split("=")[1]] : [])]
+  : [];
 const runtimeArg = process.argv.find((arg) => arg.startsWith("--runtime="));
 const sandboxProvider = sandboxArg?.slice("--sandbox=".length) ?? "fake";
 const e2eSpec = specArg?.slice("--spec=".length);
@@ -217,7 +222,7 @@ async function main() {
             "test",
             ...(e2eSpec ? [e2eSpec] : []),
             ...(e2eGrep ? ["--grep", e2eGrep] : []),
-            ...(updateSnapshots ? ["--update-snapshots"] : []),
+            ...updateSnapshots,
           ],
           {
             ...process.env,

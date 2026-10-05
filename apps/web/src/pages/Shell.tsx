@@ -3155,24 +3155,25 @@ export function ShellPage() {
           <button
             type="button"
             data-testid="sidebar-search-trigger"
+            aria-label={t`Search`}
             aria-pressed={sidebarSearchOpen}
+            title={t`Search`}
             onClick={() => {
               setSidebarSearchOpen((open) => !open);
               if (sidebarSearchOpen) setQuery("");
             }}
-            className="app-no-drag flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card text-[13.5px] font-medium text-foreground/85 hover:bg-sidebar-accent"
+            className="app-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground/85 hover:bg-sidebar-accent"
           >
             <Search size={15} strokeWidth={1.8} aria-hidden="true" />
-            <Trans>Search</Trans>
           </button>
           <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
             <PopoverTrigger
-              className="app-no-drag flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card text-[13.5px] font-medium text-foreground/85 hover:bg-sidebar-accent"
+              className="app-no-drag flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground/85 hover:bg-sidebar-accent"
               title={t`New chat`}
+              aria-label={t`New chat`}
               data-testid="create-menu-trigger"
             >
               <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
-              <Trans>New chat</Trans>
             </PopoverTrigger>
             {createMenuOpen ? (
               <PopoverContent
