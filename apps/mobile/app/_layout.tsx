@@ -143,6 +143,19 @@ export default function Layout() {
                 <Stack.Screen name="bot-settings" options={{ title: t("Chat settings") }} />
                 <Stack.Screen name="thread" options={{ title: t("Thread") }} />
                 <Stack.Screen name="routine" options={{ title: t("Routine") }} />
+                <Stack.Screen name="routines" options={{ title: t("Routines") }} />
+                <Stack.Screen name="projects" options={{ title: t("Tasks") }} />
+                <Stack.Screen name="project" options={{ title: t("Project") }} />
+                <Stack.Screen name="library" options={{ title: t("Library") }} />
+                <Stack.Screen
+                  name="new-team-bot"
+                  options={{
+                    title: t("Team bot"),
+                    presentation: "modal",
+                    gestureEnabled: true,
+                    headerBackVisible: false,
+                  }}
+                />
                 <Stack.Screen name="computer" options={{ title: t("Computer") }} />
               </Stack>
               <ComputerUpdateProgress />

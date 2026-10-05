@@ -722,6 +722,30 @@ function Thread() {
         }),
     },
     {
+      text: t("Tasks"),
+      onPress: () =>
+        router.push({
+          pathname: "/projects",
+          params: { botId: botId ?? "", botName: displayName ?? "" },
+        }),
+    },
+    {
+      text: t("Routines"),
+      onPress: () =>
+        router.push({
+          pathname: "/routines",
+          params: { botId: botId ?? "", botName: displayName ?? "" },
+        }),
+    },
+    {
+      text: t("Library"),
+      onPress: () =>
+        router.push({
+          pathname: "/library",
+          params: { botId: botId ?? "", botName: displayName ?? "" },
+        }),
+    },
+    {
       text: t("Clear conversation"),
       destructive: true,
       onPress: () =>
