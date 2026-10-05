@@ -150,7 +150,14 @@ jobs:
           MOBILE_RUN_ID: ${{ github.run_id }}
           MOBILE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MOBILE_SHA: ${{ github.sha }}
-        run: bash scripts/publish-mobile-screenshot-gallery.sh
+        # The gallery is an upstream publishing convenience; forks without the
+        # S3 secrets still capture artifacts, so skip instead of failing.
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "No S3 credentials — skipping gallery publish; artifacts carry the screenshots."
+            exit 0
+          fi
+          bash scripts/publish-mobile-screenshot-gallery.sh
 
       - name: Upload screenshots and diagnostics
         if: always()
