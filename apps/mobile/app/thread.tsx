@@ -18,6 +18,7 @@ import {
   buildComposerMentionOptions,
   type ComposerMention,
   cloudAgentHttpsUrl,
+  decodeAttachmentBase64,
   groupVoiceChats,
   isApprovalAskBlock,
   isRunTerminalEvent,
@@ -142,7 +143,7 @@ import {
   ThreadScrollBehavior,
   type ThreadScrollState,
 } from "../lib/thread-scroll";
-import { speakText } from "../lib/voice";
+import { playMpeg, speakText } from "../lib/voice";
 import { probeProviderTranscribe, resolveVoiceCallPlan } from "../lib/voice-call-entry";
 
 type PendingAttachment = PickedAttachment & { threadKey: string };
@@ -1308,6 +1309,36 @@ function Thread() {
     }
   }
 
+  async function submitDraftAction(
+    draftMessage: MobileMessage,
+    block: Extract<MessageBlock, { kind: "draft_action" }>,
+  ) {
+    const targetBotId = botId;
+    const targetGroupId = groupId;
+    if ((!targetBotId && !targetGroupId) || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      await rpc("threads/updateDraftAction", {
+        ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
+        messageId: draftMessage.id,
+        draftId: block.draftId,
+        fields: block.fields,
+        status: "submitted",
+      });
+      await rpc("threads/send", {
+        ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
+        clientNonce: newClientNonce(),
+        text: draftExecutionPrompt(block),
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Could not submit draft"));
+    } finally {
+      setSending(false);
+    }
+  }
+
   const answerMessage = useCallback(
     async (message: MobileMessage, answer: string, username?: string) => {
       const targetBotId = botId;
@@ -1619,6 +1650,7 @@ function Thread() {
               onAnswer={answerMessage}
               onOpenBot={openBot}
               onPreviewMarkdown={setMarkdownPreview}
+              onDraftSubmit={submitDraftAction}
               actionProps={actionProps}
             />
           </Pressable>
@@ -2574,6 +2606,92 @@ function previewMessageText(message: MobileMessage): string {
   return t("Message");
 }
 
+function draftExecutionPrompt(block: Extract<MessageBlock, { kind: "draft_action" }>): string {
+  const body = block.fields
+    .map((field) => `- ${field.label} (${field.key}): ${field.value}`)
+    .join("\n");
+  return [
+    "Execute this submitted draft action now.",
+    `Provider: ${block.provider}`,
+    `Action: ${block.action}`,
+    "Fields:",
+    body,
+    "",
+    "Use the connected provider/tool for the action. This submission is an explicit user request to proceed, but continue to follow the configured approval and Auto Review policy for consequential external actions.",
+  ].join("\n");
+}
+
+const VoiceMemoRow = memo(function VoiceMemoRow({
+  target,
+  block,
+  userSent,
+}: {
+  target: MobileArtifactTarget;
+  block: Extract<MessageBlock, { kind: "voice_memo" }>;
+  userSent: boolean;
+}) {
+  const tokens = mobileTokens();
+  const { t } = useI18n();
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
+
+  async function play() {
+    if (state === "loading") return;
+    setState("loading");
+    try {
+      const artifact = await rpc<{ contentBase64: string }>("artifacts/get", {
+        ...target,
+        artifactId: block.artifactId,
+      });
+      const bytes = decodeAttachmentBase64(artifact.contentBase64);
+      await playMpeg(bytes);
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  }
+
+  return (
+    <View
+      style={{
+        alignSelf: userSent ? "flex-end" : "flex-start",
+        maxWidth: "85%",
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        backgroundColor: tokens.muted,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        gap: 6,
+      }}
+    >
+      <Text style={{ color: tokens.mutedForeground, fontSize: 12 }} numberOfLines={1}>
+        {block.name || t("Voice memo")}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={state === "playing" ? t("Playing voice memo") : t("Play voice memo")}
+        onPress={() => void play()}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          borderRadius: 12,
+          backgroundColor: tokens.background,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+        }}
+      >
+        <Text style={{ color: tokens.foreground, fontSize: 13.5, fontWeight: "600" }}>
+          {state === "loading" ? t("Loading…") : state === "playing" ? t("Playing…") : t("▶ Play")}
+        </Text>
+      </Pressable>
+      {state === "error" ? (
+        <Text style={{ color: tokens.destructive, fontSize: 12 }}>{t("Could not play memo.")}</Text>
+      ) : null}
+    </View>
+  );
+});
+
 function memberName(
   members: MobileSnapshot["members"] | undefined,
   botId: string | undefined,
@@ -2607,6 +2725,7 @@ const MessageBubble = memo(function MessageBubble({
   onAnswer,
   onOpenBot,
   onPreviewMarkdown,
+  onDraftSubmit,
   actionProps,
 }: {
   botId: string;
@@ -2620,6 +2739,10 @@ const MessageBubble = memo(function MessageBubble({
   onAnswer: (message: MobileMessage, answer: string, username?: string) => Promise<void>;
   onOpenBot: (botId: string, name: string) => void;
   onPreviewMarkdown: (target: MarkdownArtifactPreviewTarget) => void;
+  onDraftSubmit?: (
+    message: MobileMessage,
+    block: Extract<MessageBlock, { kind: "draft_action" }>,
+  ) => Promise<void>;
   actionProps: MessageActionProps;
 }) {
   const colorScheme = useResolvedAppearance();
@@ -2635,6 +2758,16 @@ const MessageBubble = memo(function MessageBubble({
   const mcpApprovalBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "mcp_approval" }> =>
       block.kind === "mcp_approval",
+  );
+  const draftActionBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "draft_action" }> =>
+      block.kind === "draft_action",
+  );
+  const projectBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "project" }> => block.kind === "project",
+  );
+  const voiceMemoBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "voice_memo" }> => block.kind === "voice_memo",
   );
   const ask = message.blocks.find(
     (block): block is Extract<MessageBlock, { kind: "ask" }> =>
@@ -3031,6 +3164,106 @@ const MessageBubble = memo(function MessageBubble({
             block={block}
             accessibilityActions={actionProps.accessibilityActions}
             onAccessibilityAction={actionProps.onAccessibilityAction}
+          />
+        ))}
+        {draftActionBlocks.map((block) => (
+          <View
+            key={block.draftId}
+            style={{
+              width: "100%",
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: tokens.border,
+              backgroundColor: tokens.muted,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              gap: 8,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text
+                style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600", flexShrink: 1 }}
+                numberOfLines={1}
+              >
+                {block.title}
+              </Text>
+              <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
+                {block.provider} · {block.action}
+              </Text>
+            </View>
+            {block.fields.map((field) => (
+              <View key={field.key} style={{ gap: 2 }}>
+                <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>{field.label}</Text>
+                <Text style={{ color: tokens.foreground, fontSize: 13.5 }} selectable>
+                  {field.value}
+                </Text>
+              </View>
+            ))}
+            <Text
+              style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
+            >
+              {block.status}
+            </Text>
+            {block.status === "draft" && onDraftSubmit ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Send draft")}
+                onPress={() => void onDraftSubmit(message, block)}
+                style={{
+                  alignSelf: "flex-start",
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  backgroundColor: tokens.background,
+                }}
+              >
+                <Text style={{ color: tokens.foreground, fontSize: 13.5, fontWeight: "600" }}>
+                  {t("Send")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+        {projectBlocks.map((block) => (
+          <View
+            key={block.projectId}
+            style={{
+              width: "100%",
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: tokens.border,
+              backgroundColor: tokens.muted,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              gap: 6,
+            }}
+          >
+            <Text
+              style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}
+              numberOfLines={1}
+            >
+              {block.title}
+            </Text>
+            <Text
+              style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
+            >
+              {t("Project")} · {block.status}
+            </Text>
+            {block.objective ? (
+              <Text style={{ color: tokens.foreground, fontSize: 13.5 }} numberOfLines={3}>
+                {block.objective}
+              </Text>
+            ) : null}
+          </View>
+        ))}
+        {voiceMemoBlocks.map((block) => (
+          <VoiceMemoRow
+            key={block.artifactId}
+            target={artifactTarget}
+            block={block}
+            userSent={message.role === "user"}
           />
         ))}
       </View>
