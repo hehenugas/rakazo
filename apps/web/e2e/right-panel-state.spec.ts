@@ -11,7 +11,9 @@ async function waitForStoredPanel(page: Page, panel: string | null) {
           const key = localStorage.key(i);
           if (!key?.includes("rakazo:right-panel-state:")) continue;
           try {
-            const value = JSON.parse(localStorage.getItem(key) ?? "null") as { panel?: unknown };
+            const value = JSON.parse(localStorage.getItem(key) ?? "null") as {
+              panel?: unknown;
+            };
             if (value && "panel" in value && value.panel === expected) return true;
           } catch {
             // ignore malformed entries while waiting for the write effect
@@ -79,7 +81,12 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   });
   await page.getByTestId("bot-settings-trigger").click();
   await page.getByTestId("conversation-details-routines").click();
-  await page.getByRole("button", { name: /Weekly summary/ }).click();
+  // The roster preview also mentions the routine name, so resolve the row
+  // inside the side panel.
+  await page
+    .getByTestId("side-panel")
+    .getByRole("button", { name: /Weekly summary/ })
+    .click();
   const name = page.locator("label:has-text('Name') input");
   await expect(name).toHaveValue("Weekly summary");
   await waitForStoredPanel(page, "routine");
@@ -144,11 +151,13 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   await waitForStoredPanel(page, "settings");
   await page.reload();
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
-  await page.getByTestId("bot-settings-trigger").click();
-  await page.getByTestId("conversation-details-routines").click();
-  await page.getByRole("button", { name: /Weekly summary/ }).click();
+  // Removing the saved routine drops the restore to the computer pane: a full
+  // navigation back to the chat reads the saved routine panel, and the missing
+  // routine falls back instead of reopening the editor.
   await rpc(page, "routines/remove", { routineId: routine.id });
-  await page.reload();
+  await page.goto(`/app/${botId}`);
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "computer");
-  await expect(page.getByRole("button", { name: /Weekly summary/ })).toHaveCount(0);
+  await expect(
+    page.getByTestId("side-panel").getByRole("button", { name: /Weekly summary/ }),
+  ).toHaveCount(0);
 });

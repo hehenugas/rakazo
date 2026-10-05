@@ -22,14 +22,19 @@ test("email draft: edit, save, submit, and sent state", async ({ page }, testInf
   await card.getByRole("button", { name: "Save" }).click();
   await expect(toField).not.toBeEditable();
 
-  const submitted = card.waitForResponse((response) =>
+  const submitted = page.waitForResponse((response) =>
     response.url().includes("/rpc/threads/updateDraftAction"),
   );
   await card.getByRole("button", { name: "Send" }).click();
   await submitted;
-  await expect(card.getByText("submitted", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByText("submitted", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  // The roster preview echoes the reply, so assert inside the transcript.
   await expect(
-    page.getByText("done. the submitted action went out through the connected provider."),
+    page
+      .getByTestId("transcript")
+      .getByText("done. the submitted action went out through the connected provider."),
   ).toBeVisible({ timeout: 30_000 });
   await captureScreenshot(page, testInfo, "10-draft-action-submitted");
 });
@@ -48,6 +53,8 @@ test("slack draft: discard keeps the message from sending", async ({ page }, tes
   await expect(card.getByText("Standup note")).toBeVisible();
 
   await card.getByRole("button", { name: "Discard" }).click();
-  await expect(card.getByText("discarded", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText("discarded", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   await captureScreenshot(page, testInfo, "11-draft-action-discarded");
 });

@@ -46,7 +46,10 @@ async function captureSidebarSearchSelected(
         height: Math.min(Math.max(box.height * 0.45, 280), 420),
       },
     });
-    await testInfo.attach(name, { contentType: "image/png", path: screenshotPath });
+    await testInfo.attach(name, {
+      contentType: "image/png",
+      path: screenshotPath,
+    });
     return;
   }
   await captureScreenshot(page, testInfo, name);
@@ -122,7 +125,10 @@ test("sidebar bot rows hover with the same tone as the integrations row", async 
   const chiefBg = await readChiefBg();
   await captureScreenshot(page, testInfo, "sidebar-row-hover");
 
-  const integrations = sidebar.getByRole("button", { name: "Integrations", exact: true });
+  const integrations = sidebar.getByRole("button", {
+    name: "Connect apps",
+    exact: true,
+  });
   await integrations.hover();
   await expect
     .poll(() => integrations.evaluate((el) => getComputedStyle(el).backgroundColor))

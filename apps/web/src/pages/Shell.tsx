@@ -474,15 +474,24 @@ export function ShellPage() {
   const panelSearch = useRef({ searchParams, setSearchParams });
   panelSearch.current = { searchParams, setSearchParams };
   const setPanel = useCallback((next: Panel | ((current: Panel) => Panel)) => {
-    // A user navigation wins over a saved routine still waiting for its list.
+    // A user navigation wins over a saved routine still waiting for its list and
+    // over a ?panel=/project= link that has not been applied yet: a click can land
+    // before bootstrap delivers the storage key, and the stale param must not
+    // reopen the previous panel on top of the choice the user just made.
     pendingPanelRestore.current = null;
     pendingExplicitPanel.current = panelStorageKeyRef.current === null;
     setRestoredPanelKey(panelStorageKeyRef.current);
     setPanelState(next);
     const currentSearch = panelSearch.current;
-    if (currentSearch.searchParams.has("routine")) {
+    if (
+      currentSearch.searchParams.has("routine") ||
+      currentSearch.searchParams.has("panel") ||
+      currentSearch.searchParams.has("project")
+    ) {
       const params = new URLSearchParams(currentSearch.searchParams);
       params.delete("routine");
+      params.delete("panel");
+      params.delete("project");
       currentSearch.setSearchParams(params, { replace: true });
     }
   }, []);
@@ -2708,12 +2717,36 @@ export function ShellPage() {
   }, [panel, active]);
 
   useEffect(() => {
+    // The routines list is normally fetched with the thread; re-reading it when
+    // the panel opens keeps the editor honest about routines created elsewhere
+    // (RPC seeding, another device) since that fetch.
+    if (panel !== "routines" || inGroup || !active) return;
+    let cancelled = false;
+    void rpc.routines
+      .list({ botId: active.id })
+      .then((fresh) => {
+        if (cancelled || activeBotId.current !== active.id) return;
+        setRoutines(fresh);
+        setRoutinesBotId(active.id);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [panel, active, inGroup]);
+
+  useEffect(() => {
     if (!panelStorageKey) return;
     // A ?panel=&project= deep link is explicit user intent: it wins over the
     // saved layout preference exactly once, on the first load that sees it.
     if (!deepLinkPanelApplied.current) {
       deepLinkPanelApplied.current = true;
-      const deepPanel = searchParams.get("panel");
+      // An explicit in-app panel choice made before bootstrap beats the param:
+      // the observed-key block below consumes that intent and keeps the choice.
+      const deepPanel =
+        pendingExplicitPanel.current || explicitPanelTarget.current === panelStorageKey
+          ? null
+          : searchParams.get("panel");
       if (
         deepPanel === "details" ||
         deepPanel === "tasks" ||

@@ -16,10 +16,12 @@ test("Details → Tasks → Project survives a refresh via deep link", async ({ 
 
   await page.getByTestId("bot-settings-trigger").click();
   await expect(page.getByTestId("conversation-details")).toBeVisible();
+  await captureScreenshot(page, testInfo, "05-details-home");
   await page.getByTestId("conversation-details-tasks").click();
   const tasks = page.getByTestId("bot-tasks");
   await expect(tasks).toBeVisible();
   await expect(tasks.getByText("Quarterly report")).toBeVisible();
+  await captureScreenshot(page, testInfo, "06-tasks-list");
 
   await tasks.getByRole("button", { name: /Quarterly report/ }).click();
   const detail = page.getByTestId("project-detail");
@@ -29,8 +31,16 @@ test("Details → Tasks → Project survives a refresh via deep link", async ({ 
   await expect(page).toHaveURL(new RegExp(`panel=tasks&project=${project.id}`));
   await captureScreenshot(page, testInfo, "06-project-detail");
 
+  // The same project in its completed state (status set server-side, deep link
+  // restores the detail after a reload).
+  await rpc(page, "projects/update", {
+    projectId: project.id,
+    status: "completed",
+  });
   await page.reload();
   await expect(page.getByTestId("project-detail")).toBeVisible();
+  await expect(detail.getByText("completed", { exact: true })).toBeVisible();
+  await captureScreenshot(page, testInfo, "06b-project-completed");
   await expect(page).toHaveURL(new RegExp(`panel=tasks&project=${project.id}`));
 
   await page.getByTestId("bot-settings-trigger").click();

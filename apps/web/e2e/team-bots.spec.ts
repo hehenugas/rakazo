@@ -10,6 +10,7 @@ test("Team Bot creation opens the actor's private instance", async ({ page }, te
   await page.getByTestId("create-new-team-bot").click();
   const form = page.getByTestId("create-team-bot-form");
   await expect(form).toBeVisible();
+  await captureScreenshot(page, testInfo, "11-team-bot-setup");
 
   const instanceUrl = page.waitForURL(/\/app\/[^/]+$/, { timeout: 30_000 });
   await form.locator("label:has-text('Name') input").fill("Research crew");
@@ -30,4 +31,9 @@ test("Team Bot creation opens the actor's private instance", async ({ page }, te
   const picker = page.getByTestId("bot-create-picker");
   await expect(picker.getByText("Team Bots")).toBeVisible();
   await expect(picker.getByText("Research crew").first()).toBeVisible();
+
+  // The instance's details hub carries the template share/export affordance.
+  await page.getByTestId("bot-settings-trigger").click();
+  await expect(page.getByTestId("conversation-details-share")).toBeVisible();
+  await captureScreenshot(page, testInfo, "12a-team-bot-share");
 });

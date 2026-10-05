@@ -135,7 +135,11 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await savedRoutine;
   await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
   await page.getByRole("button", { name: "Back" }).click();
-  await expect(page.getByText("Monday briefing")).toBeVisible();
+  // The transcript notice in the timeline also says "Monday briefing", so
+  // assert on the routine row inside the side panel.
+  await expect(
+    page.getByTestId("side-panel").getByRole("button", { name: /Monday briefing/ }),
+  ).toBeVisible();
   await captureScreenshot(page, testInfo, "10-routine-created");
 
   await page.getByRole("button", { name: "Connect apps" }).click();
@@ -152,7 +156,9 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await expect(page.getByRole("button", { name: "Add GraphQL", exact: true })).toBeHidden();
   await expect(page.getByText("Tool sources", { exact: true })).toBeHidden();
   await expect(
-    page.getByText("Connect apps or add Treg, MCP, and OpenAPI tool sources.", { exact: true }),
+    page.getByText("Connect apps or add Treg, MCP, and OpenAPI tool sources.", {
+      exact: true,
+    }),
   ).toBeHidden();
   await captureScreenshot(page, testInfo, "11-plugins-catalog");
 
@@ -182,7 +188,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await expect(detail.getByLabel("Account label").nth(1)).toHaveValue("Work");
   await captureScreenshot(page, testInfo, "11a2-multi-account-plugins");
 
-  await page.getByRole("button", { name: "Close integrations" }).click();
+  await page.getByRole("button", { name: "Close apps" }).click();
   await page.getByRole("button", { name: "Connect apps" }).click();
   await expect(page.getByPlaceholder("Search apps")).toBeVisible();
   const gmailTileAgain = page.getByTestId("connection-tile-gmail");
@@ -300,7 +306,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   ).toBeVisible();
   await captureScreenshot(page, testInfo, "11d-provider-emulators");
 
-  await page.getByRole("button", { name: "Close integrations" }).click();
+  await page.getByRole("button", { name: "Close apps" }).click();
 
   await page.getByText("Chief").first().click();
   const gear = page.getByRole("button", { name: "Show settings" });

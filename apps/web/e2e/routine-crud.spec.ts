@@ -79,21 +79,28 @@ test("routine editing updates in place, preserves timezone, and deletion persist
     notify: true,
   });
   expect(created.nextRunAt).not.toBeNull();
-  expect(localSchedule(created.nextRunAt!, created.timezone)).toMatchObject({ hour: 9, minute: 0 });
+  expect(localSchedule(created.nextRunAt!, created.timezone)).toMatchObject({
+    hour: 9,
+    minute: 0,
+  });
   await page.reload();
   await page.getByTestId("bot-settings-trigger").click();
   await page.getByTestId("conversation-details-routines").click();
 
-  await page.getByRole("button", { name: /Tokyo check-in/ }).click();
+  // Routine names also appear in the sidebar roster preview and transcript
+  // notices, so routine rows are always resolved inside the side panel.
+  const panel = page.getByTestId("side-panel");
+
+  await panel.getByRole("button", { name: /Tokyo check-in/ }).click();
   await page.locator("label:has-text('Name') input").fill("Weekday check-in");
   await page.locator("label:has-text('Instruction') textarea").fill("Send the revised update");
   await page.getByLabel("How often").selectOption("Weekdays");
   await saveAndReturn(page, "routines/update");
 
-  const updatedButton = page.getByRole("button", { name: /Weekday check-in/ });
+  const updatedButton = panel.getByRole("button", { name: /Weekday check-in/ });
   await expect(updatedButton).toHaveCount(1);
   await expect(updatedButton).toContainText("Weekdays at 9:00 AM");
-  await expect(page.getByRole("button", { name: /Tokyo check-in/ })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: /Tokyo check-in/ })).toHaveCount(0);
 
   const [updated] = await rpc<Routine[]>(page, "routines/list", { botId });
   expect(updated).toMatchObject({
@@ -110,7 +117,9 @@ test("routine editing updates in place, preserves timezone, and deletion persist
 
   await updatedButton.click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
-  const dialog = page.getByRole("alertdialog", { name: "Delete Weekday check-in?" });
+  const dialog = page.getByRole("alertdialog", {
+    name: "Delete Weekday check-in?",
+  });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
@@ -228,7 +237,10 @@ test("switching bots while a routine save is pending does not reopen stale state
 
   await page.getByTestId("bot-settings-trigger").click();
   await page.getByTestId("conversation-details-routines").click();
-  await page.getByRole("button", { name: /First routine/ }).click();
+  await page
+    .getByTestId("side-panel")
+    .getByRole("button", { name: /First routine/ })
+    .click();
   await page.locator("label:has-text('Name') input").fill("First routine updated");
 
   let releaseUpdate!: () => void;
@@ -259,7 +271,7 @@ test("switching bots while a routine save is pending does not reopen stale state
     .first()
     .getByRole("button", { name: /^Second/ })
     .click();
-  await page.waitForURL(new RegExp(`/app/${secondBot.id}$`));
+  await page.waitForURL((url) => url.pathname === `/app/${secondBot.id}`);
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "closed");
 
   releaseUpdate();
@@ -269,8 +281,9 @@ test("switching bots while a routine save is pending does not reopen stale state
 
   await page.getByTestId("bot-settings-trigger").click();
   await page.getByTestId("conversation-details-routines").click();
-  await expect(page.getByRole("button", { name: /Second routine/ })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /First routine/ })).toHaveCount(0);
+  const panelRows = page.getByTestId("side-panel").getByRole("button");
+  await expect(panelRows.filter({ hasText: "Second routine" })).toHaveCount(1);
+  await expect(panelRows.filter({ hasText: "First routine" })).toHaveCount(0);
 
   let releaseStaleList!: () => void;
   let sawStaleList!: () => void;
@@ -299,13 +312,14 @@ test("switching bots while a routine save is pending does not reopen stale state
   await botList.getByRole("button", { name: /^Chief/ }).click();
   await staleListIntercepted;
   await botList.getByRole("button", { name: /^Second/ }).click();
-  await page.waitForURL(new RegExp(`/app/${secondBot.id}$`));
+  await page.waitForURL((url) => url.pathname === `/app/${secondBot.id}`);
   releaseStaleList();
   await staleListResponse;
   await page.unroute("**/rpc/routines/list");
 
-  await expect(page.getByRole("button", { name: /Second routine/ })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /First routine/ })).toHaveCount(0);
+  const panelRowsAfterSwitch = page.getByTestId("side-panel").getByRole("button");
+  await expect(panelRowsAfterSwitch.filter({ hasText: "Second routine" })).toHaveCount(1);
+  await expect(panelRowsAfterSwitch.filter({ hasText: "First routine" })).toHaveCount(0);
 });
 
 function localSchedule(iso: string, timezone: string) {

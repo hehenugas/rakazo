@@ -18,6 +18,12 @@ test("Main Bot selection shows the roster star and toggles off", async ({ page }
   await expect(aside.getByLabel("Main Bot").first()).toBeVisible();
   await captureScreenshot(page, testInfo, "13-main-bot-selected");
 
+  const checkins = page.getByTestId("conversation-details-main-bot-checkins");
+  await expect(checkins).toBeVisible();
+  await checkins.click();
+  await expect(checkins).toHaveAttribute("aria-pressed", "true");
+  await captureScreenshot(page, testInfo, "13a-main-bot-checkins");
+
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(aside.getByLabel("Main Bot")).toHaveCount(0);
