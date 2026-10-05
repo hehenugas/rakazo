@@ -151,11 +151,15 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   await waitForStoredPanel(page, "settings");
   await page.reload();
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
-  // Removing the saved routine drops the restore to the computer pane: a full
-  // navigation back to the chat reads the saved routine panel, and the missing
-  // routine falls back instead of reopening the editor.
+  // Back in this chat, opening the routine editor saves the routine panel
+  // again; removing the routine server-side then drops the restore to the
+  // computer pane instead of reopening a dead editor.
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-routines").click();
+  await page.getByTestId("side-panel").getByRole("button", { name: /Weekly summary/ }).click();
+  await waitForStoredPanel(page, "routine");
   await rpc(page, "routines/remove", { routineId: routine.id });
-  await page.goto(`/app/${botId}`);
+  await page.reload();
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "computer");
   await expect(
     page.getByTestId("side-panel").getByRole("button", { name: /Weekly summary/ }),

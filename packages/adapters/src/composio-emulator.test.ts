@@ -48,9 +48,13 @@ describe("ComposioEmulator", () => {
   it("serves and searches a deterministic catalog", async () => {
     const emulator = new ComposioEmulator();
 
-    await expect(emulator.catalog(context)).resolves.toHaveLength(6);
+    // Six hosted-connector slugs plus the offline X capability pack (phase 07).
+    await expect(emulator.catalog(context)).resolves.toHaveLength(7);
     await expect(emulator.catalog(context, "git")).resolves.toEqual([
       expect.objectContaining({ slug: "GITHUB", name: "GitHub", connected: false }),
+    ]);
+    await expect(emulator.catalog(context, "x")).resolves.toEqual([
+      expect.objectContaining({ slug: "X", name: "X", connected: false }),
     ]);
   });
 

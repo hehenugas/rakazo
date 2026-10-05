@@ -309,16 +309,15 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await page.getByRole("button", { name: "Close apps" }).click();
 
   await page.getByText("Chief").first().click();
-  const gear = page.getByRole("button", { name: "Show settings" });
-  if (!(await gear.isVisible().catch(() => false))) {
-    await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
-  }
-  await gear.click();
+  // Bot settings now live behind the identity pill → Conversation details.
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-settings").click();
+  const settings = page.getByTestId("bot-settings");
+  await expect(settings).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export" }).click();
+  await settings.getByRole("button", { name: "Export" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/chief-export\.json/i);
-  const settings = page.getByTestId("bot-settings");
   await expect(settings.getByRole("button", { name: "Archive bot" })).toHaveCount(0);
   await expect(settings.getByRole("button", { name: "Delete bot" })).toHaveCount(0);
   await page.getByRole("button", { name: "Close panel" }).click();
