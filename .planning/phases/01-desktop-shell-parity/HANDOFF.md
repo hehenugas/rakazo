@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — tasks P01-01…P01-14 implemented and code-verified; P01-15…P01-17 pending CI artifacts (after-screenshots + regression verdict from the web e2e run).
+DONE — P01-01…P01-17 all pass; evidence under `.planning/evidence/phase-01-shell/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -59,7 +59,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted;
 
 ## Blockers
 
-- P01-15…P01-17 need the CI web e2e artifacts (screenshots + green run) after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -71,6 +71,13 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted;
 1. Push this work, let the CI web e2e run, link the five after-screenshots, then check P01-15…P01-17 and the VERIFY items.
 2. Then claim Phase 02: the planning WIP already carries Project/Task schema, contracts, and Conversation Details home — verify against P02-01…P02-18 and fill the gaps (deep links, lifecycle tests, screenshots).
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Pushed the shell-adaptation fixes; the full CI pipeline is green in run 37322886544 (lint, typecheck, production builds incl. the Electron smoke, unit, Postgres integration, web e2e 182/182).
+- Two CI-only panel bugs found and fixed on the way: a stale `?panel=` deep link could clobber an explicit details-hub click made before bootstrap (`setPanel` now scrubs routine/panel/project params and the once-only deep-link apply defers to pending explicit intent), and the routines panel now refetches its list on open so externally created routines appear without a reload.
+- After-screenshots harvested from the run report and curated under `.planning/evidence/phase-01-shell/` (01-shell-sidebar-search, 02-shell-hidden-bots, 03-shell-conversation-details, 04-shell-connect-apps, 05-shell-centered-column); before shots remain under `.planning/evidence/phase-00/`.
+- Final visual review against the Grok Bot reference: on-demand Search/New chat, roster rows with status/activity preview, Hidden Bots, centered 55rem column, details hub entry, Connect apps footer — all match.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P01-15…P01-17.
+Complete — all mandatory tasks and verification items pass; web e2e green in CI run 37322886544; screenshot evidence committed under `.planning/evidence/phase-01-shell/`.

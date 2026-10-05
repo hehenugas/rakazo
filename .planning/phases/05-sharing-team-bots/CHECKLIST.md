@@ -2,7 +2,7 @@
 
 ## Status
 
-**DOING — ZCode (GLM)**
+**DONE — ZCode (GLM)**
 
 ## Tasks
 
@@ -28,17 +28,17 @@
 - [x] P05-20 Add multi-user authorization/leakage integration tests. (`apps/api/src/team-bots.test.ts`: member-scoped list, foreign-membership open refusal, plus template redaction.)
 - [x] P05-21 Add template redaction/security tests. (`team-bots.test.ts` "exports only the whitelisted bot and routine fields" — exact-key assertions pin the sanitizer.)
 - [x] P05-22 Add E2E with two users proving private thread separation. (Two-actor separation is proven at the API level — member-scoped list/open refusal with distinct actors; `team-bots.spec.ts` e2e covers create → private instance. A two-browser e2e needs the space invite flow and is recorded as a follow-up.)
-- [ ] P05-23 Capture Team Bot setup/share/use screenshots. (After-screenshots from the CI web e2e run — pending CI artifacts.)
+- [x] P05-23 Capture Team Bot setup/share/use screenshots. (2026-10-05: green CI web e2e run 37322886544 on the pushed tree; curated captures under `.planning/evidence/phase-05-team-bots/` — 11-team-bot-setup, 12-team-bot-instance, 12a-team-bot-share.)
 
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-01 All mandatory tasks above are checked.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (2026-10-05: full pipeline green in CI run 37322886544 — lint, typecheck, production builds + desktop smoke, unit, Postgres integration, web e2e; baseline environment failures documented in the phase 00 HANDOFF.)
+- [x] VERIFY-03 No unresolved P0/P1 regression remains. (2026-10-05: the 9 shell-adaptation e2e regressions found by CI were fixed on the pushed tree; no open P0/P1.)
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 
-- [ ] Phase marked **DONE** only after all verification items pass.
+- [x] Phase marked **DONE** — all mandatory tasks and verification items pass (2026-10-05).

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P07-01…P07-17 implemented and code-verified; P07-18 (screenshots) pending CI artifacts.
+DONE — P07-01…P07-18 all pass; evidence under `.planning/evidence/phase-07-connect-x-voice/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -62,7 +62,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P07-18 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -73,6 +73,12 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P07-18 + VERIFY items.
 2. Claim Phase 08 (Mobile Parity): map the new IA onto Expo navigation and the shared contracts.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Connect apps / X / voice flows green in CI run 37322886544 (web e2e 182/182).
+- Capture matrix completed: app suggestions, connected-after-reload, plugins catalog, connected plugins, catalog feed (X tile visible), and voice-memo playback. Curated under `.planning/evidence/phase-07-connect-x-voice/`.
+- The offline X capability pack is pinned by the Composio emulator catalog unit test (7 slugs incl. X), which CI now runs green.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P07-18.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-07-connect-x-voice/`.

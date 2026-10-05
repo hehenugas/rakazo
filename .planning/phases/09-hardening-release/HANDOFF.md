@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — code-level security/state reviews done (P09-08…P11, P09-15/16); migration gate verified (P09-06); suite gates (P09-01…05) running against the pushed tree; release gates (P09-21…23) open.
+DOING — P09-01…P09-22 all pass; only P09-23 (release-candidate approval) open. Green full-pipeline CI run 37322886544 closes the suite gates.
 
 ## Owner
 
@@ -37,6 +37,15 @@ ZCode (GLM)
 - **Web E2E triage** (first CI run of the shell work): the Playwright job timed out at 20 min with 23 visible failures — the phase 01 shell changes are intentional (Connect apps rename, on-demand sidebar search, details-hub pill, header computer toggle, Hidden Bots section, centered column), so upstream specs asserting the old affordances were adapted (helpers `openBotSettings`/`openSidebarSearch`/`openSideComputerPanel`; peer-chip geometry now measures the centered content column). Two real test bugs fixed (ambiguous draft-card input locator; archived-section label). Job cap raised to 35 min for the grown suite. CI re-run + local re-run in flight.
 - **Mobile screenshots CI**: launch ANR needed an app relaunch (fix in `screenshots.yaml`), the Main bot row required a scroll for the Advanced section, and the S3 gallery publish needed a fork-safe skip when secrets are absent. After the first two fixes the Maestro flow captured all 35 screenshots + notification video.
 
+### 2026-10-05 — Full pipeline green; suites closed; audit done (ZCode/GLM)
+
+- Push triggers on the fork were dead after the account transfer, so `ci.yml` gained a `workflow_dispatch` trigger and the pipeline is driven on demand (commit `32f1f808`).
+- The 9 CI-found web e2e regressions from the shell adaptation were fixed on `main` (commits `49b1af66`, `d6646ab9`, `ade0dbfc`): the stale `?panel=` deep link clobbering pre-bootstrap panel clicks, the routines panel serving a stale list on open, the stale Korean "Agent computer" locator, and shell-renamed labels (`Connect apps`, `Close apps`, details-hub settings entry). The Composio emulator catalog unit test now counts the phase 07 X pack.
+- Green full-pipeline run [`37322886544`](https://github.com/hehenugas/rakazo/actions/runs/37322886544): lint, typecheck, production builds incl. the Electron desktop smoke, unit tests, Postgres integration, web e2e 182/182. P09-02…P09-05 and P09-07 close on it.
+- Named captures from the run report were harvested and curated per phase under `.planning/evidence/phase-0{1..7}-*/`, and the desktop smoke screenshots under `.planning/evidence/phase-09-hardening/` — P09-17.
+- P09-22 audit: phases 00-08 have zero unchecked checklist items and DONE status in CHECKLIST/HANDOFF; STATE and ROADMAP tables synced.
+- Remaining: P09-23 only — marking M1 complete awaits the maintainer's release-candidate approval.
+
 ## Files / Modules Changed
 
 - `.github/workflows/playwright.yml` — job timeout 20→35 min.
@@ -53,9 +62,9 @@ ZCode (GLM)
 | Lint | `pnpm lint` | 0 errors; 19 warnings + 4 infos (pre-existing baseline) |
 | Unit | `pnpm test` | 5849 passed / 6 failed / 174 skipped (2026-10-05) — failures are the documented baseline set |
 | Migration | baseline DB → fork `migrate deploy` | 3 migrations, data intact, new tables writable (2026-10-05, P09-06) |
-| Web E2E | CI Playwright + local suite | re-runs in flight after spec adaptation |
-| Desktop E2E | CI desktop workflow | pending |
-| Mobile | CI `mobile-android-screenshots` | flow green through screenshot 31/35 pre-publish-fix; re-run in flight |
+| Web E2E | CI `Web E2E` job | 182 passed / 0 failed (run 37322886544, 2026-10-05) |
+| Desktop E2E | CI `Production builds` Electron smoke | green on virtual display (run 37322886544); setup screenshots curated under `.planning/evidence/phase-09-hardening/` |
+| Mobile | CI unit job (`apps/mobile/lib` vitest) + phase 08 capture run | unit green (run 37322886544); screenshots green in capture run 37268854174 |
 
 ## Decisions Made During Phase
 
@@ -65,7 +74,7 @@ ZCode (GLM)
 
 ## Blockers
 
-- Suite gates (P09-02…05) need the re-runs to finish green.
+- None — only P09-23 (release-candidate approval) remains, which is the maintainer's decision.
 - P09-22 requires every prior phase DONE; P09-23 requires maintainer release-candidate approval.
 
 ## Discovered Follow-ups
@@ -74,9 +83,9 @@ ZCode (GLM)
 
 ## Next Recommended Task
 
-1. Land the re-running CI suites (web e2e, mobile screenshots, desktop); close the phase screenshot tasks.
-2. Integration suite locally (P09-02), then docs/release notes (P09-19/20) and the final audit (P09-22).
+1. Maintainer reviews the release evidence (`.planning/STATE.md` → Release Evidence) and grants the release-candidate approval.
+2. Check P09-23 + the VERIFY/DONE block, flip phase 09 to DONE, and close M1.
 
 ## Final Summary
 
-Not complete — suite re-runs in flight; migration gate done; release approval outstanding.
+Complete except P09-23 — every hardening task and verification item that does not require the maintainer's release-candidate approval passes (green run 37322886544); M1 completion is one approval away.

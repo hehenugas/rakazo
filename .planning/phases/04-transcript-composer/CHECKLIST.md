@@ -2,7 +2,7 @@
 
 ## Status
 
-**DOING — ZCode (GLM)**
+**DONE — ZCode (GLM)**
 
 ## Tasks
 
@@ -24,17 +24,17 @@
 - [x] P04-16 Add unit tests for draft state transitions and validation. (`apps/web/src/components/DraftActionCard.test.tsx`: 4 tests — read-only gating, save, submit-then-send, discard, non-draft lock.)
 - [x] P04-17 Add E2E for edit → approval if needed → send → sent state. (`apps/web/e2e/draft-action.spec.ts`; CI arbitrates green.)
 - [x] P04-18 Add E2E regression for reply/reaction/mention/attachment/Skill. (Existing upstream specs cover these: `message-hover-actions`, `mention-picker-keyboard`, `composer-paste`, `slash-skills`, `teach-task`; the web e2e run exercises them against the new shell.)
-- [ ] P04-19 Capture transcript-card visual matrix screenshots. (After-screenshots from the CI web e2e run — pending CI artifacts.)
+- [x] P04-19 Capture transcript-card visual matrix screenshots. (2026-10-05: green CI web e2e run 37322886544 on the pushed tree; curated captures under `.planning/evidence/phase-04-transcript-composer/` — choice-card trio + mcp-approval-card, 01-focus-choice, 20/24 approval cards, 10-draft-action-submitted, 11-draft-action-discarded, 14-voice-memo-playback.)
 
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-01 All mandatory tasks above are checked.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (2026-10-05: full pipeline green in CI run 37322886544 — lint, typecheck, production builds + desktop smoke, unit, Postgres integration, web e2e; baseline environment failures documented in the phase 00 HANDOFF.)
+- [x] VERIFY-03 No unresolved P0/P1 regression remains. (2026-10-05: the 9 shell-adaptation e2e regressions found by CI were fixed on the pushed tree; no open P0/P1.)
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 
-- [ ] Phase marked **DONE** only after all verification items pass.
+- [x] Phase marked **DONE** — all mandatory tasks and verification items pass (2026-10-05).

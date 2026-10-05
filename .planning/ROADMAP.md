@@ -4,16 +4,16 @@
 
 | Phase | Name | Depends On | Status |
 |---|---|---|---|
-| 00 | Bootstrap & Baseline | — | TODO |
-| 01 | Desktop Shell Parity | 00 | TODO |
-| 02 | Conversation Details, Tasks & Projects | 01 | TODO |
-| 03 | Routines, Library & Search | 01, 02 | TODO |
-| 04 | Transcript Cards & Composer | 01, 02 | TODO |
-| 05 | Sharing & Team Bots | 00, 02, 04 | TODO |
-| 06 | Main Bot & Proactivity | 02, 05 | TODO |
-| 07 | Connect Apps, X & Voice Memo | 03, 04 | TODO |
-| 08 | Mobile Parity | 02–07 | TODO |
-| 09 | Hardening & Release | 00–08 | TODO |
+| 00 | Bootstrap & Baseline | — | DONE |
+| 01 | Desktop Shell Parity | 00 | DONE |
+| 02 | Conversation Details, Tasks & Projects | 01 | DONE |
+| 03 | Routines, Library & Search | 01, 02 | DONE |
+| 04 | Transcript Cards & Composer | 01, 02 | DONE |
+| 05 | Sharing & Team Bots | 00, 02, 04 | DONE |
+| 06 | Main Bot & Proactivity | 02, 05 | DONE |
+| 07 | Connect Apps, X & Voice Memo | 03, 04 | DONE |
+| 08 | Mobile Parity | 02–07 | DONE |
+| 09 | Hardening & Release | 00–08 | DOING (release-candidate approval pending) |
 
 ## Phase Outcomes
 

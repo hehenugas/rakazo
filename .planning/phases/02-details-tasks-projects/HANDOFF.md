@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P02-01…P02-17 implemented and code-verified; P02-18 (screenshots) pending CI artifacts.
+DONE — P02-01…P02-18 all pass; evidence under `.planning/evidence/phase-02-details-tasks/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -61,7 +61,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P02-18 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -73,6 +73,12 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P02-18 + VERIFY items.
 2. Claim Phase 03 (Routines, Library & Search): map the existing Routines/Library/Search capabilities against P03 tasks and land the remaining repositioning.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- The details/tasks suite is green in CI run 37322886544 (web e2e 182/182, full pipeline green).
+- Added the capture matrix the checklist asked for: details home, tasks list, active project detail, and the completed-project state (status set server-side, deep link restores after reload).
+- Evidence curated under `.planning/evidence/phase-02-details-tasks/`.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P02-18.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-02-details-tasks/`.

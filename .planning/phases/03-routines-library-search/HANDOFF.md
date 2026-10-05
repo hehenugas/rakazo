@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P03-01…P03-16 implemented and code-verified; P03-17 (screenshots) pending CI artifacts.
+DONE — P03-01…P03-17 all pass; evidence under `.planning/evidence/phase-03-routines-library/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -60,7 +60,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P03-17 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -71,6 +71,11 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P03-17 + VERIFY items.
 2. Claim Phase 04 (Transcript Cards & Composer): the WIP already carries DraftActionCard, VoiceMemo components, and block contracts — verify against P04 tasks and fill gaps.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Routines/Library/Search parity screens green in CI run 37322886544 (web e2e 182/182).
+- Routines open through the details hub with a fresh list (the panel refetches on open now); Library and Search captures curated under `.planning/evidence/phase-03-routines-library/`.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P03-17.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-03-routines-library/`.

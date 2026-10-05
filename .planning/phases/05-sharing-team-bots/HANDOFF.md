@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P05-01…P05-22 implemented/decided and code-verified; P05-23 (screenshots) pending CI artifacts.
+DONE — P05-01…P05-23 all pass; evidence under `.planning/evidence/phase-05-team-bots/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -53,7 +53,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P05-23 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -65,6 +65,11 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P05-23 + VERIFY items.
 2. Claim Phase 06 (Main Bot & Proactivity): the WIP carries `Space.mainBotId`, the roster star, and the proactive check-in prompt — verify against P06 tasks.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Team Bot flows green in CI run 37322886544 (web e2e 182/182).
+- Capture matrix completed: setup form, private instance, and the details-hub template Share affordance. Curated under `.planning/evidence/phase-05-team-bots/`.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P05-23.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-05-team-bots/`.

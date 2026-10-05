@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P06-01…P06-15 implemented/decided and code-verified; P06-16 (screenshots) pending CI artifacts.
+DONE — P06-01…P06-16 all pass; evidence under `.planning/evidence/phase-06-main-bot/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -53,7 +53,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P06-16 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -64,6 +64,11 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P06-16 + VERIFY items.
 2. Claim Phase 07 (Connect Apps, X & Voice Memo): the WIP carries voice memo components and the audio attachment pipeline — verify against P07 tasks.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Main Bot flows green in CI run 37322886544 (web e2e 182/182).
+- Capture matrix completed: roster star on selection and the proactive check-ins toggle in its on state. Curated under `.planning/evidence/phase-06-main-bot/`.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P06-16.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-06-main-bot/`.

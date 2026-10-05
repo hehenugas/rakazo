@@ -2,7 +2,7 @@
 
 ## Status
 
-**DOING — ZCode (GLM)**
+**DONE — ZCode (GLM)**
 
 ## Tasks
 
@@ -21,17 +21,17 @@
 - [x] P06-13 Test one-Main-Bot invariant. (`apps/api/src/main-bot.test.ts`: the single column moves rather than multiplies; foreign/archived bots rejected.)
 - [x] P06-14 Test dedupe, quiet hours, disable, authorization. (Authorization in `main-bot.test.ts`/`projects.test.ts`; cadence/disable/quiet-hours are Routine semantics already covered upstream — mapping recorded in HANDOFF.)
 - [x] P06-15 E2E: select Main Bot → coordinate → proactive surfaced item. (`apps/web/e2e/main-bot.spec.ts`: select → roster star → toggle off. The coordination path reuses the run pipeline covered by existing specs.)
-- [ ] P06-16 Capture Main Bot screenshots. (After-screenshots from the CI web e2e run — pending CI artifacts.)
+- [x] P06-16 Capture Main Bot screenshots. (2026-10-05: green CI web e2e run 37322886544 on the pushed tree; curated captures under `.planning/evidence/phase-06-main-bot/` — 13-main-bot-selected, 13a-main-bot-checkins.)
 
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-01 All mandatory tasks above are checked.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (2026-10-05: full pipeline green in CI run 37322886544 — lint, typecheck, production builds + desktop smoke, unit, Postgres integration, web e2e; baseline environment failures documented in the phase 00 HANDOFF.)
+- [x] VERIFY-03 No unresolved P0/P1 regression remains. (2026-10-05: the 9 shell-adaptation e2e regressions found by CI were fixed on the pushed tree; no open P0/P1.)
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 
-- [ ] Phase marked **DONE** only after all verification items pass.
+- [x] Phase marked **DONE** — all mandatory tasks and verification items pass (2026-10-05).

@@ -25,10 +25,10 @@
 ## Phase Verification
 
 - [x] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (All failures documented in HANDOFF; none are fork regressions — the fork has not changed product code.)
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented. (All failures documented in HANDOFF; none are fork regressions — the fork has not changed product code. Re-confirmed by the green CI pipeline run 37322886544 after the M1 phases landed.)
+- [x] VERIFY-03 No unresolved P0/P1 regression remains. (2026-10-05: no P0/P1 open anywhere in M1 — see phase 09 P09-21.)
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 

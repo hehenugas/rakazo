@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P04-01…P04-18 implemented and code-verified; P04-19 (visual matrix) pending CI artifacts.
+DONE — P04-01…P04-19 all pass; evidence under `.planning/evidence/phase-04-transcript-composer/`; green pipeline in CI run 37322886544.
 
 ## Owner
 
@@ -61,7 +61,7 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 
 ## Blockers
 
-- P04-19 needs the CI web e2e artifacts after this work is pushed.
+- None — resolved by green CI run 37322886544.
 
 ## Discovered Follow-ups
 
@@ -72,6 +72,11 @@ Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
 1. Push, let CI arbitrate the e2e specs, link screenshots, check P04-19 + VERIFY items.
 2. Claim Phase 05 (Sharing & Team Bots): the WIP carries TeamBot schema/contracts/RPC/UI — verify against P05 tasks and fill gaps.
 
+### 2026-10-05 — CI green; phase closed (ZCode/GLM)
+
+- Transcript-card matrix green in CI run 37322886544 (web e2e 182/182), including the draft-action submit/discard flows and the voice-memo playback capture.
+- Curated under `.planning/evidence/phase-04-transcript-composer/`: choice-card rendered/answered/narrow, MCP approval card, focus-choice onboarding, approval-input request and resume-after-reload, draft-action submitted and discarded, voice-memo playback.
+
 ## Final Summary
 
-Not complete — pending CI artifacts for P04-19.
+Complete — all mandatory tasks and verification items pass; evidence under `.planning/evidence/phase-04-transcript-composer/`.

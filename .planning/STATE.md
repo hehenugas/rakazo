@@ -6,38 +6,43 @@
 
 ## Current Phase
 
-**Phase 00 — Bootstrap & Baseline (DOING)**
+**Phase 09 — Hardening & Release (DOING — release-candidate approval pending)**
 
 ## Phase Status
 
 | Phase | Status | Owner | Branch/Worktree | Last Update |
 |---|---|---|---|---|
-| 00 Bootstrap & Baseline | DONE | ZCode (GLM) | phase/00-bootstrap @ hehenugas | 2026-10-05 |
-| 01 Desktop Shell Parity | DOING | ZCode (GLM) | main (local, baseline fd356375) / phase/00-bootstrap @ origin | 2026-10-05 |
-| 02 Details, Tasks & Projects | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 03 Routines, Library & Search | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 04 Transcript Cards & Composer | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 05 Sharing & Team Bots | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 06 Main Bot & Proactivity | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 07 Connect Apps, X & Voice Memo | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
-| 08 Mobile Parity | DONE | ZCode (GLM) | phase/00-bootstrap @ hehenugas | 2026-10-05 |
-| 09 Hardening & Release | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 00 Bootstrap & Baseline | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 01 Desktop Shell Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 02 Details, Tasks & Projects | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 03 Routines, Library & Search | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 04 Transcript Cards & Composer | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 05 Sharing & Team Bots | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 06 Main Bot & Proactivity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 07 Connect Apps, X & Voice Memo | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 08 Mobile Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 09 Hardening & Release | DOING | ZCode (GLM) | main (fork) | 2026-10-05 |
 
 ## Active Blockers
 
-- Web E2E / desktop CI suites are re-running against the pushed tree (spec adaptations for the intentional shell changes are in); phase screenshot tasks (P01-15, P02-18, P03-17, P04-19, P05-23, P06-16, P07-18) close when the Playwright run publishes its report artifacts.
-- P09-02/03/04/05 close with those same runs; P09-22 audit and release approval close Phase 09.
+- None. P09-01…P09-22 are complete; only P09-23 (mark M1 complete after release-candidate approval) remains, which is the maintainer's call.
 
 ## Global Verification
 
-- [ ] Fork initialized and upstream remote configured
-- [ ] Baseline test suite documented
-- [ ] Desktop baseline screenshots captured
-- [ ] Web baseline screenshots captured
+- [x] Fork initialized and upstream remote configured
+- [x] Baseline test suite documented
+- [x] Desktop baseline screenshots captured
+- [x] Web baseline screenshots captured
 - [x] Mobile baseline screenshots captured (CI run 37268854174, curated under `.planning/evidence/phase-08-mobile/`)
-- [ ] All M1 phases DONE (00 and 08 done; 01-07 verified code-complete awaiting CI screenshot evidence; 09 in verification)
-- [ ] Security review complete
+- [x] All M1 phases DONE except 09, which is complete except P09-23 (release-candidate approval)
+- [x] Security review complete (P09-08…P09-11)
 - [ ] Release candidate approved
+
+## Release Evidence
+
+- Green full-pipeline CI run [`37322886544`](https://github.com/hehenugas/rakazo/actions/runs/37322886544) on `main` (2026-10-05): lint, typecheck, production builds + Electron smoke, unit tests, Postgres integration, web e2e 182/182.
+- Phase screenshot evidence curated under `.planning/evidence/phase-0{1..9}-*/`.
+- Upstream sync: fork main carries upstream `f3d4c6c3`; merge-tree clean, no conflict hotspots (P09-18).
 
 ## Coordinator Notes
 
