@@ -4,6 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown, LinkifiedText } from "@rakazo/chat-ui/web";
 import type {
   AgentSkillCatalogEntry,
+  Artifact,
   Bot,
   BotSection,
   ComputerMode,
@@ -14,11 +15,14 @@ import type {
   Group,
   Me,
   ProductEvent,
+  Project,
   Routine,
+  RunActivityRow,
   SearchHit,
   Space,
   SpaceMemoryConfig,
   TaughtSkill,
+  TeamBot,
   ThreadMessage,
   ThreadSnapshot,
   VoiceStatus,
@@ -88,6 +92,8 @@ import {
   Bell,
   Box,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   FolderOpen,
@@ -97,6 +103,7 @@ import {
   LogOut,
   Maximize2,
   Menu,
+  MessagesSquare,
   Mic,
   Monitor,
   MoreHorizontal,
@@ -109,8 +116,10 @@ import {
   Reply,
   Search,
   Settings,
+  Share2,
   Smile,
   Square,
+  Star,
   TextQuote,
   Trash2,
   X,
@@ -147,6 +156,7 @@ import { ComputerUpdateProgress } from "../components/ComputerUpdateProgress";
 import { CallCard } from "../components/call/CallCard";
 import { VoiceChatCard } from "../components/call/VoiceChatCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
+import { DraftActionCard } from "../components/DraftActionCard";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import {
   LIVE_TOOL_STEP_WINDOW,
@@ -159,6 +169,8 @@ import { SkillDraftCard } from "../components/teach/SkillDraftCard";
 import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerOverlayControl } from "../components/teach/TeachComputerOverlay";
 import { TeachRecordingChrome, TeachStopButton } from "../components/teach/TeachRecordingChrome";
+import { VoiceMemoButton } from "../components/VoiceMemoButton";
+import { VoiceMemoCard } from "../components/VoiceMemoCard";
 import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { authClient } from "../lib/auth";
@@ -252,7 +264,7 @@ import {
 } from "./RoutineEditor";
 import type { SettingsSection } from "./SettingsOverlay";
 import { SpaceSearchResults } from "./SpaceSearch";
-import { BotSettings, CreateBotForm } from "./shell/bot-panel";
+import { BotSettings, CreateBotForm, CreateTeamBotForm } from "./shell/bot-panel";
 import { BotCreatePicker } from "./shell/bot-picker";
 import { CommandPalette, isCommandPaletteHotkey } from "./shell/command-palette";
 import {
@@ -309,6 +321,9 @@ type PendingBrowserNotification = {
 };
 
 const ATTACHMENT_ACCEPT = ATTACHMENT_ALLOWED_MIME_TYPES.join(",");
+const MAIN_BOT_CHECKIN_ROUTINE_NAME = "Main Bot check-in";
+const MAIN_BOT_CHECKIN_PROMPT =
+  "Review my active Projects, recent task outcomes, blocked or waiting work, and meaningful activity from other Bots. Proactively surface only items that need my attention, a decision, or a useful next action. Keep the check-in concise and do not invent urgency.";
 /** Identity colour for bots the roster no longer knows about. */
 const FALLBACK_BOT_COLOR = "#85858A";
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
@@ -392,6 +407,7 @@ export function ShellPage() {
   const userId = session.data?.user.id;
   const [groups, setGroups] = useState<Group[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
+  const [teamBots, setTeamBots] = useState<TeamBot[]>([]);
   const botsRef = useRef(bots);
   botsRef.current = bots;
   const botOrderEpochRef = useRef(0);
@@ -413,8 +429,18 @@ export function ShellPage() {
     setBotsSidebarCollapsed(readBotsSidebarCollapsed(userId));
   }, [userId]);
   const [query, setQuery] = useState("");
+  const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [taskRunsActive, setTaskRunsActive] = useState<RunActivityRow[]>([]);
+  const [taskRunsRecent, setTaskRunsRecent] = useState<RunActivityRow[]>([]);
+  const [taskRunsLoading, setTaskRunsLoading] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [libraryItems, setLibraryItems] = useState<(Artifact & { versionCount: number })[] | null>(
+    null,
+  );
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<ThreadSnapshot | null>(null);
   const snapshotRef = useRef<ThreadSnapshot | null>(null);
   const streamResponses = useSyncExternalStore(
@@ -444,6 +470,7 @@ export function ShellPage() {
   const explicitPanelTarget = useRef<string | null>(null);
   const pendingPanelRestore = useRef<RightPanelState | null>(null);
   const pendingExplicitPanel = useRef(false);
+  const deepLinkPanelApplied = useRef(false);
   const panelSearch = useRef({ searchParams, setSearchParams });
   panelSearch.current = { searchParams, setSearchParams };
   const setPanel = useCallback((next: Panel | ((current: Panel) => Panel)) => {
@@ -747,6 +774,16 @@ export function ShellPage() {
     [active?.id, groupId, inGroup, pendingAttachments],
   );
   const activeRoutines = !inGroup && routinesBotId === active?.id ? routines : [];
+  const currentSpace = spaces.find((space) => space.id === bootstrapMe?.spaceId);
+  const mainBotId = currentSpace?.mainBotId ?? null;
+  const activeIsMainBot = Boolean(active && mainBotId === active.id);
+  const mainBotCheckInRoutine = activeIsMainBot
+    ? activeRoutines.find((routine) => routine.name === MAIN_BOT_CHECKIN_ROUTINE_NAME)
+    : undefined;
+  const selectedProject =
+    selectedProjectId == null
+      ? null
+      : (projects.find((project) => project.id === selectedProjectId) ?? null);
   const panelTarget = inGroup ? activeGroup?.id : active?.id;
   const panelStorageKey =
     userId && bootstrapMe?.spaceId && panelTarget
@@ -886,8 +923,9 @@ export function ShellPage() {
       const archivedRequest = includeArchived ? ++archivedBotsRefreshEpoch.current : null;
       botsRefreshInFlight.current += 1;
       try {
-        const [navigation, archived, archivedGroupList] = await Promise.all([
+        const [navigation, teamBotList, archived, archivedGroupList] = await Promise.all([
           rpc.spaces.list(),
+          rpc.teamBots.list(),
           includeArchived ? rpc.bots.listArchived() : Promise.resolve(null),
           includeArchived ? rpc.groups.listArchived() : Promise.resolve(null),
         ]);
@@ -911,6 +949,7 @@ export function ShellPage() {
         }
         setBotSections(sections);
         setGroups(groupList);
+        setTeamBots(teamBotList);
         setSpaces(navigation.spaces);
         setInitialBotsLoaded(true);
         botsRefreshApplied.current = request;
@@ -1120,6 +1159,12 @@ export function ShellPage() {
         }
       });
     const appliedAtStart = botsRefreshApplied.current;
+    void rpc.teamBots
+      .list()
+      .then((list) => {
+        if (!cancelled) setTeamBots(list);
+      })
+      .catch(() => undefined);
     void takeInitialBootstrap(botId)
       .then((bootstrap) => {
         if (cancelled) return;
@@ -2229,6 +2274,72 @@ export function ShellPage() {
       t,
     ],
   );
+  const sendVoiceMemo = useCallback(
+    async (file: File, transcript: string) => {
+      const botTarget = activeBotId.current;
+      const groupTarget = activeGroupId.current;
+      if ((!botTarget && !groupTarget) || sendingRef.current) return;
+      const mimeType = inferAttachmentMimeType(file.name, file.type);
+      if (!mimeType?.startsWith("audio/")) {
+        setSendError(t`Unsupported voice memo format`);
+        return;
+      }
+      sendingRef.current = true;
+      setSending(true);
+      setSendError(null);
+      try {
+        const contentBase64 = await readFileAsBase64(file);
+        const artifact = await rpc.artifacts.create(
+          groupTarget
+            ? { groupId: groupTarget, name: file.name, mimeType, contentBase64 }
+            : { botId: botTarget!, name: file.name, mimeType, contentBase64 },
+        );
+        const text = transcript.trim() || "Voice memo";
+        const clientNonce = newClientNonce();
+        if (groupTarget) {
+          await rpc.threads.send({
+            groupId: groupTarget,
+            clientNonce,
+            text,
+            artifactIds: [artifact.id],
+            replyToMessageId: activeReplyTarget?.id,
+            replyQuote: activeReplyQuote ?? undefined,
+          });
+          if (activeGroupId.current === groupTarget) {
+            await refreshGroupThreadRef.current(groupTarget);
+          }
+        } else if (botTarget) {
+          const sent = await rpc.threads.send({
+            botId: botTarget,
+            clientNonce,
+            text,
+            artifactIds: [artifact.id],
+            replyToMessageId: activeReplyTarget?.id,
+            replyQuote: activeReplyQuote ?? undefined,
+          });
+          if (activeBotId.current === botTarget) {
+            updateSnapshot((current) =>
+              applyThreadSendReceipt(
+                current,
+                { botId: botTarget, runId: sent.runId, taskId: sent.taskId },
+                terminalRunReceipts.current,
+              ),
+            );
+            await refreshThreadRef.current(botTarget);
+          }
+        }
+        clearReply();
+        void refreshBots().catch(() => undefined);
+      } catch (error) {
+        setSendError(error instanceof Error ? error.message : t`Failed to send voice memo`);
+      } finally {
+        sendingRef.current = false;
+        setSending(false);
+      }
+    },
+    [activeReplyQuote, activeReplyTarget?.id, clearReply, refreshBots, t],
+  );
+
   const stopRun = useCallback(async () => {
     if (sending) return;
     sendingRef.current = true;
@@ -2542,7 +2653,81 @@ export function ShellPage() {
   }, [panel]);
 
   useEffect(() => {
+    if (panel !== "tasks" || !active) return;
+    let cancelled = false;
+    setTaskRunsLoading(true);
+    void Promise.all([
+      rpc.runs.list({ filter: "active" }),
+      rpc.runs.list({ filter: "recent" }),
+      rpc.projects.list({ botId: active.id }),
+    ])
+      .then(([activeRuns, recentRuns, projectList]) => {
+        if (cancelled) return;
+        setTaskRunsActive(activeRuns.runs.filter((run) => run.botId === active.id));
+        setTaskRunsRecent(recentRuns.runs.filter((run) => run.botId === active.id));
+        setProjects(projectList);
+        setSelectedProjectId((current) =>
+          current && projectList.some((project) => project.id === current) ? current : null,
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTaskRunsActive([]);
+        setTaskRunsRecent([]);
+        setProjects([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTaskRunsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Run-status changes are the only signal that project/task state moved;
+    // they are rare, so refetching on them stays storm-free.
+  }, [panel, active, activeSnapshot?.run?.status]);
+
+  useEffect(() => {
+    if (panel !== "library" || !active) return;
+    let cancelled = false;
+    setLibraryItems(null);
+    setLibraryError(null);
+    void rpc.artifacts
+      .listSpace({ botId: active.id, limit: 60 })
+      .then((page) => {
+        if (!cancelled) setLibraryItems(page.items);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setLibraryError(error instanceof Error ? error.message : t`Could not load library`);
+          setLibraryItems([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [panel, active]);
+
+  useEffect(() => {
     if (!panelStorageKey) return;
+    // A ?panel=&project= deep link is explicit user intent: it wins over the
+    // saved layout preference exactly once, on the first load that sees it.
+    if (!deepLinkPanelApplied.current) {
+      deepLinkPanelApplied.current = true;
+      const deepPanel = searchParams.get("panel");
+      if (
+        deepPanel === "details" ||
+        deepPanel === "tasks" ||
+        deepPanel === "routines" ||
+        deepPanel === "library" ||
+        deepPanel === "computer" ||
+        deepPanel === "settings"
+      ) {
+        if (deepPanel === "tasks") setSelectedProjectId(searchParams.get("project"));
+        setPanelState(deepPanel);
+        setRestoredPanelKey(panelStorageKey);
+        return;
+      }
+    }
     if (observedPanelKey.current !== panelStorageKey) {
       observedPanelKey.current = panelStorageKey;
       if (pendingExplicitPanel.current || explicitPanelTarget.current === panelStorageKey) {
@@ -2556,8 +2741,28 @@ export function ShellPage() {
       // Reload starts with panel=null so storage restores. In-session chat switches used to
       // keep computer/settings open; only routine was cleared (handled above). Carry is
       // session-only — do not write the carried panel onto the destination's saved prefs.
-      if (panel === "computer" || panel === "settings" || panel === "group-settings") {
-        const carried = panel === "computer" ? "computer" : inGroup ? "group-settings" : "settings";
+      if (
+        panel === "details" ||
+        panel === "tasks" ||
+        panel === "routines" ||
+        panel === "library" ||
+        panel === "computer" ||
+        panel === "settings" ||
+        panel === "group-settings"
+      ) {
+        const carried = inGroup
+          ? "group-settings"
+          : panel === "computer"
+            ? "computer"
+            : panel === "settings"
+              ? "settings"
+              : panel === "tasks"
+                ? "tasks"
+                : panel === "routines"
+                  ? "routines"
+                  : panel === "library"
+                    ? "library"
+                    : "details";
         pendingPanelRestore.current = null;
         if (carried !== panel) setPanelState(carried);
         setRestoredPanelKey(null);
@@ -2598,6 +2803,41 @@ export function ShellPage() {
   }, [panelStorageKey, restoredPanelKey, panel, editingRoutine?.id]);
 
   useEffect(() => {
+    // Keep durable panels and the open project addressable: ?panel=tasks&project=<id>
+    // survives a refresh or a copied link; ephemeral panels scrub the params.
+    const params = new URLSearchParams(searchParams);
+    let changed = false;
+    const linkable =
+      panel === "details" ||
+      panel === "tasks" ||
+      panel === "routines" ||
+      panel === "library" ||
+      panel === "computer" ||
+      panel === "settings";
+    if (linkable) {
+      if (params.get("panel") !== panel) {
+        params.set("panel", panel);
+        changed = true;
+      }
+      const project = panel === "tasks" ? selectedProjectId : null;
+      if (project) {
+        if (params.get("project") !== project) {
+          params.set("project", project);
+          changed = true;
+        }
+      } else if (params.has("project")) {
+        params.delete("project");
+        changed = true;
+      }
+    } else if (params.has("panel") || params.has("project")) {
+      params.delete("panel");
+      params.delete("project");
+      changed = true;
+    }
+    if (changed) setSearchParams(params, { replace: true });
+  }, [panel, selectedProjectId, searchParams, setSearchParams]);
+
+  useEffect(() => {
     const threadKey = inGroup ? groupId : active?.id;
     setPendingAttachments((current) => {
       const stale = current.filter((attachment) => attachment.threadKey !== threadKey);
@@ -2627,6 +2867,29 @@ export function ShellPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.repeat)
+        return;
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setCreateMenuOpen(true);
+        return;
+      }
+      if (event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setBotsSidebarCollapsedPref(!readBotsSidebarCollapsed(userId));
+        return;
+      }
+      if (event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSidebarSearchOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setBotsSidebarCollapsedPref, userId]);
 
   useEffect(() => {
     const heartbeatBotId = computerBot?.id ?? active?.id;
@@ -2850,73 +3113,121 @@ export function ShellPage() {
             >
               <PanelLeftClose size={15} strokeWidth={1.8} aria-hidden="true" />
             </button>
-            <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
-              <PopoverTrigger
-                className="app-no-drag text-[21px] text-muted-foreground/70 hover:text-foreground/75"
-                title={t`Create`}
-                data-testid="create-menu-trigger"
-              >
-                +
-              </PopoverTrigger>
-              {/* Unmount with the state change so the panel it opens never coexists with the menu. */}
-              {createMenuOpen ? (
-                <PopoverContent
-                  align="end"
-                  className="app-no-drag w-auto gap-0 overflow-hidden p-0 data-closed:animate-none"
-                >
-                  <BotCreatePicker
-                    bots={bots}
-                    onCreateBot={() => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      setPanel("create");
-                    }}
-                    onOpenBot={(id) => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      navigate(`/app/${id}`);
-                    }}
-                    onCreateGroup={() => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      setPanel("create-group");
-                    }}
-                    onCreateSpace={() => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      setNewSpaceOpen(true);
-                    }}
-                    onShowGroupInfo={() => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      setPickerInfoTopic("group");
-                    }}
-                    onShowSpaceInfo={() => {
-                      setCreateMenuOpen(false);
-                      setMobileSidebarOpen(false);
-                      setPickerInfoTopic("space");
-                    }}
-                  />
-                </PopoverContent>
-              ) : null}
-            </Popover>
           </div>
         </div>
-        <InputGroup
-          data-testid="sidebar-search"
-          className="mx-2.5 mb-3 w-auto rounded-xl bg-card dark:bg-input border border-border text-muted-foreground focus-within:border-ring"
-        >
-          <InputGroupAddon>
-            <Search size={16} strokeWidth={1.8} aria-hidden="true" />
-          </InputGroupAddon>
-          <InputGroupInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t`Search`}
-            autoComplete="off"
-            name="sidebar-search"
-          />
-        </InputGroup>
+        <div className="mx-2.5 mb-3 flex gap-2">
+          <button
+            type="button"
+            data-testid="sidebar-search-trigger"
+            aria-pressed={sidebarSearchOpen}
+            onClick={() => {
+              setSidebarSearchOpen((open) => !open);
+              if (sidebarSearchOpen) setQuery("");
+            }}
+            className="app-no-drag flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card text-[13.5px] font-medium text-foreground/85 hover:bg-sidebar-accent"
+          >
+            <Search size={15} strokeWidth={1.8} aria-hidden="true" />
+            <Trans>Search</Trans>
+          </button>
+          <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
+            <PopoverTrigger
+              className="app-no-drag flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card text-[13.5px] font-medium text-foreground/85 hover:bg-sidebar-accent"
+              title={t`New chat`}
+              data-testid="create-menu-trigger"
+            >
+              <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
+              <Trans>New chat</Trans>
+            </PopoverTrigger>
+            {createMenuOpen ? (
+              <PopoverContent
+                align="end"
+                className="app-no-drag w-auto gap-0 overflow-hidden p-0 data-closed:animate-none"
+              >
+                <BotCreatePicker
+                  bots={bots}
+                  teamBots={teamBots}
+                  onCreateBot={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setPanel("create");
+                  }}
+                  onCreateTeamBot={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setPanel("create-team-bot");
+                  }}
+                  onOpenBot={(id) => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    navigate(`/app/${id}`);
+                  }}
+                  onOpenTeamBot={(teamBotId) => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    void rpc.teamBots
+                      .open({ teamBotId })
+                      .then(async (bot) => {
+                        await refreshBots();
+                        navigate(`/app/${bot.id}`);
+                      })
+                      .catch(() => undefined);
+                  }}
+                  onCreateGroup={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setPanel("create-group");
+                  }}
+                  onCreateSpace={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setNewSpaceOpen(true);
+                  }}
+                  onShowGroupInfo={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setPickerInfoTopic("group");
+                  }}
+                  onShowSpaceInfo={() => {
+                    setCreateMenuOpen(false);
+                    setMobileSidebarOpen(false);
+                    setPickerInfoTopic("space");
+                  }}
+                />
+              </PopoverContent>
+            ) : null}
+          </Popover>
+        </div>
+        {sidebarSearchOpen ? (
+          <InputGroup
+            data-testid="sidebar-search"
+            className="mx-2.5 mb-3 w-auto rounded-xl bg-card dark:bg-input border border-border text-muted-foreground focus-within:border-ring"
+          >
+            <InputGroupAddon>
+              <Search size={16} strokeWidth={1.8} aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t`Search messages, files, and routines`}
+              autoComplete="off"
+              name="sidebar-search"
+            />
+            <InputGroupAddon align="inline-end">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t`Close search`}
+                onClick={() => {
+                  setQuery("");
+                  setSidebarSearchOpen(false);
+                }}
+              >
+                <X size={14} strokeWidth={1.8} aria-hidden="true" />
+              </Button>
+            </InputGroupAddon>
+          </InputGroup>
+        ) : null}
         <div className="rk-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-2.5">
           {showSpaceSearch ? (
             <SpaceSearchResults
@@ -3207,6 +3518,15 @@ export function ShellPage() {
                                     >
                                       {item.chat.name}
                                     </span>
+                                    {item.kind === "bot" && item.chat.id === mainBotId ? (
+                                      <Star
+                                        size={12}
+                                        strokeWidth={1.8}
+                                        fill="currentColor"
+                                        className="shrink-0 text-foreground/70"
+                                        aria-label={t`Main Bot`}
+                                      />
+                                    ) : null}
                                     {item.chat.unread ? (
                                       <span className="sr-only">
                                         <Trans> (unread)</Trans>
@@ -3261,7 +3581,7 @@ export function ShellPage() {
                 className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[13.5px] text-muted-foreground hover:bg-sidebar-accent"
               >
                 <span>
-                  <Trans>Archived</Trans>
+                  <Trans>Hidden Bots</Trans>
                 </span>
                 <span>{archivedBots.length + archivedGroups.length}</span>
               </button>
@@ -3346,7 +3666,7 @@ export function ShellPage() {
             <LayoutGrid size={15} strokeWidth={1.8} />
           </span>
           <span className="text-[14px] font-medium text-foreground/90">
-            <Trans>Integrations</Trans>
+            <Trans>Connect apps</Trans>
           </span>
         </button>
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -3474,7 +3794,7 @@ export function ShellPage() {
         inert={mobileSidebarOpen}
         className="flex min-w-0 flex-1 flex-col bg-background"
       >
-        <div className="app-drag flex items-center justify-between border-b border-sidebar-border px-3 py-[17px] md:px-[22px]">
+        <div className="app-drag relative flex items-center justify-between border-b border-sidebar-border px-3 py-[17px] md:px-[22px]">
           <div className="flex min-w-0 items-center gap-2">
             {/* Collapsed bots sidebar: this header is the leading edge for window chrome. */}
             {botsSidebarCollapsed && desktopBridge() ? <WindowChrome /> : null}
@@ -3498,51 +3818,59 @@ export function ShellPage() {
                 <PanelLeftOpen size={19} strokeWidth={1.7} aria-hidden="true" />
               </button>
             ) : null}
-            <button
-              type="button"
-              data-testid="bot-settings-trigger"
-              onClick={() => setPanel(inGroup ? "group-settings" : "settings")}
-              className="app-no-drag flex min-w-0 items-center gap-3"
-            >
-              {inGroup ? (
-                <GroupAvatar
-                  members={activeSnapshot?.members ?? activeGroup?.members ?? []}
-                  size={26}
-                />
-              ) : active ? (
-                <BotAvatar
-                  color={active.color}
-                  identity={active.id}
-                  size={26}
-                  status={active.status}
-                />
-              ) : null}
-              <span className="min-w-0">
-                <span className="block truncate text-[16px] font-medium text-foreground" dir="auto">
-                  {inGroup
-                    ? (activeGroup?.name ?? activeSnapshot?.groupName ?? t`Group`)
-                    : (active?.name ?? t`Select a bot`)}
-                </span>
-              </span>
-            </button>
           </div>
+          <button
+            type="button"
+            data-testid="bot-settings-trigger"
+            onClick={() => setPanel(inGroup ? "group-settings" : "details")}
+            className="app-no-drag absolute start-1/2 flex max-w-[55%] -translate-x-1/2 items-center gap-2 rounded-full px-2.5 py-1.5 hover:bg-accent"
+          >
+            {inGroup ? (
+              <GroupAvatar
+                members={activeSnapshot?.members ?? activeGroup?.members ?? []}
+                size={24}
+              />
+            ) : active ? (
+              <BotAvatar
+                color={active.color}
+                identity={active.id}
+                size={24}
+                status={active.status}
+              />
+            ) : null}
+            {!inGroup && activeIsMainBot ? (
+              <Star
+                size={12}
+                strokeWidth={1.8}
+                fill="currentColor"
+                className="shrink-0 text-foreground/70"
+                aria-label={t`Main Bot`}
+              />
+            ) : null}
+            <span className="min-w-0 truncate text-[15px] font-medium text-foreground" dir="auto">
+              {inGroup
+                ? (activeGroup?.name ?? activeSnapshot?.groupName ?? t`Group`)
+                : (active?.name ?? t`Select a bot`)}
+            </span>
+            <ChevronDown size={14} strokeWidth={1.8} className="shrink-0 text-muted-foreground" />
+          </button>
           <div className="flex items-center gap-1">
             {!inGroup && active ? (
               <button
                 type="button"
-                title={t`Agent computer`}
+                title={t`Computer`}
+                aria-label={t`Computer`}
                 onClick={() => {
                   const next = panel === "computer" ? null : "computer";
                   setPanel(next);
                   if (next === "computer" && active) {
-                    // Refresh run/computer so Take control isn't stuck on a stale busyBotName.
                     void refreshThread(active.id).catch(() => undefined);
                   }
                 }}
                 data-active={panel === "computer" ? "" : undefined}
-                className="app-no-drag grid h-[30px] w-[34px] place-items-center rounded-[9px] hover:bg-accent data-active:bg-accent"
+                className="app-no-drag grid h-[30px] w-[34px] place-items-center rounded-[9px] text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-accent data-active:text-foreground"
               >
-                <Monitor size={18} strokeWidth={1.6} className="text-foreground/75" />
+                <Monitor size={17} strokeWidth={1.6} />
               </button>
             ) : null}
           </div>
@@ -3619,6 +3947,8 @@ export function ShellPage() {
             onRemoveAttachment={removeAttachment}
             onSend={sendMessage}
             onStop={stopRun}
+            onVoiceMemo={sendVoiceMemo}
+            voiceMemoTranscribe={Boolean(voiceStatus?.transcribe)}
             onVoice={
               !inGroup && active
                 ? () => {
@@ -3667,19 +3997,30 @@ export function ShellPage() {
 
       <ResizableSidePanel
         botsSidebarCollapsed={botsSidebarCollapsed}
-        open={Boolean(panel && (active || activeGroup || panel === "create"))}
+        open={Boolean(
+          panel && (active || activeGroup || panel === "create" || panel === "create-team-bot"),
+        )}
         panel={panel ?? "closed"}
       >
-        {panel && (active || activeGroup || panel === "create") ? (
+        {panel && (active || activeGroup || panel === "create" || panel === "create-team-bot") ? (
           <div className="rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]">
             {panel !== "routine" &&
             panel !== "create" &&
+            panel !== "create-team-bot" &&
             panel !== "create-group" &&
             panel !== "group-settings" ? (
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-[13.5px] text-muted-foreground">
-                  {panel === "settings" ? (
-                    <Trans>Settings</Trans>
+                  {panel === "details" ? (
+                    <Trans>Conversation details</Trans>
+                  ) : panel === "tasks" ? (
+                    <Trans>Tasks</Trans>
+                  ) : panel === "routines" ? (
+                    <Trans>Routines</Trans>
+                  ) : panel === "library" ? (
+                    <Trans>Library</Trans>
+                  ) : panel === "settings" ? (
+                    <Trans>Bot settings</Trans>
                   ) : active ? (
                     (computer?.state ?? active.status)
                   ) : (
@@ -3699,15 +4040,15 @@ export function ShellPage() {
                       }}
                     />
                   ) : null}
-                  {active ? (
+                  {active && panel !== "details" ? (
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={panel === "settings" ? t`Show computer` : t`Show settings`}
-                      onClick={() => setPanel(panel === "settings" ? "computer" : "settings")}
-                      className={panel === "settings" ? "text-foreground" : "text-muted-foreground"}
+                      aria-label={t`Back to conversation details`}
+                      onClick={() => setPanel("details")}
+                      className="text-muted-foreground"
                     >
-                      <Settings size={16} strokeWidth={1.7} />
+                      <ChevronLeft size={16} strokeWidth={1.8} />
                     </Button>
                   ) : null}
                   <Button
@@ -3719,6 +4060,660 @@ export function ShellPage() {
                     <X size={16} strokeWidth={1.8} />
                   </Button>
                 </div>
+              </div>
+            ) : null}
+            {panel === "details" && active ? (
+              <div data-testid="conversation-details" className="space-y-5">
+                <div className="flex flex-col items-center px-3 pb-2 pt-1 text-center">
+                  <BotAvatar
+                    color={active.color}
+                    identity={active.id}
+                    size={54}
+                    status={active.status}
+                  />
+                  <div
+                    className="mt-3 max-w-full truncate text-[18px] font-semibold text-foreground"
+                    dir="auto"
+                  >
+                    {active.name}
+                  </div>
+                  {active.title ? (
+                    <div
+                      className="mt-1 max-w-full truncate text-[13.5px] text-muted-foreground"
+                      dir="auto"
+                    >
+                      {active.title}
+                    </div>
+                  ) : null}
+                  <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[12.5px] text-muted-foreground">
+                    <span
+                      className={`size-2 shrink-0 rounded-full ${
+                        active.status === "idle" ? "bg-muted-foreground/40" : "bg-foreground"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {rosterWorkStatusLabel(active.status) ?? active.status}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="conversation-details-computer"
+                  onClick={() => {
+                    setPanel("computer");
+                    void refreshThread(active.id).catch(() => undefined);
+                  }}
+                  className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-start hover:bg-accent"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground">
+                    <Monitor size={17} strokeWidth={1.7} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13.5px] font-medium text-foreground">
+                      <Trans>Computer</Trans>
+                    </span>
+                    <span className="block truncate text-[12px] text-muted-foreground">
+                      {computer?.state ?? active.status}
+                    </span>
+                  </span>
+                  <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                </button>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <button
+                    type="button"
+                    data-testid="conversation-details-tasks"
+                    onClick={() => setPanel("tasks")}
+                    className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-start hover:bg-accent"
+                  >
+                    <Box size={17} strokeWidth={1.7} className="text-muted-foreground" />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      <Trans>Tasks</Trans>
+                    </span>
+                    {snapshot?.run && isActive(snapshot.run.status) ? (
+                      <span className="text-[12px] text-muted-foreground">1</span>
+                    ) : null}
+                    <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="conversation-details-routines"
+                    onClick={() => setPanel("routines")}
+                    className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-start hover:bg-accent"
+                  >
+                    <Clock size={17} strokeWidth={1.7} className="text-muted-foreground" />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      <Trans>Routines</Trans>
+                    </span>
+                    <span className="text-[12px] text-muted-foreground">
+                      {activeRoutines.length}
+                    </span>
+                    <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="conversation-details-library"
+                    onClick={() => setPanel("library")}
+                    className="flex w-full items-center gap-3 px-3 py-3 text-start hover:bg-accent"
+                  >
+                    <FolderOpen size={17} strokeWidth={1.7} className="text-muted-foreground" />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      <Trans>Library</Trans>
+                    </span>
+                    <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <button
+                    type="button"
+                    data-testid="conversation-details-settings"
+                    onClick={() => setPanel("settings")}
+                    className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-start hover:bg-accent"
+                  >
+                    <Settings size={17} strokeWidth={1.7} className="text-muted-foreground" />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      <Trans>Bot settings</Trans>
+                    </span>
+                    <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="conversation-details-share"
+                    onClick={() => {
+                      void rpc.export
+                        .template({ botId: active.id })
+                        .then((manifest) => {
+                          const blob = new Blob([JSON.stringify(manifest, null, 2)], {
+                            type: "application/json",
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const anchor = document.createElement("a");
+                          anchor.href = url;
+                          anchor.download = `${
+                            active.name
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, "-")
+                              .replace(/^-|-$/g, "") || "bot"
+                          }-template.json`;
+                          anchor.click();
+                          URL.revokeObjectURL(url);
+                        })
+                        .catch(() => undefined);
+                    }}
+                    className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-start hover:bg-accent"
+                  >
+                    <Share2 size={17} strokeWidth={1.7} className="text-muted-foreground" />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      <Trans>Share</Trans>
+                    </span>
+                    <span className="text-[11.5px] text-muted-foreground">
+                      <Trans>Template</Trans>
+                    </span>
+                    <ChevronRight size={15} strokeWidth={1.8} className="text-muted-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="conversation-details-main-bot"
+                    aria-pressed={activeIsMainBot}
+                    onClick={() => {
+                      const nextMainBotId = activeIsMainBot ? null : active.id;
+                      void rpc.spaces
+                        .setMainBot({ botId: nextMainBotId })
+                        .then(({ mainBotId: next }) => {
+                          setSpaces((current) =>
+                            current.map((space) =>
+                              space.id === bootstrapMe?.spaceId
+                                ? { ...space, mainBotId: next }
+                                : space,
+                            ),
+                          );
+                        })
+                        .catch(() => undefined);
+                    }}
+                    className={`flex w-full items-center gap-3 px-3 py-3 text-start hover:bg-accent ${
+                      activeIsMainBot ? "border-b border-border" : ""
+                    }`}
+                  >
+                    <Star
+                      size={17}
+                      strokeWidth={1.7}
+                      fill={activeIsMainBot ? "currentColor" : "none"}
+                      className="text-muted-foreground"
+                    />
+                    <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                      {activeIsMainBot ? <Trans>Main Bot</Trans> : <Trans>Make Main Bot</Trans>}
+                    </span>
+                    {activeIsMainBot ? (
+                      <span className="text-[11.5px] text-muted-foreground">
+                        <Trans>Primary</Trans>
+                      </span>
+                    ) : null}
+                  </button>
+                  {activeIsMainBot ? (
+                    <button
+                      type="button"
+                      data-testid="conversation-details-main-bot-checkins"
+                      aria-pressed={Boolean(mainBotCheckInRoutine?.active)}
+                      onClick={() => {
+                        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+                        if (mainBotCheckInRoutine) {
+                          void rpc.routines
+                            .update({
+                              routineId: mainBotCheckInRoutine.id,
+                              active: !mainBotCheckInRoutine.active,
+                            })
+                            .then((updated) => {
+                              setRoutines((current) =>
+                                current.map((routine) =>
+                                  routine.id === updated.id ? updated : routine,
+                                ),
+                              );
+                            })
+                            .catch(() => undefined);
+                          return;
+                        }
+                        void rpc.routines
+                          .create({
+                            botId: active.id,
+                            name: MAIN_BOT_CHECKIN_ROUTINE_NAME,
+                            prompt: MAIN_BOT_CHECKIN_PROMPT,
+                            crons: ["0 */4 * * *"],
+                            timezone,
+                            notify: true,
+                            active: true,
+                            webhookEnabled: false,
+                            githubEnabled: false,
+                            messageProvider: null,
+                          })
+                          .then((created) => {
+                            setRoutines((current) => [...current, created]);
+                          })
+                          .catch(() => undefined);
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-3 text-start hover:bg-accent"
+                    >
+                      <Bell
+                        size={17}
+                        strokeWidth={1.7}
+                        fill={mainBotCheckInRoutine?.active ? "currentColor" : "none"}
+                        className="text-muted-foreground"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-medium text-foreground">
+                          <Trans>Proactive check-ins</Trans>
+                        </span>
+                        <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+                          {mainBotCheckInRoutine ? (
+                            mainBotCheckInRoutine.active ? (
+                              <Trans>On · every 4 hours</Trans>
+                            ) : (
+                              <Trans>Off</Trans>
+                            )
+                          ) : (
+                            <Trans>Off · creates an editable Routine</Trans>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {panel === "tasks" && active ? (
+              <div data-testid="bot-tasks" className="space-y-5">
+                {taskRunsLoading ? (
+                  <div className="rounded-xl border border-border bg-card px-4 py-5 text-[13px] text-muted-foreground">
+                    <Trans>Loading tasks…</Trans>
+                  </div>
+                ) : null}
+
+                {selectedProject ? (
+                  <section className="space-y-4" data-testid="project-detail">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProjectId(null)}
+                      className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronLeft size={14} strokeWidth={1.8} aria-hidden="true" />
+                      <Trans>Tasks</Trans>
+                    </button>
+                    <div>
+                      <div className="text-[17px] font-semibold text-foreground" dir="auto">
+                        {selectedProject.title}
+                      </div>
+                      <div className="mt-1 text-[12px] capitalize text-muted-foreground">
+                        {selectedProject.status}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        <Trans>Goal</Trans>
+                      </div>
+                      <p
+                        className="mt-2 whitespace-pre-wrap text-[13px] leading-5 text-foreground/90"
+                        dir="auto"
+                      >
+                        {selectedProject.objective}
+                      </p>
+                    </div>
+                    {selectedProject.plan.length > 0 ? (
+                      <div>
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                          <Trans>Plan</Trans>
+                        </div>
+                        <ol className="space-y-2">
+                          {selectedProject.plan.map((step, index) => (
+                            <li
+                              key={`${index}-${step}`}
+                              className="flex gap-2 rounded-lg bg-muted/40 px-3 py-2 text-[12.5px] text-foreground/85"
+                            >
+                              <span className="text-muted-foreground">{index + 1}.</span>
+                              <span dir="auto">{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+                    <div>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        <Trans>Project tasks</Trans>
+                      </div>
+                      {selectedProject.tasks.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border px-3 py-5 text-center text-[12.5px] text-muted-foreground">
+                          <Trans>No project tasks yet.</Trans>
+                        </div>
+                      ) : (
+                        <div className="overflow-hidden rounded-xl border border-border bg-card">
+                          {selectedProject.tasks.map((task, index) => (
+                            <div
+                              key={task.id}
+                              className={`flex items-start gap-2 px-3 py-3 ${
+                                index > 0 ? "border-t border-border" : ""
+                              }`}
+                            >
+                              <span
+                                className={`mt-1.5 size-2 shrink-0 rounded-full ${
+                                  task.status === "completed"
+                                    ? "bg-muted-foreground/40"
+                                    : "bg-foreground"
+                                }`}
+                                aria-hidden="true"
+                              />
+                              <span
+                                className="min-w-0 flex-1 text-[12.5px] leading-5 text-foreground/90"
+                                dir="auto"
+                              >
+                                {task.prompt}
+                              </span>
+                              <span className="shrink-0 text-[11px] capitalize text-muted-foreground">
+                                {task.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                ) : projects.length > 0 ? (
+                  <section>
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      <Trans>Projects</Trans>
+                    </div>
+                    <div className="space-y-2">
+                      {projects.map((project) => {
+                        const completed = project.tasks.filter(
+                          (task) => task.status === "completed",
+                        ).length;
+                        return (
+                          <button
+                            key={project.id}
+                            type="button"
+                            onClick={() => setSelectedProjectId(project.id)}
+                            className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-start hover:bg-accent"
+                          >
+                            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                              <Box size={16} strokeWidth={1.7} aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className="block truncate text-[13.5px] font-medium text-foreground"
+                                dir="auto"
+                              >
+                                {project.title}
+                              </span>
+                              <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
+                                {project.tasks.length > 0
+                                  ? `${completed} of ${project.tasks.length} complete`
+                                  : project.status}
+                              </span>
+                            </span>
+                            <ChevronRight
+                              size={15}
+                              strokeWidth={1.8}
+                              className="text-muted-foreground"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
+                {!taskRunsLoading &&
+                projects.length === 0 &&
+                taskRunsActive.length === 0 &&
+                taskRunsRecent.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                    <Box size={22} strokeWidth={1.6} className="mx-auto text-muted-foreground" />
+                    <div className="mt-3 text-[13.5px] font-medium text-foreground">
+                      <Trans>No tasks yet</Trans>
+                    </div>
+                    <div className="mt-1 text-[12.5px] text-muted-foreground">
+                      <Trans>Work started by this Bot will show up here.</Trans>
+                    </div>
+                  </div>
+                ) : null}
+
+                {taskRunsActive.length > 0 ? (
+                  <section>
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      <Trans>Active</Trans>
+                    </div>
+                    <div className="space-y-2">
+                      {taskRunsActive.map((run) => (
+                        <div
+                          key={run.runId}
+                          className="rounded-xl border border-border bg-card px-3 py-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="size-2 rounded-full bg-foreground"
+                              aria-hidden="true"
+                            />
+                            <span
+                              className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-foreground"
+                              dir="auto"
+                            >
+                              {run.promptSnippet}
+                            </span>
+                            <span className="text-[11.5px] capitalize text-muted-foreground">
+                              {run.status}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                            <span className="capitalize">{run.trigger.replaceAll("_", " ")}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatRosterTime(run.updatedAt)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {taskRunsRecent.length > 0 ? (
+                  <section>
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      <Trans>Recent</Trans>
+                    </div>
+                    <div className="space-y-2">
+                      {taskRunsRecent.map((run) => (
+                        <div
+                          key={run.runId}
+                          className="rounded-xl border border-border bg-card px-3 py-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`size-2 rounded-full ${
+                                run.status === "failed"
+                                  ? "bg-destructive"
+                                  : "bg-muted-foreground/40"
+                              }`}
+                              aria-hidden="true"
+                            />
+                            <span
+                              className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-foreground"
+                              dir="auto"
+                            >
+                              {run.promptSnippet}
+                            </span>
+                            <span className="text-[11.5px] capitalize text-muted-foreground">
+                              {run.status}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                            <span className="capitalize">{run.trigger.replaceAll("_", " ")}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatRosterTime(run.updatedAt)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+            {panel === "library" && active ? (
+              <div data-testid="bot-library" className="space-y-5">
+                {libraryItems === null ? (
+                  <div className="rounded-xl border border-border bg-card px-4 py-5 text-[13px] text-muted-foreground">
+                    <Trans>Loading library…</Trans>
+                  </div>
+                ) : null}
+                {libraryError ? (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-destructive/30 bg-card px-4 py-3 text-[13px] text-destructive"
+                  >
+                    {libraryError}
+                  </div>
+                ) : null}
+                {libraryItems?.length === 0 && !libraryError ? (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                    <FolderOpen
+                      size={22}
+                      strokeWidth={1.6}
+                      className="mx-auto text-muted-foreground"
+                    />
+                    <div className="mt-3 text-[13.5px] font-medium text-foreground">
+                      <Trans>Library is empty</Trans>
+                    </div>
+                    <div className="mt-1 text-[12.5px] text-muted-foreground">
+                      <Trans>Files and artifacts shared by this Bot will appear here.</Trans>
+                    </div>
+                  </div>
+                ) : null}
+                {(["today", "week", "older"] as const).map((bucket) => {
+                  const items = (libraryItems ?? []).filter(
+                    (item) => artifactRecencyBucket(item.createdAt) === bucket,
+                  );
+                  if (items.length === 0) return null;
+                  return (
+                    <section key={bucket}>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        {bucket === "today" ? (
+                          <Trans>Today</Trans>
+                        ) : bucket === "week" ? (
+                          <Trans>This week</Trans>
+                        ) : (
+                          <Trans>Older</Trans>
+                        )}
+                      </div>
+                      <div className="overflow-hidden rounded-xl border border-border bg-card">
+                        {items.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className={`flex items-stretch gap-0 px-0 py-0 ${
+                              index > 0 ? "border-t border-border" : ""
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPanel(null);
+                                navigate(`/app/artifacts/${item.id}`);
+                              }}
+                              className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-start hover:bg-accent"
+                            >
+                              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                                <FolderOpen size={16} strokeWidth={1.7} />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span
+                                  className="block truncate text-[13.5px] font-medium text-foreground"
+                                  dir="auto"
+                                >
+                                  {item.name}
+                                </span>
+                                <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
+                                  {item.mimeType}
+                                  {item.versionCount > 1 ? ` · v${item.version}` : ""}
+                                </span>
+                              </span>
+                              <ChevronRight
+                                size={15}
+                                strokeWidth={1.8}
+                                className="text-muted-foreground"
+                              />
+                            </button>
+                            {item.groupId ? (
+                              <button
+                                type="button"
+                                aria-label={t`Open chat`}
+                                title={t`Open chat`}
+                                onClick={() => {
+                                  setPanel(null);
+                                  navigate(`/app/g/${item.groupId}`);
+                                }}
+                                className="grid w-11 place-items-center border-s border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                              >
+                                <MessagesSquare size={15} strokeWidth={1.8} />
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+                {libraryItems && libraryItems.length > 0 ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      setPanel(null);
+                      navigate("/app/artifacts");
+                    }}
+                  >
+                    <Trans>Open full library</Trans>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {panel === "routines" && active ? (
+              <div data-testid="bot-routines">
+                <RoutineListHeader
+                  onCreate={() => {
+                    setRoutineDraft(emptyRoutineDraft());
+                    setRoutineWebhookSecret(null);
+                    setEditingRoutine(null);
+                    setRoutineError(null);
+                    setPanel("routine");
+                  }}
+                />
+                {activeRoutines.length === 0 ? (
+                  <div className="mt-3 rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                    <Clock size={22} strokeWidth={1.6} className="mx-auto text-muted-foreground" />
+                    <div className="mt-3 text-[13.5px] font-medium text-foreground">
+                      <Trans>No routines yet</Trans>
+                    </div>
+                    <div className="mt-1 text-[12.5px] text-muted-foreground">
+                      <Trans>Turn repeatable work into a schedule or event-driven routine.</Trans>
+                    </div>
+                  </div>
+                ) : null}
+                {activeRoutines.map((routine) => {
+                  const routineRunning =
+                    snapshot?.run?.routineId === routine.id && isActive(snapshot.run.status);
+                  return (
+                    <RoutineListRow
+                      key={routine.id}
+                      routine={routine}
+                      running={routineRunning}
+                      onOpen={() => {
+                        setRoutineDraft(draftFromRoutine(routine));
+                        setRoutineWebhookSecret(null);
+                        setEditingRoutine(routine);
+                        setRoutineError(null);
+                        setPanel("routine");
+                      }}
+                      onStop={() => void stopRun()}
+                    />
+                  );
+                })}
               </div>
             ) : null}
             {panel === "computer" && active ? (
@@ -3774,34 +4769,6 @@ export function ShellPage() {
                 <p className="mt-2 truncate text-[13.5px] text-muted-foreground" dir="auto">
                   {t`${active.name}'s screen`}
                 </p>
-                <RoutineListHeader
-                  onCreate={() => {
-                    setRoutineDraft(emptyRoutineDraft());
-                    setRoutineWebhookSecret(null);
-                    setEditingRoutine(null);
-                    setRoutineError(null);
-                    setPanel("routine");
-                  }}
-                />
-                {activeRoutines.map((routine) => {
-                  const routineRunning =
-                    snapshot?.run?.routineId === routine.id && isActive(snapshot.run.status);
-                  return (
-                    <RoutineListRow
-                      key={routine.id}
-                      routine={routine}
-                      running={routineRunning}
-                      onOpen={() => {
-                        setRoutineDraft(draftFromRoutine(routine));
-                        setRoutineWebhookSecret(null);
-                        setEditingRoutine(routine);
-                        setRoutineError(null);
-                        setPanel("routine");
-                      }}
-                      onStop={() => void stopRun()}
-                    />
-                  );
-                })}
               </div>
             ) : null}
             {panel === "create-group" ? (
@@ -3840,6 +4807,19 @@ export function ShellPage() {
               <CreateBotForm
                 onCancel={() => setPanel(null)}
                 onCreate={(input) => createBot(input)}
+              />
+            ) : null}
+            {panel === "create-team-bot" ? (
+              <CreateTeamBotForm
+                onCancel={() => setPanel(null)}
+                onCreate={async (input) => {
+                  const shared = await rpc.teamBots.create(input);
+                  setTeamBots(await rpc.teamBots.list());
+                  const bot = await rpc.teamBots.open({ teamBotId: shared.id });
+                  await refreshBots();
+                  setPanel(null);
+                  navigate(`/app/${bot.id}`);
+                }}
               />
             ) : null}
             {panel === "settings" && active ? (
@@ -3896,7 +4876,7 @@ export function ShellPage() {
                 saving={savingRoutine}
                 running={runningRoutine}
                 error={routineError}
-                onBack={() => setPanel("computer")}
+                onBack={() => setPanel("routines")}
                 onClose={() => setPanel(null)}
                 onEnsureWebhook={async () => {
                   await ensureWebhookSecret(active.id);
@@ -4026,7 +5006,7 @@ export function ShellPage() {
                     setDeleteRoutineTarget(editingRoutine);
                     return;
                   }
-                  setPanel("computer");
+                  setPanel("routines");
                 }}
               />
             ) : null}
@@ -4380,7 +5360,7 @@ export function ShellPage() {
               setEditingRoutine((current) => (current?.id === target.id ? null : current));
               if (activeBotId.current !== target.botId) return;
               await refreshThread(target.botId);
-              if (activeBotId.current === target.botId) setPanel("computer");
+              if (activeBotId.current === target.botId) setPanel("routines");
             }}
           />
         ) : null}
@@ -4932,7 +5912,7 @@ const Transcript = memo(function Transcript({
             following.current = false;
           }
         }}
-        className="rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-5 md:px-7 md:py-6"
+        className="rk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-5 md:py-6 md:px-[max(1.75rem,calc((100%-55rem)/2))]"
       >
         {olderCursor != null ? (
           <button
@@ -5193,6 +6173,8 @@ const Composer = memo(function Composer({
   onSend,
   onStop,
   onVoice,
+  onVoiceMemo,
+  voiceMemoTranscribe,
   replyTarget,
   replyQuote,
   replyTargetName,
@@ -5219,6 +6201,8 @@ const Composer = memo(function Composer({
   onSend: (text: string, mentions?: ComposerMention[]) => Promise<void>;
   onStop: () => Promise<void>;
   onVoice?: () => void;
+  onVoiceMemo?: (file: File, transcript: string) => Promise<void>;
+  voiceMemoTranscribe?: boolean;
   replyTarget?: ThreadMessage | null;
   replyQuote?: string | null;
   replyTargetName?: string;
@@ -5532,7 +6516,7 @@ const Composer = memo(function Composer({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative z-30 m-0 min-w-0 border-0 px-3 pb-4 pt-3 md:px-6 md:pb-6 ${
+      className={`relative z-30 m-0 min-w-0 border-0 px-3 pb-4 pt-3 md:pb-6 md:px-[max(1.5rem,calc((100%-55rem)/2))] ${
         draggingFiles ? "rounded-[14px] ring-2 ring-inset ring-ring" : ""
       }`}
     >
@@ -5846,6 +6830,13 @@ const Composer = memo(function Composer({
             className="max-h-32 min-h-[24px] min-w-[8rem] flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-[15.5px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-40"
           />
         </div>
+        {onVoiceMemo && draft.trim().length === 0 ? (
+          <VoiceMemoButton
+            disabled={disabled || sending}
+            transcribe={Boolean(voiceMemoTranscribe)}
+            onReady={onVoiceMemo}
+          />
+        ) : null}
         {onVoice && draft.trim().length === 0 ? (
           <Button
             variant="outline"
@@ -5976,6 +6967,16 @@ function accessibleReplyExcerpt(text: string, max = 120): string {
   // Reserve a slot for the ellipsis; never split a surrogate pair at the cut.
   const end = (normalized.charCodeAt(max - 2) & 0xfc00) === 0xd800 ? max - 2 : max - 1;
   return `${normalized.slice(0, end).trimEnd()}…`;
+}
+
+function artifactRecencyBucket(isoDate: string): "today" | "week" | "older" {
+  const date = new Date(isoDate);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return "today";
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  return date >= startOfWeek ? "week" : "older";
 }
 
 function formatRosterTime(isoDate?: string | null): string {
@@ -6529,6 +7530,20 @@ const MessageView = memo(function MessageView({
             </div>
           );
         }
+        if (block.kind === "voice_memo") {
+          return (
+            <div
+              key={i}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <VoiceMemoCard
+                artifactId={block.artifactId}
+                mimeType={block.mimeType}
+                name={block.name}
+              />
+            </div>
+          );
+        }
         if (block.kind === "file") {
           return (
             <div
@@ -6614,6 +7629,53 @@ const MessageView = memo(function MessageView({
               canAnswer={canAnswer}
               onAnswer={(text, username) => onAnswer(message, text, username)}
             />
+          );
+        }
+        if (block.kind === "draft_action") {
+          return (
+            <div key={i} className="flex justify-start">
+              <DraftActionCard
+                target={artifactTarget}
+                messageId={message.id}
+                block={block}
+                onRefresh={onRefresh}
+              />
+            </div>
+          );
+        }
+        if (block.kind === "project") {
+          return (
+            <div key={i} className="flex justify-start">
+              <div className="w-full max-w-[520px] rounded-[18px] border border-border bg-card px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                    <Box size={17} strokeWidth={1.7} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className="block truncate text-[13.5px] font-semibold text-foreground"
+                      dir="auto"
+                    >
+                      {block.title}
+                    </span>
+                    <span className="mt-0.5 block text-[11.5px] capitalize text-muted-foreground">
+                      {block.status}
+                    </span>
+                  </span>
+                </div>
+                {block.objective ? (
+                  <p
+                    className="mt-3 line-clamp-3 text-[12.5px] leading-5 text-foreground/80"
+                    dir="auto"
+                  >
+                    {block.objective}
+                  </p>
+                ) : null}
+                <div className="mt-3 text-[11.5px] text-muted-foreground">
+                  <Trans>Project · Open Tasks to see progress</Trans>
+                </div>
+              </div>
+            </div>
           );
         }
         if (block.kind === "cloud_agent") return <CloudAgentCard key={i} block={block} />;

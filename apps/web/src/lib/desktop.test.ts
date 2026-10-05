@@ -64,10 +64,12 @@ describe("window chrome", () => {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../pages");
     const shell = readFileSync(path.join(root, "Shell.tsx"), "utf8");
     expect(shell).toContain(
-      'className="app-drag flex items-center justify-between border-b border-sidebar-border',
+      'className="app-drag relative flex items-center justify-between border-b border-sidebar-border',
     );
     expect(shell).toContain('className="app-no-drag grid h-8 w-8');
-    expect(shell).toContain('className="app-no-drag flex min-w-0 items-center gap-3"');
+    expect(shell).toContain(
+      'className="app-no-drag absolute start-1/2 flex max-w-[55%] -translate-x-1/2 items-center gap-2 rounded-full px-2.5 py-1.5 hover:bg-accent"',
+    );
     expect(shell.match(/className="app-no-drag grid h-\[30px\] w-\[34px\]/g)).toHaveLength(1);
   });
 
