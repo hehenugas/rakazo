@@ -72,5 +72,62 @@ M1 is complete only when:
 
 - all phase checklists are fully checked
 - all acceptance criteria pass
-- `STATE.md` shows every phase as DONE
+- `STATE.md` shows every M1 phase as DONE
 - Phase 09 release checklist is complete
+
+---
+
+## Milestone M2 — Grok Bot UI/UX Parity
+
+M2 closes the remaining “it has the feature, but it does not feel like Grok Bot” gap. Reference fidelity is measured from pinned public Grok Bot states rather than judged from memory.
+
+| Phase | Name | Depends On | Status |
+|---|---|---|---|
+| 10 | Reference Lock & Visual Diff Foundation | 01–08 | TODO |
+| 11 | Shell, Roster & Navigation Parity | 10 | TODO |
+| 12 | Composer & Input Behavior Parity | 10, 11 | TODO |
+| 13 | Transcript, Cards & Voice Parity | 10, 12 | TODO |
+| 14 | Details, Connect Apps & Team Bot Parity | 10, 11, 13 | TODO |
+| 15 | Main Bot & Work-Flow Feel Parity | 10, 13, 14 | TODO |
+| 16 | Responsive Parity & M2 Release Gate | 11–15 | TODO |
+
+## M2 Phase Outcomes
+
+### Phase 10 — Reference Lock & Visual Diff Foundation
+
+Pin the current public Grok Bot reference, build the canonical state matrix, measure geometry/interaction behavior, and establish deterministic screenshot + visual-diff gates.
+
+### Phase 11 — Shell, Roster & Navigation Parity
+
+Match the shell people see first: Search/New chat, coworker roster, Bot identity/status, avatars, conversation header, centered content geometry, sidebar states, and Connect apps entry.
+
+### Phase 12 — Composer & Input Behavior Parity
+
+Match composer geometry plus learned editing behavior: lists, keyboard semantics, selection/quote/add-to-prompt, mentions, attachments, voice controls, optimistic send, progress, and send/stop states.
+
+### Phase 13 — Transcript, Cards & Voice Parity
+
+Match message geometry, streaming/activity disclosure, approvals, editable drafts, failed-send retry/delete, artifacts, replies, and synchronized voice-memo transcript/playback.
+
+### Phase 14 — Details, Connect Apps & Team Bot Parity
+
+Match Conversation Details hierarchy, plugin discovery, Team Bot step flow/publish/managers, draft policy, and secure credential-request UX while preserving authorization and provider neutrality.
+
+### Phase 15 — Main Bot & Work-Flow Feel Parity
+
+Close user-visible orchestration gaps: event-aware Main Bot attention, message priority, delegated work status, Project/Task flow, stop cascading, retry/reopen, and notification deduplication.
+
+### Phase 16 — Responsive Parity & M2 Release Gate
+
+Verify the complete reference matrix across web, Electron, narrow desktop, and mobile; remove obsolete diff exceptions; run accessibility/performance/security/full-regression gates; obtain maintainer parity approval.
+
+## M2 Exit
+
+M2 is complete only when:
+
+- phases 10–16 are DONE
+- every canonical reference state has current evidence
+- stable visual diffs are inside documented tolerances
+- zero undocumented P0/P1 parity deltas remain
+- keyboard and responsive flows match the pinned reference or have an explicit security/accessibility/native-platform exception
+- Phase 16 full verification and maintainer parity review pass

@@ -9,11 +9,12 @@ An agent must:
 1. Read `.planning/PROJECT.md`.
 2. Read `.planning/ROADMAP.md`.
 3. Read `.planning/STATE.md`.
-4. Read the target phase's `SPEC.md`.
-5. Read the target phase's `CHECKLIST.md`.
-6. Read the target phase's `HANDOFF.md`.
-7. Inspect repository instructions such as `AGENTS.md`.
-8. Inspect current git status before changing code.
+4. For M2 phases 10–16, read `.planning/phases/10-reference-visual-contract/UI-SPEC.md` and the current Phase 10 parity/reference matrix or evidence index.
+5. Read the target phase's `SPEC.md`.
+6. Read the target phase's `CHECKLIST.md`.
+7. Read the target phase's `HANDOFF.md`.
+8. Inspect repository instructions such as `AGENTS.md`.
+9. Inspect current git status before changing code.
 
 ## Claiming Work
 
@@ -76,6 +77,7 @@ A phase becomes DONE only when:
 - phase acceptance criteria pass
 - relevant unit/integration/E2E tests pass
 - UI phases have current screenshot evidence
+- M2 UI phases pass the documented visual-diff/parity scorecard for their canonical states
 - accessibility sanity checks pass for changed UI
 - no known P0/P1 regression remains
 - phase handoff contains a final summary

@@ -8,6 +8,12 @@
 
 **Phase 09 — Hardening & Release (DOING — release-candidate approval pending)**
 
+## Next Milestone
+
+**M2 — Grok Bot UI/UX Parity (PLANNED)**
+
+M2 begins with Phase 10 reference locking. Do not mark any M2 surface as parity-complete from feature presence alone; use the Phase 10 UI contract, canonical reference matrix, and visual/behavior verification gates.
+
 ## Phase Status
 
 | Phase | Status | Owner | Branch/Worktree | Last Update |
@@ -22,6 +28,13 @@
 | 07 Connect Apps, X & Voice Memo | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 08 Mobile Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 09 Hardening & Release | DOING | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 10 Reference & Visual Diff | TODO | — | — | 2026-10-05 |
+| 11 Shell/Roster/Navigation Parity | TODO | — | — | 2026-10-05 |
+| 12 Composer/Input Parity | TODO | — | — | 2026-10-05 |
+| 13 Transcript/Cards/Voice Parity | TODO | — | — | 2026-10-05 |
+| 14 Details/Connect Apps/Team Bot Parity | TODO | — | — | 2026-10-05 |
+| 15 Main Bot/Work-Flow Feel Parity | TODO | — | — | 2026-10-05 |
+| 16 Responsive Parity & M2 Release | TODO | — | — | 2026-10-05 |
 
 ## Active Blockers
 
@@ -49,3 +62,5 @@
 When a phase changes status, update this file in the same commit as the corresponding phase `HANDOFF.md`.
 
 Do not mark a phase DONE unless every mandatory item in its `CHECKLIST.md` is checked and its DONE gate is satisfied.
+
+M1 remains the current milestone until Phase 09 receives release-candidate approval. M2 planning is intentionally ready in advance; Phase 10 may only be claimed explicitly. For phases 10–16, the shared UI contract at `.planning/phases/10-reference-visual-contract/UI-SPEC.md` is mandatory reading.

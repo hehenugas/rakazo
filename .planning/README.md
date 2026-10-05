@@ -2,7 +2,7 @@
 
 This directory is the shared source of truth for humans and coding agents working on the Rakazo fork.
 
-The product goal is not merely to add missing features to Rakazo. The fork should preserve Rakazo's strong open-source/provider-neutral engine while moving the product model, information architecture, interaction patterns, and visual hierarchy much closer to the current Grok Bot experience.
+The product goal is not merely to add missing features to Rakazo. The fork should preserve Rakazo's strong open-source/provider-neutral engine while moving the product model, information architecture, interaction patterns, and visual hierarchy as close as practical to the current public Grok Bot experience. M2 makes that fidelity measurable with pinned references, canonical states, and visual/behavior diff gates.
 
 ## Start Here
 
@@ -51,7 +51,14 @@ A task is never checked merely because code was written. It is checked only afte
     ├── 06-main-bot-proactivity/
     ├── 07-marketplace-x-voice/
     ├── 08-mobile-parity/
-    └── 09-hardening-release/
+    ├── 09-hardening-release/
+    ├── 10-reference-visual-contract/
+    ├── 11-shell-roster-navigation-parity/
+    ├── 12-composer-input-parity/
+    ├── 13-transcript-cards-voice-parity/
+    ├── 14-details-marketplace-team-parity/
+    ├── 15-coordination-workflow-parity/
+    └── 16-responsive-parity-release/
 ```
 
 Each phase contains:
@@ -63,3 +70,5 @@ Each phase contains:
 ## Core Rule
 
 Where Grok Bot has an equivalent product surface, do not independently redesign it unless this plan explicitly says otherwise. Match Grok Bot's information hierarchy and interaction model first, then adapt Rakazo-specific capabilities into that model.
+
+For M2 phases 10–16, “looks close” is not a completion criterion. Read `phases/10-reference-visual-contract/UI-SPEC.md`, use the pinned parity matrix, capture deterministic evidence, and verify geometry + copy + interaction + timing + keyboard + responsive behavior.

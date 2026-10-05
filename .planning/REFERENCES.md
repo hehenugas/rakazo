@@ -12,6 +12,19 @@ Use current official sources when implementation details are uncertain or may ha
 - Grok Bot changelog: https://x.ai/changelog/bot
 - Grok Bot design article: https://x.ai/news/designing-grok-bot
 
+## M2 Reference Handling
+
+M2 uses public, observable Grok Bot behavior as a pinned UX reference rather than relying on memory or broad “Grok-like” descriptions.
+
+For Phase 10 and every later parity phase:
+
+- record the capture date and source for each canonical state
+- prefer current official product/docs/changelog/design material
+- pin viewport and deterministic fixture assumptions
+- store fork evidence under the matching `.planning/evidence/phase-XX-*/` directory
+- document every visual-diff mask/tolerance and every intentional security/accessibility/native-platform divergence
+- if Grok changes during M2, record the delta and deliberately re-pin; do not silently move the target mid-phase
+
 ## Rakazo Code Areas Already Identified
 
 These paths existed in upstream Rakazo during initial analysis and should be revalidated after the fork is initialized.

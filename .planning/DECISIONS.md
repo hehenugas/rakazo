@@ -42,6 +42,14 @@ Editable email/Slack/etc. drafts should share a provider-neutral action-card mod
 
 First-class X UX may exist, but core agent logic remains provider-neutral and should use the connector/tool abstraction.
 
+### D-011 — M2 targets measured UI/UX fidelity
+
+M1 acceptance proved feature and information-architecture parity. M2 intentionally raises the bar: for equivalent public Grok Bot surfaces, independently implement the observable layout, hierarchy, copy, state transitions, timing, keyboard behavior, and responsive flow as closely as practical. Do not copy proprietary source code or private assets.
+
+### D-012 — Visual diff is an M2 acceptance gate
+
+Stable canonical states must use deterministic screenshot comparison plus a parity scorecard. A feature existing is not evidence of parity. Structural mismatches fail even when a permissive numeric pixel threshold would pass; masks and tolerances require written justification.
+
 ## Pending Decisions
 
 ### P-001 — Team Bot persistence model — RESOLVED 2026-10-05

@@ -2,9 +2,9 @@
 
 ## Vision
 
-Create an open-source, self-hostable Grok Bot alternative by forking Rakazo and preserving its provider-neutral runtime, computers, memory, integrations, routines, and multi-agent primitives while making the product feel substantially closer to Grok Bot.
+Create an open-source, self-hostable Grok Bot alternative by forking Rakazo and preserving its provider-neutral runtime, computers, memory, integrations, routines, and multi-agent primitives while making the externally observable product experience feel as close as practical to the current Grok Bot reference.
 
-The target is **product parity in behavior and interaction**, not a literal proprietary clone.
+The target is an **independent implementation with close visual, interaction, and workflow parity** to public Grok Bot references. M1 establishes capability and information-architecture parity; M2 raises the acceptance bar to measured UI/UX parity across geometry, hierarchy, copy, state transitions, timing, keyboard behavior, and responsive flow. Do not copy proprietary source code, private assets, or hidden implementation details.
 
 ## Primary Product Goal
 
@@ -71,6 +71,7 @@ The project treats the following as first-class gaps:
 12. Voice memo messages
 13. Mobile parity for the new information architecture
 14. Release hardening, migrations, auditability, and upstream-sync discipline
+15. Measured Grok Bot UI/UX parity across shell, roster, composer, transcript, details, Team Bot, coordination, and responsive/mobile flows
 
 ## Product Principles
 
@@ -98,12 +99,16 @@ If Rakazo already has a working primitive, build the Grok-like UX on top of it i
 
 Prefer additive models, clear adapters, isolated UI modules, and migrations that minimize permanent conflicts with upstream Rakazo.
 
+### P7 — Parity is verified state, not feature presence
+
+For M2 UI/UX work, a feature is not “parity” merely because an equivalent control exists. The reference state, geometry, visible copy, interaction behavior, timing, keyboard flow, and responsive transformation must be captured and verified. Stable surfaces should use deterministic screenshots and visual diffing.
+
 ## Explicit Non-Goals
 
 Unless added to a future milestone:
 
 - no visual node-canvas workflow builder like n8n
-- no requirement to copy proprietary source code or exact pixels
+- no copying proprietary source code, private assets, or hidden implementation details; independently implemented pixel-level alignment to observable public UI is a valid M2 goal
 - no xAI-only model dependency
 - no transfer of secrets/history/private memory in templates
 - no weakening of Rakazo approval/security boundaries for parity
