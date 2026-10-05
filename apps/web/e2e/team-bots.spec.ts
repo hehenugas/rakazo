@@ -29,5 +29,5 @@ test("Team Bot creation opens the actor's private instance", async ({ page }, te
   await page.getByTestId("create-menu-trigger").click();
   const picker = page.getByTestId("bot-create-picker");
   await expect(picker.getByText("Team Bots")).toBeVisible();
-  await expect(picker.getByText("Research crew")).toBeVisible();
+  await expect(picker.getByText("Research crew").first()).toBeVisible();
 });

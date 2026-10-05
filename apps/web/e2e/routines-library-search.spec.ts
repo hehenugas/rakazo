@@ -27,6 +27,9 @@ test("Routines create, edit, and test-run through Conversation Details", async (
 
   await routines.getByTestId("routine-create-button").click();
   await page.locator("label:has-text('Name') input").fill("Daily digest");
+  await page.getByRole("button", { name: "Add trigger" }).click();
+  await page.getByRole("menuitem", { name: "On a schedule" }).hover();
+  await page.getByRole("menuitem", { name: "Every day", exact: true }).click();
   await saveRoutine(page, "routines/create");
   const row = routines.getByRole("button", { name: /Daily digest/ });
   await expect(row).toBeVisible();
@@ -66,6 +69,9 @@ test("Library groups artifacts and Search groups results in Grok order", async (
 
   await library.getByRole("button", { name: /runbook\.pdf/ }).click();
   await expect(page).toHaveURL(/\/app\/artifacts\//);
+  // The artifact page leaves the app shell; go back before driving the sidebar.
+  await page.goBack();
+  await expect(page.getByTestId("sidebar-search-trigger")).toBeVisible();
 
   const searchTrigger = page.getByTestId("sidebar-search-trigger");
   await searchTrigger.click();

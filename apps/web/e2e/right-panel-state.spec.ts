@@ -77,7 +77,8 @@ test("reload restores the selected routine and scopes preferences to the chat", 
     timezone: "UTC",
     active: false,
   });
-  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-routines").click();
   await page.getByRole("button", { name: /Weekly summary/ }).click();
   const name = page.locator("label:has-text('Name') input");
   await expect(name).toHaveValue("Weekly summary");
@@ -143,7 +144,8 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   await waitForStoredPanel(page, "settings");
   await page.reload();
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
-  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-routines").click();
   await page.getByRole("button", { name: /Weekly summary/ }).click();
   await rpc(page, "routines/remove", { routineId: routine.id });
   await page.reload();

@@ -15,12 +15,12 @@ test("email draft: edit, save, submit, and sent state", async ({ page }, testInf
   await expect(card.getByText("Intro call follow-up")).toBeVisible();
   const toField = card.getByRole("textbox", { name: "To" });
   await expect(toField).toHaveValue("client@example.test");
-  await expect(toField).toBeReadOnly();
+  await expect(toField).not.toBeEditable();
 
   await card.getByRole("button", { name: "Edit" }).click();
   await expect(toField).toBeEditable();
   await card.getByRole("button", { name: "Save" }).click();
-  await expect(toField).toBeReadOnly();
+  await expect(toField).not.toBeEditable();
 
   const submitted = card.waitForResponse((response) =>
     response.url().includes("/rpc/threads/updateDraftAction"),

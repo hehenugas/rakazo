@@ -2805,6 +2805,9 @@ export function ShellPage() {
   useEffect(() => {
     // Keep durable panels and the open project addressable: ?panel=tasks&project=<id>
     // survives a refresh or a copied link; ephemeral panels scrub the params.
+    // Hold off until the restore machinery is live (bootstrap loaded) — scrubbing
+    // earlier would erase a deep link before the restore effect reads it.
+    if (!panelStorageKey) return;
     const params = new URLSearchParams(searchParams);
     let changed = false;
     const linkable =
@@ -2835,7 +2838,7 @@ export function ShellPage() {
       changed = true;
     }
     if (changed) setSearchParams(params, { replace: true });
-  }, [panel, selectedProjectId, searchParams, setSearchParams]);
+  }, [panel, selectedProjectId, panelStorageKey, searchParams, setSearchParams]);
 
   useEffect(() => {
     const threadKey = inGroup ? groupId : active?.id;

@@ -29,7 +29,7 @@ test("sidebar keeps Search and New chat as top actions with on-demand search", a
   await page.keyboard.press("Escape");
 
   await page.keyboard.press("ControlOrMeta+b");
-  await expect(page.getByRole("button", { name: "Show bots" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show bots" }).first()).toBeVisible();
   await page.keyboard.press("ControlOrMeta+b");
   await expect(searchTrigger).toBeVisible();
 });

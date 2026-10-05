@@ -241,6 +241,7 @@ async function setComputerMode(
   mode: "team" | "dedicated",
 ) {
   await page.getByRole("button", { name: botName, exact: true }).last().click();
+  await page.getByTestId("conversation-details-settings").click();
   const settings = page.getByTestId("bot-settings");
   await expect(settings.locator("label:has-text('Name') input")).toHaveValue(botName);
   const advanced = settings.getByTestId("bot-settings-advanced");
