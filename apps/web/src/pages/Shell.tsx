@@ -3207,6 +3207,7 @@ export function ShellPage() {
             </InputGroupAddon>
             <InputGroupInput
               autoFocus
+              aria-label={t`Search messages, files, and routines`}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t`Search messages, files, and routines`}

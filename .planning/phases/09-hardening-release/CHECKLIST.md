@@ -17,15 +17,15 @@
 - [x] P09-09 Security review template redaction. (Exact-key whitelist test on `export.template`.)
 - [x] P09-10 Security review connector/credential boundaries. (Upstream isolation unchanged; X rides the connector path with no first-party credentials.)
 - [x] P09-11 Security review approvals for draft/X/proactive actions. (No bypass paths: draft = user turn, connector writes default-approval, check-ins = normal runs.)
-- [ ] P09-12 Accessibility audit changed web surfaces. (Code-level: aria roles/labels/sr-only verified per phase; full audit pending final UI.)
-- [ ] P09-13 Accessibility audit changed mobile surfaces. (New cards carry roles/labels; full audit pending.)
-- [ ] P09-14 Performance review shell/transcript/Project/Library/Search.
+- [x] P09-12 Accessibility audit changed web surfaces. (2026-10-05 pass over the final UI: roster rows carry sr-only unread labels; search trigger/create trigger/computer toggle expose aria-pressed or aria-label; Hidden Bots uses aria-expanded; details hub rows are real buttons; the sidebar search input gained an explicit aria-label this pass (placeholder-only before); DraftActionCard fields are labeled for/id with role=alert errors; VoiceMemo uses native audio controls plus sr-only metadata.)
+- [x] P09-13 Accessibility audit changed mobile surfaces. (2026-10-05 pass: draft cards use accessibilityRole/labels and selectable text with a play-failure state; voice rows label play/stop state; the new screens use accessibilityRole=button rows with Switch/labels in bot-settings, pull-to-refresh, and the i18n completeness guard keeps every label translatable.)
+- [x] P09-14 Performance review shell/transcript/Project/Library/Search. (2026-10-05: roster grouping is memoized on query/data identity; search grouping is linear over bounded hits; Tasks refetches only on run-status transitions; centering is pure CSS padding; new mobile screens load on mount without polling; no new subscriptions or timers.)
 - [x] P09-15 Check realtime subscriptions for leaks/reconnect storms. (No new subscriptions; refetch only on run-status transitions.)
 - [x] P09-16 Review empty/loading/error/offline states. (Documented per phase for every new surface.)
 - [ ] P09-17 Run visual regression/screenshot review.
 - [x] P09-18 Test integration of latest upstream and document conflict hotspots. (merge-tree clean for planning docs vs upstream `01b5cd6b`; product-code assessment happens per-phase on landing.)
-- [ ] P09-19 Update user/admin/developer docs.
-- [ ] P09-20 Write release and migration notes.
+- [x] P09-19 Update user/admin/developer docs. (CHANGELOG [Unreleased] gained Added entries for every user-visible M1 surface and a Migration notes section; existing docs pages describe backend behavior and none reference the replaced UI paths, so no contradictions to fix.)
+- [x] P09-20 Write release and migration notes. (See CHANGELOG Migration notes: three additive migrations apply automatically via `prisma migrate deploy`; no manual steps, no new environment variables.)
 - [ ] P09-21 Resolve all P0/P1 issues.
 - [ ] P09-22 Audit every prior phase checklist and STATE entry.
 - [ ] P09-23 Mark M1 complete only after release candidate approval.
