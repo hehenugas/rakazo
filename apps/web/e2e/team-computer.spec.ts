@@ -91,7 +91,7 @@ test("user control leaves another Team bot's screen available", async ({ page },
   const workerId = await createBot(page, "Worker", "team");
 
   await openBot(page, "Chief");
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await page.getByTestId("computer-preview").hover();
   await page.getByTestId("computer-preview-open").click();
   await expect(page.getByRole("button", { name: "Close computer" })).toBeVisible();
@@ -128,7 +128,7 @@ test("user control leaves another Team bot's screen available", async ({ page },
 test("a failed control release keeps the computer open for retry", async ({ page }, testInfo) => {
   await signup(page, `team-release-${Date.now()}@rakazo.test`, "password12", "Team Release");
   await completeOnboarding(page);
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await page.getByTestId("computer-preview").hover();
   await page.getByTestId("computer-preview-open").click();
   const chrome = page.getByTestId("computer-chrome");
@@ -186,7 +186,7 @@ test("an active Team bot must be stopped before user takeover", async ({ page },
     .poll(async () => (await threadSnapshot(page, chiefId)).run?.status ?? "idle")
     .toBe("running");
 
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   const sidePanel = page.getByTestId("side-panel");
   await expect(sidePanel.getByRole("button", { name: /Take control/i })).toHaveCount(0);
   await page.getByTestId("computer-preview").hover();
@@ -268,7 +268,7 @@ async function openBot(page: Page, name: string) {
 }
 
 async function openComputerPanel(page: Page) {
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await expect(page.getByTestId("computer-preview")).toBeVisible();
   await expect(page.getByTestId("computer-preview-open")).toHaveCount(1);
 }

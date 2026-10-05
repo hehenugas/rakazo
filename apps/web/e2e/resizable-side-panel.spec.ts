@@ -10,7 +10,7 @@ test("computer rail resizes its preview and remembers width", async ({ page }, t
     "Computer Preferences",
   );
   await completeOnboarding(page);
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   const panel = page.getByTestId("side-panel");
   const separator = page.getByRole("separator", { name: "Resize panel" });
   await expect(separator).toBeVisible();
@@ -26,9 +26,12 @@ test("computer rail resizes its preview and remembers width", async ({ page }, t
   expect(after.width).toBeGreaterThan(before.width + 200);
   expect(after.height).toBeGreaterThan(before.height + 100);
   await page.reload();
-  await page.getByTitle("Agent computer").waitFor({ state: "visible" });
+  const computerToggle = page
+    .locator("main")
+    .getByRole("button", { name: "Computer", exact: true });
+  await computerToggle.waitFor({ state: "visible" });
   if ((await page.getByTestId("side-panel").getAttribute("data-panel")) === "closed") {
-    await page.getByTitle("Agent computer").click();
+    await computerToggle.click();
   }
   await expect.poll(async () => (await panel.boundingBox())!.width).toBeGreaterThan(600);
   const preferredWidth = await page.evaluate(() =>

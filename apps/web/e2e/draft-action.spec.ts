@@ -13,7 +13,7 @@ test("email draft: edit, save, submit, and sent state", async ({ page }, testInf
   const card = page.getByTestId("draft-action-card");
   await expect(card).toBeVisible({ timeout: 30_000 });
   await expect(card.getByText("Intro call follow-up")).toBeVisible();
-  const toField = card.locator("input");
+  const toField = card.getByRole("textbox", { name: "To" });
   await expect(toField).toHaveValue("client@example.test");
   await expect(toField).toBeReadOnly();
 

@@ -28,7 +28,7 @@ test("reload restores the open, closed and settings rail states", async ({ page 
   await completeOnboarding(page);
   const panel = page.getByTestId("side-panel");
   await expect(panel).toHaveAttribute("data-panel", "closed");
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await expect(panel).toHaveAttribute("data-panel", "computer");
   await waitForStoredPanel(page, "computer");
   await page.reload();
@@ -51,15 +51,16 @@ test("reload restores the open, closed and settings rail states", async ({ page 
     await route.fulfill({ response });
   });
   await page.reload();
+  // The identity pill opens the conversation details hub; settings sit one hop deeper.
   await page.getByTestId("bot-settings-trigger").click();
   const bootstrapResponse = page.waitForResponse("**/rpc/bootstrap");
   releaseBootstrap();
   await bootstrapResponse;
   await page.unrouteAll({ behavior: "wait" });
-  await expect(panel).toHaveAttribute("data-panel", "settings");
-  await waitForStoredPanel(page, "settings");
+  await expect(panel).toHaveAttribute("data-panel", "details");
+  await waitForStoredPanel(page, "details");
   await page.reload();
-  await expect(panel).toHaveAttribute("data-panel", "settings");
+  await expect(panel).toHaveAttribute("data-panel", "details");
 });
 
 test("reload restores the selected routine and scopes preferences to the chat", async ({
@@ -76,7 +77,7 @@ test("reload restores the selected routine and scopes preferences to the chat", 
     timezone: "UTC",
     active: false,
   });
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await page.getByRole("button", { name: /Weekly summary/ }).click();
   const name = page.locator("label:has-text('Name') input");
   await expect(name).toHaveValue("Weekly summary");
@@ -125,10 +126,10 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   releaseRoutines();
   await listResponse;
   await page.unrouteAll({ behavior: "wait" });
-  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
-  await waitForStoredPanel(page, "settings");
+  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "details");
+  await waitForStoredPanel(page, "details");
   await page.reload();
-  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
+  await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "details");
 
   // Editing another chat must beat its saved routine panel.
   const originalName = await rpc<Bot>(page, "bots/get", { botId }).then((bot) => bot.name);
@@ -142,7 +143,7 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   await waitForStoredPanel(page, "settings");
   await page.reload();
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "settings");
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   await page.getByRole("button", { name: /Weekly summary/ }).click();
   await rpc(page, "routines/remove", { routineId: routine.id });
   await page.reload();

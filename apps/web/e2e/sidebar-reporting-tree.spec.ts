@@ -25,14 +25,14 @@ test("spawned bots nest under their parent and collapse", async ({ page }, testI
   const sidebar = page.locator("aside").first();
   const toggle = sidebar.getByRole("button", { name: "Collapse Chief" });
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await sidebar.getByPlaceholder("Search").hover();
+  await sidebar.getByTestId("sidebar-search-trigger").hover();
   await captureScreenshot(page, testInfo, "sidebar-reporting-tree-expanded");
 
   await toggle.click();
   await expect(scout).toHaveCount(0);
   const expand = sidebar.getByRole("button", { name: "Expand Chief" });
   await expect(expand).toHaveAttribute("aria-expanded", "false");
-  await sidebar.getByPlaceholder("Search").hover();
+  await sidebar.getByTestId("sidebar-search-trigger").hover();
   await captureScreenshot(page, testInfo, "sidebar-reporting-tree-collapsed");
 
   await page.reload();

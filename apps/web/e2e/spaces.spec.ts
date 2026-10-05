@@ -170,6 +170,6 @@ test("deleting the last bot in a space stays in the app after first use", async 
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(sidebar.getByText("Side", { exact: true })).toHaveCount(0);
-  await sidebar.getByRole("button", { name: /^Archived/ }).click();
+  await sidebar.getByRole("button", { name: /^Hidden Bots/ }).click();
   await expect(sidebar.getByText("Chief", { exact: true })).toBeVisible();
 });

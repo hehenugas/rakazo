@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openSidebarSearch, signup } from "./helpers";
 
 test("restricted signup waits for mailbox verification", async ({ page }, testInfo) => {
   await page.route("**/api/auth/get-session**", (route) => route.fulfill({ json: null }));
@@ -159,14 +159,9 @@ test("changes and recovers an email password", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByTestId("user-settings");
   await expect(settings).toBeVisible();
-  await expect(page.getByTestId("sidebar-search").locator("input")).toHaveAttribute(
-    "autocomplete",
-    "off",
-  );
-  await expect(page.getByTestId("sidebar-search").locator("input")).toHaveAttribute(
-    "name",
-    "sidebar-search",
-  );
+  const sidebarSearch = await openSidebarSearch(page);
+  await expect(sidebarSearch).toHaveAttribute("autocomplete", "off");
+  await expect(sidebarSearch).toHaveAttribute("name", "sidebar-search");
   await expect(settings.locator('input[name="username"]')).toHaveAttribute(
     "autocomplete",
     "username",

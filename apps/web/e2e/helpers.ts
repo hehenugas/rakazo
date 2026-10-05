@@ -84,6 +84,34 @@ export async function openNewBot(page: Page) {
   await expect(page.getByTestId("create-bot-form")).toBeVisible();
 }
 
+/**
+ * Open the full bot settings form through the conversation details hub
+ * (the header identity pill opens the hub; settings live one hop deeper).
+ */
+export async function openBotSettings(page: Page) {
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-settings").click();
+  const settings = page.getByTestId("bot-settings");
+  await expect(settings).toBeVisible();
+  return settings;
+}
+
+/** Open the on-demand sidebar search and return its input. */
+export async function openSidebarSearch(page: Page) {
+  await page.getByTestId("sidebar-search-trigger").click();
+  const input = page.getByTestId("sidebar-search").getByRole("textbox");
+  await expect(input).toBeVisible();
+  return input;
+}
+
+/** Open the side-panel computer view via the header computer toggle. */
+export async function openSideComputerPanel(page: Page) {
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
+  const preview = page.getByTestId("computer-preview");
+  await expect(preview).toBeVisible();
+  return preview;
+}
+
 export async function openNewGroup(page: Page) {
   await page.getByTestId("create-menu-trigger").click();
   await page.getByTestId("create-new-group").click();

@@ -23,7 +23,7 @@ async function openComputer(page: Page) {
       body: JSON.stringify({ json: { url: screenUrl } }),
     }),
   );
-  await page.getByTitle("Agent computer").click();
+  await page.locator("main").getByRole("button", { name: "Computer", exact: true }).click();
   const preview = page.getByTestId("computer-preview");
   await preview.hover();
   await preview.getByTestId("computer-preview-open").click();
