@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The fork was transferred across accounts, which left push/pull_request
+  # triggers dead; dispatch keeps the full pipeline runnable on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
