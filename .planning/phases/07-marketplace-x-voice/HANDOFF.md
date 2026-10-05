@@ -2,15 +2,21 @@
 
 ## Current Status
 
-TODO
+DOING — P07-01…P07-17 implemented and code-verified; P07-18 (screenshots) pending CI artifacts.
 
 ## Owner
 
-Unclaimed
+ZCode (GLM)
 
 ## Branch / Worktree
 
-Not started.
+Local `main` (baseline `fd356375`) carrying the restored phase WIP, uncommitted.
+
+## Inventory (P07-01)
+
+- Connect apps: `PluginsOverlay` (featured grid + per-item connected state + advanced MCP/API/OpenAPI), connection model (composio/pipedream providers, multi-account), capability install metadata (`CapabilityInstallSchema`).
+- Voice: `/api/voice/transcribe` (upstream), `voiceStatus` catalog; the WIP adds the memo pipeline.
+- X: no first-party connector existed; X arrives provider-neutrally through the composio connector.
 
 ## Work Log
 
@@ -19,34 +25,54 @@ Not started.
 - Phase packet created.
 - No implementation work has started.
 
+### 2026-10-05 — Phase claimed; X pack + voice memo verification (ZCode/GLM)
+
+- The restored WIP carries the Connect apps retitle (P07-02) and the full voice memo pipeline (P07-10/11): audio mime allowlist in contracts, `voice_memo` block, `VoiceMemoButton` (record → optional transcribe → send), `VoiceMemoCard` (playback via the artifact), composer mic wiring.
+- P07-07/08/09: added `X` to the composio connector catalog so the X capability pack is provider-neutral (tools exist only for a connected account; deterministic `X_EMULATED_ACTION` keeps flows offline-testable). Consequential X writes keep the executor's `toolRequiresApproval` default-approval boundary.
+- P07-13: pinned the audio allowlist and `voice_memo` kind mapping with tests — `packages/contracts/src/attachments.test.ts` (mime allowlist incl. video/mp4 rejection) and `packages/core/src/attachments.test.ts` (`attachmentKindForMimeType` + block mapping).
+- P07-17: added `apps/web/e2e/voice-memo.spec.ts` and fake-media Chromium flags in `apps/web/playwright.config.ts` so recording is deterministic headlessly.
+- P07-12: condition not met — the transcribe endpoint returns plain text (no segment timings), so the card shows the plain transcript; noted for a future timed variant.
+
 ## Files / Modules Changed
 
-None.
+- `packages/adapters/src/composio-emulator.ts` — X toolkit entry (P07-07).
+- `packages/contracts/src/attachments.test.ts`, `packages/core/src/attachments.test.ts` — audio validation tests (P07-13).
+- `apps/web/playwright.config.ts` — fake-media launch flags (P07-17).
+- `apps/web/src/components/VoiceMemoCard.tsx` — `voice-memo-card` testid.
+- `apps/web/e2e/voice-memo.spec.ts` — new (P07-17).
+- Pre-existing WIP (restored, uncommitted): Connect apps retitle, voice memo components + contracts + composer wiring.
 
 ## Verification Run
 
-None yet.
+| Suite | Command | Result |
+|---|---|---|
+| Typecheck | `pnpm check` / targeted `tsc` | 22/22 tasks pass (2026-10-05) |
+| Lint | `pnpm lint` | 0 errors; 19 warnings + 4 infos (pre-existing baseline) |
+| Contract/core tests | `vitest run packages/contracts/src/attachments.test.ts packages/core/src/attachments.test.ts` | 8/8 pass |
+| E2E web | `voice-memo.spec.ts` | delegated to CI per maintainer instruction |
 
 ## Evidence / Screenshots
 
-None yet.
+- `14-voice-memo-playback` — from the CI web e2e run; to be linked here when the run finishes.
 
 ## Decisions Made During Phase
 
-None yet.
+- X ships as a connector toolkit (provider-neutral, no first-party vendor dependency) rather than a bespoke API client — matches D-002 and the no-hosted-vendor rule.
+- Voice memo transcript is plain text in M1; a timed-transcript block variant awaits segment timings from a provider.
 
 ## Blockers
 
-None.
+- P07-18 needs the CI web e2e artifacts after this work is pushed.
 
 ## Discovered Follow-ups
 
-None.
+- First-party X API client only if a vendor-less direct integration becomes a requirement.
 
 ## Next Recommended Task
 
-Claim the first unchecked task in `CHECKLIST.md`, update owner/status here and in `.planning/STATE.md`, then begin implementation.
+1. Push, let CI arbitrate the e2e specs, link screenshots, check P07-18 + VERIFY items.
+2. Claim Phase 08 (Mobile Parity): map the new IA onto Expo navigation and the shared contracts.
 
 ## Final Summary
 
-Not complete.
+Not complete — pending CI artifacts for P07-18.

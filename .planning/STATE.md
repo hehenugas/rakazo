@@ -13,19 +13,20 @@
 | Phase | Status | Owner | Branch/Worktree | Last Update |
 |---|---|---|---|---|
 | 00 Bootstrap & Baseline | DOING | ChatGPT | main @ fd356375 | 2026-10-04 |
-| 01 Desktop Shell Parity | TODO | unclaimed | — | 2026-10-04 |
-| 02 Details, Tasks & Projects | TODO | unclaimed | — | 2026-10-04 |
-| 03 Routines, Library & Search | TODO | unclaimed | — | 2026-10-04 |
-| 04 Transcript Cards & Composer | TODO | unclaimed | — | 2026-10-04 |
-| 05 Sharing & Team Bots | TODO | unclaimed | — | 2026-10-04 |
-| 06 Main Bot & Proactivity | TODO | unclaimed | — | 2026-10-04 |
-| 07 Connect Apps, X & Voice Memo | TODO | unclaimed | — | 2026-10-04 |
-| 08 Mobile Parity | TODO | unclaimed | — | 2026-10-04 |
-| 09 Hardening & Release | TODO | unclaimed | — | 2026-10-04 |
+| 01 Desktop Shell Parity | DOING | ZCode (GLM) | main (local, baseline fd356375) / phase/00-bootstrap @ origin | 2026-10-05 |
+| 02 Details, Tasks & Projects | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 03 Routines, Library & Search | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 04 Transcript Cards & Composer | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 05 Sharing & Team Bots | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 06 Main Bot & Proactivity | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 07 Connect Apps, X & Voice Memo | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 08 Mobile Parity | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
+| 09 Hardening & Release | DOING | ZCode (GLM) | main (local, baseline fd356375) | 2026-10-05 |
 
 ## Active Blockers
 
-None yet.
+- P00-10 / P08-17: CI `mobile-android-screenshots` failed on the clean baseline (upstream Maestro assertion `assertVisible: "React"` after long-press in `apps/mobile/.maestro/screenshots.yaml`); re-dispatched once to separate flake from reproducible. Unblocks when a run produces artifacts or the upstream flow is fixed.
+- Phase screenshot tasks (P01-15, P02-18, P03-17, P04-19, P05-23, P06-16, P07-18) and suite gates (P09-01…05) unblock when the phase work is committed, pushed, and CI runs.
 
 ## Global Verification
 

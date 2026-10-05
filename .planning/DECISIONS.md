@@ -44,33 +44,22 @@ First-class X UX may exist, but core agent logic remains provider-neutral and sh
 
 ## Pending Decisions
 
-### P-001 — Team Bot persistence model
+### P-001 — Team Bot persistence model — RESOLVED 2026-10-05
 
-Choose between:
+Chosen: separate `TeamBot` definition table + actor-scoped `Bot` instances (`Bot.teamBotId` with `@@unique([teamBotId, userId])`). `teamBots.open` lazily creates or restores the caller's instance. Rationale: additive tables keep migrations safe and upstream mergeability (the generalized definition/session split across all Bot types stays a post-M1 idea). See Phase 05 HANDOFF.
 
-- separate `TeamBotDefinition` + actor-scoped conversation instances
-- generalized Bot definition/session split across all Bot types
+### P-002 — Team Bot computer semantics — RESOLVED for M1 2026-10-05
 
-Decision must optimize semantics, migration safety, and upstream mergeability.
+Chosen: per-user Private Computer — `teamBots.open` creates instances with `computerMode: "dedicated"`. Personal browser authentication cannot leak into a teammate's execution because each member's instance carries its own computer. A shared Team Computer mode is deferred; templates record `computerMode` so future import can express either.
 
-### P-002 — Team Bot computer semantics
+### P-003 — Shared memory write policy — RESOLVED for M1 2026-10-05
 
-Decide exactly when execution uses:
-
-- shared Team Computer
-- per-user Private Computer
-- ephemeral isolated computer
-
-Personal browser authentication must not leak into shared execution.
-
-### P-003 — Shared memory write policy
-
-Decide whether ordinary member interactions may automatically write team memory or whether team-memory writes require policy/admin controls.
+Chosen: no automatic team-memory writes in M1. Each Team Bot instance keeps actor-scoped memory (isolated by default), so ordinary member interactions never mutate a teammate's memory. A team memory namespace with an explicit write policy remains a post-M1 decision; the template carries `memoryScope` for that future.
 
 ### P-004 — Template update semantics
 
 M1 default recommendation: template import creates an independent snapshot with no live update relationship.
 
-### P-005 — Proactive Main Bot cadence
+### P-005 — Proactive Main Bot cadence — RESOLVED for M1 2026-10-05
 
-Define sensible limits, quiet hours, and user control before enabling proactive check-ins by default.
+Chosen: proactive check-ins are an opt-in Routine on the Main Bot, not a new scheduler. Details offers a "Proactive check-ins" toggle that creates `MAIN_BOT_CHECKIN_ROUTINE_NAME` with `0 */4 * * *` in the user's timezone (`notify: true`), editable with every existing Routine control. Cooldown = the routine cadence (4h floor); quiet hours = timezone-aware scheduling (no overnight crons by default); disable = pause the routine. The check-in prompt reviews active Projects, recent task outcomes, blocked work, and other Bots' activity, and surfaces only items needing attention — keeping proactivity summary-first and approval-gated like any run.
