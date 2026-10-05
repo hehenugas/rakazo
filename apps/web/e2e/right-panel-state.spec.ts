@@ -156,7 +156,10 @@ test("reload restores the selected routine and scopes preferences to the chat", 
   // computer pane instead of reopening a dead editor.
   await page.getByTestId("bot-settings-trigger").click();
   await page.getByTestId("conversation-details-routines").click();
-  await page.getByTestId("side-panel").getByRole("button", { name: /Weekly summary/ }).click();
+  await page
+    .getByTestId("side-panel")
+    .getByRole("button", { name: /Weekly summary/ })
+    .click();
   await waitForStoredPanel(page, "routine");
   await rpc(page, "routines/remove", { routineId: routine.id });
   await page.reload();
