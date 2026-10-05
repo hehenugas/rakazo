@@ -17,6 +17,11 @@ tags:
       visible: "Pixel Launcher isn't responding"
     commands:
       - tapOn: "Close app"
+      # Closing the dialog lands on the launcher home screen; bring the app back.
+      - launchApp:
+          clearState: true
+          permissions:
+            notifications: deny
 - extendedWaitUntil:
     visible: "Sign up for Rakazo"
     timeout: 30000
