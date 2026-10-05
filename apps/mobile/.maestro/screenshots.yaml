@@ -119,24 +119,28 @@ tags:
 - assertNotVisible: "React"
 - assertNotVisible: "More"
 - takeScreenshot: "15-thread"
+# Bot messages carry Reply, Quote, React, Speak, Copy — Android pages three at
+# a time, so page 1 is Reply/Quote/More and React sits behind More.
 - longPressOn: "The fixture workspace is ready."
 - assertVisible: "Reply"
-- assertVisible: "React"
+- assertVisible: "Quote"
 - assertVisible: "More"
 - takeScreenshot: "15b-message-actions"
 - tapOn: "More"
+- assertVisible: "React"
 - assertVisible: "Speak message"
 - back
-# User messages omit Speak, so Android fits Reply/React/Copy on one page (no More).
+# User messages omit Speak; with Quote they are Reply/Quote/React/Copy, so
+# page 1 is Reply/Quote/More and React/Copy sit behind More.
 - longPressOn: "Summarize the fixture launch checklist."
 - assertVisible: "Reply"
+- assertVisible: "Quote"
+- assertVisible: "More"
+- assertNotVisible: "Speak message"
+- tapOn: "More"
 - assertVisible: "React"
 - assertVisible: "Copy"
-- assertNotVisible: "More"
-- assertNotVisible: "Speak message"
-- tapOn: "Reply"
-- assertVisible: "Replying to"
-- tapOn: "Cancel reply"
+- tapOn: "Cancel"
 - tapOn: "Bot actions"
 - assertVisible: "Clear conversation"
 - takeScreenshot: "16-bot-actions"
