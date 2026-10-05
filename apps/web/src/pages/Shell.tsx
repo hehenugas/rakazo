@@ -3571,7 +3571,10 @@ export function ShellPage() {
                                     ) : null}
                                   </div>
                                   <div className="flex shrink-0 items-center gap-1.5">
-                                    <span className="text-[11.5px] text-muted-foreground/60 tabular-nums">
+                                    <span
+                                      data-testid="roster-time"
+                                      className="text-[11.5px] text-muted-foreground/60 tabular-nums"
+                                    >
                                       {formatRosterTime(item.chat.updatedAt)}
                                     </span>
                                     {item.chat.unread ? (

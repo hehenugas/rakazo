@@ -10,7 +10,7 @@
 
 ## Next Milestone
 
-**M2 — Grok Bot UI/UX Parity (PLANNED)**
+**M2 — Grok Bot UI/UX Parity (DOING — Phase 10 done, Phase 11 next)**
 
 M2 begins with Phase 10 reference locking. Do not mark any M2 surface as parity-complete from feature presence alone; use the Phase 10 UI contract, canonical reference matrix, and visual/behavior verification gates.
 

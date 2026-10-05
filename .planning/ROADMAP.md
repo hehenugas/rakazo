@@ -83,7 +83,7 @@ M2 closes the remaining “it has the feature, but it does not feel like Grok Bo
 
 | Phase | Name | Depends On | Status |
 |---|---|---|---|
-| 10 | Reference Lock & Visual Diff Foundation | 01–08 | TODO |
+| 10 | Reference Lock & Visual Diff Foundation | 01–08 | DONE |
 | 11 | Shell, Roster & Navigation Parity | 10 | TODO |
 | 12 | Composer & Input Behavior Parity | 10, 11 | TODO |
 | 13 | Transcript, Cards & Voice Parity | 10, 12 | TODO |
