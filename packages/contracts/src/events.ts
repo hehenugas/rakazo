@@ -191,6 +191,31 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     status: z.enum(["created", "archived", "deleted"]),
   }),
   z.object({
+    /** Editable outbound action. Execution is intentionally separate from drafting. */
+    kind: z.literal("draft_action"),
+    draftId: Id,
+    provider: z.string(),
+    action: z.string(),
+    title: z.string(),
+    fields: z.array(
+      z.object({
+        key: z.string(),
+        label: z.string(),
+        value: z.string(),
+        multiline: z.boolean().optional(),
+      }),
+    ),
+    status: z.enum(["draft", "submitted", "discarded"]),
+  }),
+  z.object({
+    /** Durable multi-step work surfaced in Conversation Details > Tasks. */
+    kind: z.literal("project"),
+    projectId: Id,
+    title: z.string(),
+    status: z.enum(["planned", "running", "waiting", "completed", "failed", "cancelled"]),
+    objective: z.string().optional(),
+  }),
+  z.object({
     /** Compact card for a remote cloud coding agent (not the bot computer). */
     kind: z.literal("cloud_agent"),
     agentId: z.string(),
@@ -238,6 +263,13 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("file"),
+    artifactId: Id,
+    mimeType: z.string(),
+    name: z.string(),
+    size: z.number().int().nonnegative(),
+  }),
+  z.object({
+    kind: z.literal("voice_memo"),
     artifactId: Id,
     mimeType: z.string(),
     name: z.string(),

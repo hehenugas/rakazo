@@ -3,6 +3,7 @@ import {
   ATTACHMENT_MAX_BYTES,
   type AttachmentMimeType,
   isAllowedAttachmentMimeType,
+  isAttachmentAudioMimeType,
   isAttachmentImageMimeType,
   type MessageBlock,
 } from "@rakazo/contracts";
@@ -61,8 +62,10 @@ export function validateAttachmentMimeType(mimeType: string): void {
   }
 }
 
-export function attachmentKindForMimeType(mimeType: string): "image" | "file" {
-  return isAttachmentImageMimeType(mimeType) ? "image" : "file";
+export function attachmentKindForMimeType(mimeType: string): "image" | "voice_memo" | "file" {
+  if (isAttachmentImageMimeType(mimeType)) return "image";
+  if (isAttachmentAudioMimeType(mimeType)) return "voice_memo";
+  return "file";
 }
 
 export function messageBlockForArtifact(artifact: {
@@ -70,13 +73,22 @@ export function messageBlockForArtifact(artifact: {
   name: string;
   mimeType: string;
   size: number;
-}): Extract<MessageBlock, { kind: "image" | "file" }> {
+}): Extract<MessageBlock, { kind: "image" | "voice_memo" | "file" }> {
   if (attachmentKindForMimeType(artifact.mimeType) === "image") {
     return {
       kind: "image",
       artifactId: artifact.id,
       mimeType: artifact.mimeType,
       name: artifact.name,
+    };
+  }
+  if (attachmentKindForMimeType(artifact.mimeType) === "voice_memo") {
+    return {
+      kind: "voice_memo",
+      artifactId: artifact.id,
+      mimeType: artifact.mimeType,
+      name: artifact.name,
+      size: artifact.size,
     };
   }
   return {
@@ -131,6 +143,12 @@ const EXTENSION_MIME_TYPES: Record<string, AttachmentMimeType> = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".gif": "image/gif",
+  ".webm": "audio/webm",
+  ".ogg": "audio/ogg",
+  ".m4a": "audio/mp4",
+  ".mp4": "audio/mp4",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
   ".pdf": "application/pdf",
   ".txt": "text/plain",
   ".md": "text/markdown",
@@ -146,6 +164,11 @@ const MIME_TYPE_EXTENSIONS: Record<AttachmentMimeType, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
+  "audio/webm": ".webm",
+  "audio/ogg": ".ogg",
+  "audio/mp4": ".m4a",
+  "audio/mpeg": ".mp3",
+  "audio/wav": ".wav",
   "application/pdf": ".pdf",
   "text/plain": ".txt",
   "text/markdown": ".md",

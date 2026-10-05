@@ -182,6 +182,8 @@ model Space {
   createdAt                   DateTime                     @default(now())
   deletingAt                  DateTime?
   deletionClaimId             String?
+  mainBotId                   String?
+  mainBot                     Bot?                         @relation("SpaceMainBot", fields: [mainBotId], references: [id], onDelete: SetNull)
   memberships                 SpaceMember[]
   bots                        Bot[]
   botSections                 BotSection[]
@@ -189,6 +191,7 @@ model Space {
   threads                     Thread[]
   events                      Event[]
   tasks                       Task[]
+  projects                    Project[]
   runs                        Run[]
   routines                    Routine[]
   scratchpadItems             ScratchpadItem[]
@@ -216,6 +219,7 @@ model Space {
   botSecrets BotSecret[]
   externalConversations       ExternalConversation[]
   agentSecrets                AgentSecret[]
+  teamBots                    TeamBot[]
 
   @@unique([id, organizationId])
   @@index([organizationId, createdAt])
@@ -392,20 +396,59 @@ model Bot {
   browserProfile    BrowserProfile?
   artifacts         Artifact[]
   tasks             Task[]
+  projects          Project[]
   runs              Run[]
   steeringMessages  SteeringMessage[]
   mcpServers        BotMcpServer[]
   groupMembers      ChatGroupMember[]
   botSecrets BotSecret[]
+  teamBotId            String?
+  teamBot              TeamBot?              @relation(fields: [teamBotId], references: [id], onDelete: Cascade)
 
   externalConversations ExternalConversation[]
+  mainForSpaces         Space[]              @relation("SpaceMainBot")
 
   @@unique([spaceId, spawnKey])
   @@index([spaceId, userId, archivedAt, pinned, updatedAt])
   @@index([sectionId])
   @@index([computerId])
   @@index([parentBotId])
+  @@index([teamBotId])
+  @@unique([teamBotId, userId])
   @@map("bots")
+}
+
+model TeamBot {
+  id           String          @id @default(cuid())
+  spaceId      String
+  space        Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  ownerUserId  String
+  name         String
+  title        String          @default("")
+  description  String          @default("")
+  instructions String          @default("")
+  color        String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  members      TeamBotMember[]
+  botInstances Bot[]
+
+  @@index([spaceId, updatedAt])
+  @@index([ownerUserId])
+  @@map("team_bots")
+}
+
+model TeamBotMember {
+  id        String   @id @default(cuid())
+  teamBotId String
+  teamBot   TeamBot  @relation(fields: [teamBotId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  @@unique([teamBotId, userId])
+  @@index([userId, createdAt])
+  @@map("team_bot_members")
 }
 
 model BotSection {
@@ -547,6 +590,26 @@ model Event {
   @@map("events")
 }
 
+model Project {
+  id          String   @id @default(cuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  botId       String
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String
+  objective   String
+  plan        Json     @default("[]")
+  status      String   @default("planned")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+  tasks       Task[]
+
+  @@index([spaceId, botId, userId, status, updatedAt])
+  @@map("projects")
+}
+
 model Task {
   id        String   @id @default(cuid())
   spaceId   String
@@ -556,6 +619,8 @@ model Task {
   threadId  String
   thread    Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   userId    String
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   prompt    String
   status    String
   createdAt DateTime @default(now())
@@ -563,6 +628,7 @@ model Task {
   runs      Run[]
 
   @@index([spaceId, botId])
+  @@index([projectId, createdAt])
   @@map("tasks")
 }
 
