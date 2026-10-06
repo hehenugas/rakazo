@@ -28,13 +28,13 @@ M2 begins with Phase 10 reference locking. Do not mark any M2 surface as parity-
 | 07 Connect Apps, X & Voice Memo | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 08 Mobile Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 09 Hardening & Release | DOING | ZCode (GLM) | main (fork) | 2026-10-05 |
-| 10 Reference & Visual Diff | TODO | — | — | 2026-10-05 |
-| 11 Shell/Roster/Navigation Parity | TODO | — | — | 2026-10-05 |
-| 12 Composer/Input Parity | TODO | — | — | 2026-10-05 |
-| 13 Transcript/Cards/Voice Parity | TODO | — | — | 2026-10-05 |
-| 14 Details/Connect Apps/Team Bot Parity | TODO | — | — | 2026-10-05 |
-| 15 Main Bot/Work-Flow Feel Parity | TODO | — | — | 2026-10-05 |
-| 16 Responsive Parity & M2 Release | TODO | — | — | 2026-10-05 |
+| 10 Reference & Visual Diff | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 11 Shell/Roster/Navigation Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 12 Composer/Input Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 13 Transcript/Cards/Voice Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 14 Details/Connect Apps/Team Bot Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 15 Main Bot/Work-Flow Feel Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
+| 16 Responsive Parity & M2 Release | DOING | ZCode (GLM) | main (fork) | 2026-10-06 |
 
 ## Active Blockers
 
