@@ -79,6 +79,10 @@ export type Bot = z.infer<typeof BotSchema>;
 export const TeamBotRoleSchema = z.enum(["owner", "editor", "member"]);
 export type TeamBotRole = z.infer<typeof TeamBotRoleSchema>;
 
+/** Owner-only draft until Publish; Unpublish removes teammate availability. */
+export const TeamBotStatusSchema = z.enum(["draft", "published", "unpublished"]);
+export type TeamBotStatus = z.infer<typeof TeamBotStatusSchema>;
+
 export const TeamBotSchema = z.object({
   id: Id,
   spaceId: Id,
@@ -88,6 +92,7 @@ export const TeamBotSchema = z.object({
   description: z.string(),
   instructions: z.string(),
   color: z.string(),
+  status: TeamBotStatusSchema,
   role: TeamBotRoleSchema,
   instanceBotId: Id.nullable(),
   createdAt: z.string(),

@@ -31,6 +31,7 @@ import type {
 } from "@rakazo/adapters";
 import {
   acquireComputerExecutionLease,
+  appendRoutineTranscriptNotice,
   applyCodexLiveCatalog,
   applyTeachingDesktopInput,
   archiveBot,
@@ -89,6 +90,7 @@ import {
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
   revokeScreenControl,
+  routineConfirmLines,
   sanitizeComposioError,
   savePushToken,
   scheduleComputerControlExpiry,
@@ -97,8 +99,6 @@ import {
   scriptedCatalogEntry,
   selectDefaultCredentialId,
   serializeModelSecret,
-  appendRoutineTranscriptNotice,
-  routineConfirmLines,
   storeBotSecret,
   takeoverLeaseMs,
   toComputerRef,
@@ -140,8 +140,6 @@ import {
   clampCatalogThinkingLevel,
   containsSecret,
   expandSkillReferencesInPrompt,
-  formatCron,
-  formatInstant,
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
   nextCronDateAcrossStrict,
@@ -1382,9 +1380,11 @@ export function createRouter(deps: RouterDeps) {
     teamBots: {
       list: authed.teamBots.list.handler(async ({ context }) => {
         const rows = await deps.prisma.teamBot.findMany({
+          // Owner drafts stay owner-visible; teammates only discover published
+          // team bots (P19-03/P19-11).
           where: {
             spaceId: context.actor.spaceId,
-            members: { some: { userId: context.actor.userId } },
+            OR: [{ ownerUserId: context.actor.userId }, { status: "published" }],
           },
           include: {
             members: {
@@ -1408,6 +1408,7 @@ export function createRouter(deps: RouterDeps) {
           description: row.description,
           instructions: row.instructions,
           color: row.color,
+          status: row.status as "draft" | "published" | "unpublished",
           role: (row.members[0]?.role ?? "member") as "owner" | "editor" | "member",
           instanceBotId: row.botInstances[0]?.id ?? null,
           createdAt: row.createdAt.toISOString(),
@@ -1415,34 +1416,25 @@ export function createRouter(deps: RouterDeps) {
         }));
       }),
       create: authed.teamBots.create.handler(async ({ context, input }) => {
-        const [count, spaceMembers] = await Promise.all([
-          deps.prisma.teamBot.count({ where: { spaceId: context.actor.spaceId } }),
-          deps.prisma.spaceMember.findMany({
-            where: { spaceId: context.actor.spaceId },
-            select: { userId: true },
-          }),
-        ]);
+        const count = await deps.prisma.teamBot.count({
+          where: { spaceId: context.actor.spaceId },
+        });
         const color = input.color ?? BOT_COLORS[count % BOT_COLORS.length] ?? BOT_COLORS[0];
-        const row = await deps.prisma.$transaction(async (tx) => {
-          const created = await tx.teamBot.create({
-            data: {
-              spaceId: context.actor.spaceId,
-              ownerUserId: context.actor.userId,
-              name: input.name,
-              title: input.title,
-              description: input.description,
-              instructions: input.instructions || input.description,
-              color,
-            },
-          });
-          await tx.teamBotMember.createMany({
-            data: spaceMembers.map((member) => ({
-              teamBotId: created.id,
-              userId: member.userId,
-              role: member.userId === context.actor.userId ? "owner" : "member",
-            })),
-          });
-          return created;
+        // Owner-only draft: teammates gain access only through Publish (P19-03/P19-07).
+        const row = await deps.prisma.teamBot.create({
+          data: {
+            spaceId: context.actor.spaceId,
+            ownerUserId: context.actor.userId,
+            name: input.name,
+            title: input.title,
+            description: input.description,
+            instructions: input.instructions || input.description,
+            color,
+            status: "draft",
+          },
+        });
+        await deps.prisma.teamBotMember.create({
+          data: { teamBotId: row.id, userId: context.actor.userId, role: "owner" },
         });
         return {
           id: row.id,
@@ -1453,22 +1445,182 @@ export function createRouter(deps: RouterDeps) {
           description: row.description,
           instructions: row.instructions,
           color: row.color,
+          status: "draft" as const,
           role: "owner" as const,
           instanceBotId: null,
           createdAt: row.createdAt.toISOString(),
           updatedAt: row.updatedAt.toISOString(),
         };
       }),
-      open: authed.teamBots.open.handler(async ({ context, input }) => {
-        const membership = await deps.prisma.teamBotMember.findFirst({
-          where: {
-            teamBotId: input.teamBotId,
-            userId: context.actor.userId,
-            teamBot: { spaceId: context.actor.spaceId },
-          },
-          include: { teamBot: true },
+      createFromBot: authed.teamBots.createFromBot.handler(async ({ context, input }) => {
+        const source = await repos.getBot(context.actor, input.botId);
+        if (source.teamBotId) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "This Bot is already a Team Bot instance.",
+          });
+        }
+        const count = await deps.prisma.teamBot.count({
+          where: { spaceId: context.actor.spaceId },
         });
-        if (!membership) throw new IsolationError();
+        const color = BOT_COLORS[count % BOT_COLORS.length] ?? BOT_COLORS[0];
+        // Safe shared setup only: identity/profile from the source bot. Personal
+        // conversation, memory, files, and credentials are never copied (P19-06).
+        const shared =
+          input.mode === "copy"
+            ? {
+                name: source.name,
+                title: source.title,
+                description: source.description,
+                instructions: source.instructions,
+                color: source.color,
+              }
+            : {
+                name: source.name,
+                title: "",
+                description: "",
+                instructions: "",
+                color,
+              };
+        const row = await deps.prisma.teamBot.create({
+          data: {
+            spaceId: context.actor.spaceId,
+            ownerUserId: context.actor.userId,
+            ...shared,
+            status: "draft",
+          },
+        });
+        await deps.prisma.teamBotMember.create({
+          data: { teamBotId: row.id, userId: context.actor.userId, role: "owner" },
+        });
+        return {
+          id: row.id,
+          spaceId: row.spaceId,
+          ownerUserId: row.ownerUserId,
+          name: row.name,
+          title: row.title,
+          description: row.description,
+          instructions: row.instructions,
+          color: row.color,
+          status: "draft" as const,
+          role: "owner" as const,
+          instanceBotId: null,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }),
+      update: authed.teamBots.update.handler(async ({ context, input }) => {
+        const shared = await requireOwnedTeamBot(deps, context.actor, input.teamBotId);
+        const patch = {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
+          ...(input.color !== undefined ? { color: input.color } : {}),
+        };
+        const row = await deps.prisma.$transaction(async (tx) => {
+          const updated = await tx.teamBot.update({ where: { id: shared.id }, data: patch });
+          // Shared identity reaches every teammate's instance (P19-16).
+          await tx.bot.updateMany({ where: { teamBotId: shared.id }, data: patch });
+          return updated;
+        });
+        return {
+          id: row.id,
+          spaceId: row.spaceId,
+          ownerUserId: row.ownerUserId,
+          name: row.name,
+          title: row.title,
+          description: row.description,
+          instructions: row.instructions,
+          color: row.color,
+          status: row.status as "draft" | "published" | "unpublished",
+          role: "owner" as const,
+          instanceBotId: null,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }),
+      publish: authed.teamBots.publish.handler(async ({ context, input }) => {
+        const shared = await requireOwnedTeamBot(deps, context.actor, input.teamBotId);
+        const row = await deps.prisma.teamBot.update({
+          where: { id: shared.id },
+          data: { status: "published" },
+        });
+        return mapTeamBot(row, "owner");
+      }),
+      unpublish: authed.teamBots.unpublish.handler(async ({ context, input }) => {
+        const shared = await requireOwnedTeamBot(deps, context.actor, input.teamBotId);
+        // Teammates keep their private chats and routines; availability is removed.
+        const row = await deps.prisma.teamBot.update({
+          where: { id: shared.id },
+          data: { status: "unpublished" },
+        });
+        return mapTeamBot(row, "owner");
+      }),
+      remove: authed.teamBots.remove.handler(async ({ context, input }) => {
+        const shared = await requireOwnedTeamBot(deps, context.actor, input.teamBotId);
+        const instances = await deps.prisma.bot.findMany({
+          where: { teamBotId: shared.id },
+          select: { id: true, userId: true, spaceId: true },
+        });
+        for (const instance of instances) {
+          const bot = await repos.getBot(
+            { ...context.actor, userId: instance.userId },
+            instance.id,
+            { includeArchived: true },
+          );
+          await destroyBot(
+            {
+              prisma: deps.prisma,
+              sandbox: deps.sandbox,
+              home: deps.home,
+              jobs: deps.jobs,
+              artifacts: deps.artifacts,
+              dataDir: deps.dataDir,
+            },
+            bot,
+            {
+              operationId: "destroy",
+              traceId: "destroy",
+              spaceId: context.actor.spaceId,
+              userId: instance.userId,
+              botId: bot.id,
+              signal: new AbortController().signal,
+            },
+            { deleteMemories: true },
+          );
+        }
+        await deps.prisma.teamBot.delete({ where: { id: shared.id } });
+        return { ok: true as const };
+      }),
+      open: authed.teamBots.open.handler(async ({ context, input }) => {
+        const teamBot = await deps.prisma.teamBot.findFirst({
+          where: { id: input.teamBotId, spaceId: context.actor.spaceId },
+          include: {
+            members: { where: { userId: context.actor.userId }, select: { role: true } },
+          },
+        });
+        if (!teamBot) throw new IsolationError();
+        const isOwner = teamBot.ownerUserId === context.actor.userId;
+        // Owner-only draft; teammates keep reaching their own instance while
+        // unpublished — their chats and routines come back on republish.
+        if (!isOwner && teamBot.status === "draft") throw new IsolationError();
+        let membership = teamBot.members[0] ? { role: teamBot.members[0]!.role } : null;
+        if (!membership) {
+          if (teamBot.status !== "published") throw new IsolationError();
+          // First open of a published team bot lazily joins the teammate.
+          try {
+            membership = await deps.prisma.teamBotMember.create({
+              data: { teamBotId: teamBot.id, userId: context.actor.userId, role: "member" },
+            });
+          } catch (error) {
+            if (
+              !(error && typeof error === "object" && "code" in error && error.code === "P2002")
+            ) {
+              throw error;
+            }
+            membership = { role: "member" };
+          }
+        }
 
         const existing = await deps.prisma.bot.findFirst({
           where: {
@@ -1506,14 +1658,14 @@ export function createRouter(deps: RouterDeps) {
 
         try {
           return await repos.createBot(context.actor, {
-            name: membership.teamBot.name,
-            title: membership.teamBot.title,
-            description: membership.teamBot.description,
-            instructions: membership.teamBot.instructions,
+            name: teamBot.name,
+            title: teamBot.title,
+            description: teamBot.description,
+            instructions: teamBot.instructions,
             notifyOnFinish: true,
-            color: membership.teamBot.color,
+            color: teamBot.color,
             computerMode: "dedicated",
-            teamBotId: membership.teamBot.id,
+            teamBotId: teamBot.id,
           });
         } catch (error) {
           if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
@@ -6596,6 +6748,55 @@ async function persistModelCredential(
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled");
+}
+
+type TeamBotRow = {
+  id: string;
+  spaceId: string;
+  ownerUserId: string;
+  name: string;
+  title: string;
+  description: string;
+  instructions: string;
+  color: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function mapTeamBot(
+  row: TeamBotRow,
+  role: "owner" | "editor" | "member",
+  instanceBotId: string | null = null,
+) {
+  return {
+    id: row.id,
+    spaceId: row.spaceId,
+    ownerUserId: row.ownerUserId,
+    name: row.name,
+    title: row.title,
+    description: row.description,
+    instructions: row.instructions,
+    color: row.color,
+    status: row.status as "draft" | "published" | "unpublished",
+    role,
+    instanceBotId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Team Bot shared setup is owner-only: resolve or refuse (P19-07/P19-17). */
+async function requireOwnedTeamBot(
+  deps: RouterDeps,
+  actor: Actor,
+  teamBotId: string,
+): Promise<TeamBotRow> {
+  const row = await deps.prisma.teamBot.findFirst({
+    where: { id: teamBotId, spaceId: actor.spaceId, ownerUserId: actor.userId },
+  });
+  if (!row) throw new IsolationError();
+  return row;
 }
 
 function nextRoutineDate(crons: string[], timezone: string): Date {

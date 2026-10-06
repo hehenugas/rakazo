@@ -7,6 +7,7 @@ import {
   ATTACHMENT_MAX_BASE64_LENGTH,
   ATTACHMENT_MAX_COUNT,
 } from "./attachments.js";
+import { BotAvatarValueSchema } from "./bot-avatar.js";
 import { BotSecretMetadata, BotSecretPutInput, StoredBotSecretName } from "./bot-secrets.js";
 import {
   ActionApprovalRuleSchema,
@@ -263,6 +264,31 @@ export const appContract = {
   teamBots: {
     list: oc.output(z.array(TeamBotSchema)),
     create: oc.input(CreateTeamBotInput).output(TeamBotSchema),
+    /** Publish-to-Team from an eligible personal Bot: Copy Bot or Start fresh. */
+    createFromBot: oc
+      .input(
+        z.object({
+          botId: Id,
+          mode: z.enum(["copy", "fresh"]),
+        }),
+      )
+      .output(TeamBotSchema),
+    /** Owner-only shared-setup mutation; identity fields propagate to instances. */
+    update: oc
+      .input(
+        z.object({
+          teamBotId: Id,
+          name: z.string().trim().min(1).max(80).optional(),
+          title: z.string().trim().max(500).optional(),
+          description: z.string().trim().max(4000).optional(),
+          instructions: z.string().trim().max(20000).optional(),
+          color: BotAvatarValueSchema.optional(),
+        }),
+      )
+      .output(TeamBotSchema),
+    publish: oc.input(z.object({ teamBotId: Id })).output(TeamBotSchema),
+    unpublish: oc.input(z.object({ teamBotId: Id })).output(TeamBotSchema),
+    remove: oc.input(z.object({ teamBotId: Id })).output(z.object({ ok: z.literal(true) })),
     open: oc.input(z.object({ teamBotId: Id })).output(BotSchema),
   },
   bots: {

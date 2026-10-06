@@ -5,6 +5,8 @@ export type Panel =
   | "library"
   | "computer"
   | "settings"
+  | "share"
+  | "team-setup"
   | "routine"
   | "create"
   | "create-team-bot"

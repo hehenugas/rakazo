@@ -118,7 +118,7 @@ export function BotCreatePicker({
                     <BotAvatar color={bot.color} identity={bot.id} size={22} status="idle" />
                     <span className="min-w-0 flex-1 truncate">{bot.name}</span>
                     <span className="text-[11px] text-muted-foreground">
-                      <Trans>Team</Trans>
+                      {bot.status !== "published" ? <Trans>Draft</Trans> : <Trans>Team</Trans>}
                     </span>
                   </CommandItem>
                 ))}

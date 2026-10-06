@@ -428,6 +428,7 @@ model TeamBot {
   description  String          @default("")
   instructions String          @default("")
   color        String
+  status       String          @default("draft")
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   members      TeamBotMember[]

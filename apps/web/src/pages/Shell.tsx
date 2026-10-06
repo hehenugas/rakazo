@@ -46,9 +46,9 @@ import {
   groupVoiceChats,
   inferAttachmentMimeType,
   isActive,
+  isOneShotRoutineCrons,
   isPeerReceiptBlocks,
   isRunTerminalEvent,
-  isOneShotRoutineCrons,
   isToolActivityBlock,
   latestAnswerableAskMessageId,
   mentionChipKey,
@@ -283,6 +283,7 @@ import {
   ChoiceCard,
   McpApprovalCard,
 } from "./shell/message-cards";
+import { SharedSetupForm, SharePanel } from "./shell/team-bot-panel";
 import { WindowChrome } from "./WindowChrome";
 
 const BotContextMenu = lazy(() =>
@@ -789,6 +790,10 @@ export function ShellPage() {
   const currentSpace = spaces.find((space) => space.id === bootstrapMe?.spaceId);
   const mainBotId = currentSpace?.mainBotId ?? null;
   const activeIsMainBot = Boolean(active && mainBotId === active.id);
+  const activeTeamBot =
+    active?.teamBotId != null
+      ? (teamBots.find((team) => team.id === active.teamBotId) ?? null)
+      : null;
   const mainBotCheckInRoutine = activeIsMainBot
     ? activeRoutines.find((routine) => routine.name === MAIN_BOT_CHECKIN_ROUTINE_NAME)
     : undefined;
@@ -4042,11 +4047,23 @@ export function ShellPage() {
       <ResizableSidePanel
         botsSidebarCollapsed={botsSidebarCollapsed}
         open={Boolean(
-          panel && (active || activeGroup || panel === "create" || panel === "create-team-bot"),
+          panel &&
+            (active ||
+              activeGroup ||
+              panel === "create" ||
+              panel === "create-team-bot" ||
+              panel === "share" ||
+              panel === "team-setup"),
         )}
         panel={panel ?? "closed"}
       >
-        {panel && (active || activeGroup || panel === "create" || panel === "create-team-bot") ? (
+        {panel &&
+        (active ||
+          activeGroup ||
+          panel === "create" ||
+          panel === "create-team-bot" ||
+          panel === "share" ||
+          panel === "team-setup") ? (
           <div className="rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]">
             {panel !== "routine" &&
             panel !== "create" &&
@@ -4211,6 +4228,61 @@ export function ShellPage() {
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  {activeTeamBot && activeTeamBot.role === "owner" ? (
+                    <div
+                      data-testid="team-bot-owner"
+                      className="mb-1 rounded-xl border border-border px-3 py-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex-1 text-[13.5px] font-medium text-foreground">
+                          {activeTeamBot.status === "published" ? (
+                            <Trans>Published to team</Trans>
+                          ) : activeTeamBot.status === "draft" ? (
+                            <Trans>Draft — only you</Trans>
+                          ) : (
+                            <Trans>Unpublished</Trans>
+                          )}
+                        </span>
+                        {activeTeamBot.status === "published" ? (
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            data-testid="team-bot-unpublish"
+                            onClick={() => {
+                              void rpc.teamBots
+                                .unpublish({ teamBotId: activeTeamBot.id })
+                                .then(() => refreshBots())
+                                .catch(() => undefined);
+                            }}
+                          >
+                            <Trans>Unpublish</Trans>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            data-testid="team-bot-publish"
+                            onClick={() => {
+                              void rpc.teamBots
+                                .publish({ teamBotId: activeTeamBot.id })
+                                .then(() => refreshBots())
+                                .catch(() => undefined);
+                            }}
+                          >
+                            <Trans>Publish to team</Trans>
+                          </Button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="conversation-details-team-setup"
+                        onClick={() => setPanel("team-setup")}
+                        className="mt-2 flex w-full items-center gap-1.5 text-start text-[12.5px] text-muted-foreground hover:text-foreground"
+                      >
+                        <Trans>Edit shared setup</Trans>
+                        <ChevronRight size={13} strokeWidth={1.8} />
+                      </button>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     data-testid="conversation-details-settings"
@@ -4226,27 +4298,7 @@ export function ShellPage() {
                   <button
                     type="button"
                     data-testid="conversation-details-share"
-                    onClick={() => {
-                      void rpc.export
-                        .template({ botId: active.id })
-                        .then((manifest) => {
-                          const blob = new Blob([JSON.stringify(manifest, null, 2)], {
-                            type: "application/json",
-                          });
-                          const url = URL.createObjectURL(blob);
-                          const anchor = document.createElement("a");
-                          anchor.href = url;
-                          anchor.download = `${
-                            active.name
-                              .toLowerCase()
-                              .replace(/[^a-z0-9]+/g, "-")
-                              .replace(/^-|-$/g, "") || "bot"
-                          }-template.json`;
-                          anchor.click();
-                          URL.revokeObjectURL(url);
-                        })
-                        .catch(() => undefined);
-                    }}
+                    onClick={() => setPanel("share")}
                     className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-start hover:bg-accent"
                   >
                     <Share2 size={17} strokeWidth={1.7} className="text-muted-foreground" />
@@ -4864,6 +4916,48 @@ export function ShellPage() {
                   setPanel(null);
                   navigate(`/app/${bot.id}`);
                 }}
+              />
+            ) : null}
+            {panel === "share" && active ? (
+              <SharePanel
+                botName={active.name}
+                publishing={false}
+                onPublish={async (mode) => {
+                  const shared = await rpc.teamBots.createFromBot({ botId: active.id, mode });
+                  const bot = await rpc.teamBots.open({ teamBotId: shared.id });
+                  await refreshBots();
+                  setPanel(null);
+                  navigate(`/app/${bot.id}`);
+                }}
+                onDownloadTemplate={async () => {
+                  const manifest = await rpc.export.template({ botId: active.id });
+                  const blob = new Blob([JSON.stringify(manifest, null, 2)], {
+                    type: "application/json",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement("a");
+                  anchor.href = url;
+                  anchor.download = `${
+                    active.name
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, "-")
+                      .replace(/^-|-$/g, "") || "bot"
+                  }-template.json`;
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                }}
+                onCancel={() => setPanel(null)}
+              />
+            ) : null}
+            {panel === "team-setup" && active && activeTeamBot ? (
+              <SharedSetupForm
+                teamBot={activeTeamBot}
+                onSave={async (input) => {
+                  await rpc.teamBots.update({ teamBotId: activeTeamBot.id, ...input });
+                  await refreshBots();
+                  setPanel(null);
+                }}
+                onCancel={() => setPanel(null)}
               />
             ) : null}
             {panel === "settings" && active ? (
