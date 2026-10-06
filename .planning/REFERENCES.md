@@ -14,6 +14,8 @@ Use current official sources when implementation details are uncertain or may ha
 
 ## M3 Current Product Reference — 2026-10-06
 
+Captured 2026-10-06; changelog covers v0.17.0 (Aug 12 2026) through v0.66.0 (Oct 2 2026), the current release at capture time. Full capture record, journey matrix, and gap register: `phases/17-experience-parity-contract/JOURNEY-MATRIX.md`.
+
 Current official sources are sufficient to pin important M3 journeys even without authenticated screenshots:
 
 - `https://docs.x.ai/grok-bot/skills-routines-and-automations` — Routine = workflow owned by one Bot; start with a one-time task; manage via View conversation details → Routines; enable/pause, Test run, edit schedule/instruction, inspect history, delete.

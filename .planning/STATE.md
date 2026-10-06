@@ -8,7 +8,7 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 
 ## Current Phase
 
-**Phase 17 — Experience Parity Contract & Journey Baseline (TODO — unclaimed)**
+**Phase 18 — Routines & Scheduling Experience Parity (DOING — ZCode/GLM)**
 
 ## Previous Milestones
 
@@ -36,8 +36,8 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 | 14 Details/Connect Apps/Team Bot Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 15 Main Bot/Work-Flow Feel Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 16 Responsive Parity & M2 Release | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 17 Experience Contract & Journey Baseline | TODO | — | — | 2026-10-06 |
-| 18 Routines & Scheduling Experience Parity | TODO | — | — | 2026-10-06 |
+| 17 Experience Contract & Journey Baseline | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
+| 18 Routines & Scheduling Experience Parity | DOING | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 19 Team Bot Publish & Shared Setup Parity | TODO | — | — | 2026-10-06 |
 | 20 Composer & Message Delivery Parity | TODO | — | — | 2026-10-06 |
 | 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
@@ -46,7 +46,7 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 
 ## Active Blockers
 
-- None. M3 planning is ready; Phase 17 is unclaimed.
+- None. M3 planning is committed; Phase 17 is being executed.
 
 ## Global Verification
 

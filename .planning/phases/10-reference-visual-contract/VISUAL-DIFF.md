@@ -1,5 +1,7 @@
 # Visual Diff — Masks and Tolerances
 
+> **Scope note (M3, 2026-10-06):** These gates closed M2 and stay as regression tooling only. No M3 phase or release gate (phases 17–23) depends on a Grok-vs-fork pixel ratio; see `../17-experience-parity-contract/EXPERIENCE-SPEC.md`.
+
 Phase 10 deliverable (P10-15/P10-16). How the M2 visual gates run, what is masked, and
 why. The rule: **mask only truly volatile content; never mask structural UI to make a
 diff pass.**

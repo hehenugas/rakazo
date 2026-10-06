@@ -1,5 +1,7 @@
 # M2 UI Design Contract — Grok Bot Parity
 
+> **Scope note (M3, 2026-10-06):** This contract governed M2 (phases 10–16), which is DONE. It is historical. For M3 (phases 17–23) the acceptance contract is `REQUIREMENTS.md` + `../17-experience-parity-contract/EXPERIENCE-SPEC.md` — journey/structural parity, explicitly not pixel identity. This document's visual gates remain useful as regression tooling only and are not M3 DONE gates.
+
 ## Intent
 
 M2 optimizes for recognition: a user who regularly uses Grok Bot should not need to relearn layout, control placement, state language, or common interaction flows when moving into this fork.
