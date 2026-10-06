@@ -476,8 +476,11 @@ export function ShellPage() {
   const setPanel = useCallback((next: Panel | ((current: Panel) => Panel)) => {
     // A user navigation wins over a saved routine still waiting for its list and
     // over a ?panel=/project= link that has not been applied yet: a click can land
-    // before bootstrap delivers the storage key, and the stale param must not
-    // reopen the previous panel on top of the choice the user just made.
+    // before bootstrap delivers the storage key — or after the key renders but
+    // before the restore effect runs — and the stale param must not reopen the
+    // previous panel on top of the choice the user just made. Consuming the
+    // latch here covers both windows.
+    deepLinkPanelApplied.current = true;
     pendingPanelRestore.current = null;
     pendingExplicitPanel.current = panelStorageKeyRef.current === null;
     setRestoredPanelKey(panelStorageKeyRef.current);
