@@ -1,4 +1,12 @@
 export const ZH_MESSAGES: Record<string, string> = {
+  "Could not delete routine": "无法删除例程",
+  "Could not update routine": "无法更新例程",
+  "Delete \"{name}\"? This cannot be undone.": "删除“{name}”？此操作无法撤销。",
+  "Delete routine": "删除例程",
+  "Instruction": "指令",
+  "Next run": "下次运行",
+  "Run history": "运行历史",
+  "Timezone": "时区",
   "Update your server to use AI data sharing in this mobile version.":
     "请更新服务器，以便在此移动版本中使用 AI 数据共享功能。",
   "Release computer": "释放电脑",

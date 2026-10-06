@@ -1,4 +1,12 @@
 export const RU_MESSAGES: Record<string, string> = {
+  "Could not delete routine": "Не удалось удалить рутину",
+  "Could not update routine": "Не удалось обновить рутину",
+  "Delete \"{name}\"? This cannot be undone.": "Удалить «{name}»? Это действие нельзя отменить.",
+  "Delete routine": "Удалить рутину",
+  "Instruction": "Инструкция",
+  "Next run": "Следующий запуск",
+  "Run history": "История запусков",
+  "Timezone": "Часовой пояс",
   "Update your server to use AI data sharing in this mobile version.":
     "Обновите сервер, чтобы использовать обмен данными с ИИ в этой версии мобильного приложения.",
   "Ask the server owner to configure this provider.":

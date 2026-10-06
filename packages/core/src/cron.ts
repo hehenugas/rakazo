@@ -24,11 +24,13 @@ export function hasMixedOneShotSchedule(crons: string[]): boolean {
 }
 
 export const CRON_FREQS = [
+  "Once",
   "Every hour",
   "Every day",
   "Weekdays",
   "Every week",
   "Every month",
+  "Yearly",
   "Interval",
   "Advanced",
 ] as const;
@@ -58,6 +60,7 @@ export function defaultCronPreset(): CronPreset {
 
 export function cronFromPreset(input: CronPresetInput): string {
   const advancedCron = input.cron?.trim();
+  if (input.freq === "Once") return ONCE_ROUTINE_CRON;
   if (input.freq === "Advanced") {
     if (advancedCron && isOneShotRoutineCron(advancedCron)) return ONCE_ROUTINE_CRON;
     return advancedCron || "*/3 * * * *";
@@ -73,6 +76,7 @@ export function cronFromPreset(input: CronPresetInput): string {
   if (input.freq === "Weekdays") return `${minute} ${hour} * * ${WEEKDAYS}`;
   if (input.freq === "Every week") return `${minute} ${hour} * * 1`;
   if (input.freq === "Every month") return `${minute} ${hour} 1 * *`;
+  if (input.freq === "Yearly") return `${minute} ${hour} 1 1 *`;
   return `${minute} ${hour} * * *`;
 }
 
@@ -80,7 +84,7 @@ export function presetFromCron(cron: string): CronPreset {
   const base = defaultCronPreset();
   const trimmed = cron.trim();
   if (isOneShotRoutineCron(trimmed)) {
-    return { ...base, freq: "Advanced", cron: ONCE_ROUTINE_CRON };
+    return { ...base, freq: "Once" };
   }
   const parts = trimmed.split(/\s+/);
   if (parts.length < 5) {
@@ -91,6 +95,14 @@ export function presetFromCron(cron: string): CronPreset {
   const day = parts[2] ?? "*";
   const month = parts[3] ?? "*";
   const dow = parts[4] ?? "*";
+  // Yearly fires once a year on the same date/time; recognize it before the
+  // generic month bail so the preset round-trips through the picker.
+  if (day === "1" && month === "1") {
+    if (!isInt(minute) || !isInt(hour)) {
+      return { ...base, freq: "Advanced", cron: trimmed };
+    }
+    return { ...base, freq: "Yearly", time: formatClock(Number(hour), Number(minute)) };
+  }
   if (month !== "*") {
     return { ...base, freq: "Advanced", cron: trimmed };
   }
@@ -132,6 +144,9 @@ export function presetFromCron(cron: string): CronPreset {
 }
 
 export function describeCronPreset(preset: CronPreset): { lead: string; detail: string } {
+  if (preset.freq === "Once") {
+    return { lead: "Once", detail: "" };
+  }
   if (preset.freq === "Interval") {
     return { lead: "Every", detail: `${preset.n} ${preset.unit}` };
   }
@@ -150,6 +165,9 @@ export function describeCronPreset(preset: CronPreset): { lead: string; detail: 
   if (preset.freq === "Every month") {
     return { lead: "Monthly", detail: `on the 1st at ${preset.time}` };
   }
+  if (preset.freq === "Yearly") {
+    return { lead: "Yearly", detail: `on Jan 1 at ${preset.time}` };
+  }
   return { lead: "Every day", detail: `at ${preset.time}` };
 }
 
@@ -159,8 +177,23 @@ export function formatSchedule(preset: CronPreset): string {
 }
 
 export function formatCron(cron: string): string {
-  if (isOneShotRoutineCron(cron)) return "One-time";
+  if (isOneShotRoutineCron(cron)) return "Once";
   return formatSchedule(presetFromCron(cron));
+}
+
+/** Render an instant in a routine's timezone, or "" when missing/invalid. */
+export function formatInstant(iso: string, timezone: string, locale = "en-US"): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      timeZone: validTimezoneOrUtc(timezone),
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  } catch {
+    return "";
+  }
 }
 
 export function resolveRoutineNextRunAt(

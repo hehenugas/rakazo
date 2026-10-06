@@ -23,11 +23,13 @@ const TIMES = [
   "9:00 PM",
 ];
 
-const TIMED: CronFreq[] = ["Every day", "Weekdays", "Every week", "Every month"];
+const TIMED: CronFreq[] = ["Every day", "Weekdays", "Every week", "Every month", "Yearly"];
 
 /** Translate a cron frequency into the active UI locale. */
 function cronFreqLabel(freq: CronFreq): string {
   switch (freq) {
+    case "Once":
+      return t`Once`;
     case "Every hour":
       return t`Every hour`;
     case "Every day":
@@ -38,6 +40,8 @@ function cronFreqLabel(freq: CronFreq): string {
       return t`Every week`;
     case "Every month":
       return t`Every month`;
+    case "Yearly":
+      return t`Yearly`;
     case "Interval":
       return t`Interval`;
     case "Advanced":
@@ -134,6 +138,9 @@ function describeCronPresetLocalized(
   preset: CronPreset,
   locale: string,
 ): { lead: string; detail: string } {
+  if (preset.freq === "Once") {
+    return { lead: t`Once`, detail: "" };
+  }
   if (preset.freq === "Interval") {
     if (locale === "ru") {
       return describeRussianInterval(preset.n, preset.unit);
@@ -159,6 +166,9 @@ function describeCronPresetLocalized(
   }
   if (preset.freq === "Every month") {
     return { lead: t`Monthly`, detail: t`on the 1st at ${preset.time}` };
+  }
+  if (preset.freq === "Yearly") {
+    return { lead: t`Yearly`, detail: t`on Jan 1 at ${preset.time}` };
   }
   return { lead: t`Every day`, detail: t`at ${preset.time}` };
 }

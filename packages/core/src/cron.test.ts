@@ -50,6 +50,11 @@ describe("cronFromPreset", () => {
       ONCE_ROUTINE_CRON,
     );
   });
+
+  it("maps Once and Yearly choices", () => {
+    expect(cronFromPreset(preset({ freq: "Once" }))).toBe(ONCE_ROUTINE_CRON);
+    expect(cronFromPreset(preset({ freq: "Yearly", time: "9:00 AM" }))).toBe("0 9 1 1 *");
+  });
 });
 
 describe("presetFromCron", () => {
@@ -95,10 +100,16 @@ describe("presetFromCron", () => {
       freq: "Advanced",
       cron: "30 14 15 * *",
     });
-    expect(presetFromCron(ONCE_ROUTINE_CRON)).toMatchObject({
-      freq: "Advanced",
-      cron: ONCE_ROUTINE_CRON,
-    });
+    expect(presetFromCron(ONCE_ROUTINE_CRON)).toMatchObject({ freq: "Once" });
+  });
+
+  it("round-trips Once and Yearly", () => {
+    expect(presetFromCron(ONCE_ROUTINE_CRON).freq).toBe("Once");
+    const yearly = presetFromCron("0 9 1 1 *");
+    expect(yearly).toMatchObject({ freq: "Yearly", time: "9:00 AM" });
+    expect(cronFromPreset(yearly)).toBe("0 9 1 1 *");
+    // A non-January month stays Advanced so the picker never misrepresents it.
+    expect(presetFromCron("0 9 1 6 *")).toMatchObject({ freq: "Advanced" });
   });
 });
 
@@ -122,7 +133,7 @@ describe("formatCron", () => {
     expect(formatCron("0 9 * * 1")).toBe("Every Monday at 9:00 AM");
     expect(formatCron("0 8 * * 1-5")).toBe("Weekdays at 8:00 AM");
     expect(formatCron("*/15 * * * *")).toBe("Every 15 minutes");
-    expect(formatCron(ONCE_ROUTINE_CRON)).toBe("One-time");
+    expect(formatCron(ONCE_ROUTINE_CRON)).toBe("Once");
     expect(describeCronPreset(preset({ freq: "Every hour" }))).toEqual({
       lead: "Every hour",
       detail: "",

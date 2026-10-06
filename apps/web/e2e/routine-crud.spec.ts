@@ -322,6 +322,74 @@ test("switching bots while a routine save is pending does not reopen stale state
   await expect(panelRowsAfterSwitch.filter({ hasText: "First routine" })).toHaveCount(0);
 });
 
+test("pause hides next run, resume restores it; Once and Yearly stay available", async ({
+  page,
+}, testInfo) => {
+  const stamp = Date.now();
+  await signup(page, `routine-pause-${stamp}@rakazo.test`, "password12", "Routine Pause");
+  await completeOnboarding(page);
+  const botId = activeBotId(page);
+
+  await rpc<Routine>(page, "routines/create", {
+    botId,
+    name: "Daily brief",
+    prompt: "Post the brief",
+    crons: ["0 9 * * *"],
+    timezone: "Asia/Tokyo",
+    active: true,
+    notify: true,
+  });
+  await page.reload();
+  await page.getByTestId("bot-settings-trigger").click();
+  await page.getByTestId("conversation-details-routines").click();
+  const panel = page.getByTestId("side-panel");
+  const row = () => panel.getByRole("button", { name: /Daily brief/ });
+  await expect(row()).toContainText("Next run");
+
+  // Primary human presets are grouped ahead of the Advanced disclosure.
+  await row().click();
+  await page.getByRole("button", { name: "Add trigger" }).click();
+  await page.getByRole("menuitem", { name: "On a schedule" }).hover();
+  await expect(page.getByRole("menuitem", { name: "Yearly", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Every hour", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Advanced...", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Pausing removes the next run from the management home.
+  const activeToggle = page.getByRole("switch", { name: "Active" });
+  await activeToggle.click();
+  await saveAndReturn(page, "routines/update");
+  await expect(row()).toContainText("Paused");
+  await expect(row()).not.toContainText("Next run");
+
+  // Resuming re-arms the schedule and the next run returns.
+  await row().click();
+  await page.getByRole("switch", { name: "Active" }).click();
+  await saveAndReturn(page, "routines/update");
+  await expect(row()).toContainText("Next run");
+  await captureScreenshot(page, testInfo, "18-routine-resumed");
+
+  // A Once schedule is a first-class preset and arms from an explicit run time.
+  await panel.getByRole("button", { name: "Create Routine" }).click();
+  await page.locator("label:has-text('Name') input").fill("Launch reminder");
+  await page.locator("label:has-text('Instruction') textarea").fill("Post the launch note");
+  await addScheduleTrigger(page, "Once");
+  const runAt = new Date(Date.now() + 90 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const localValue = `${runAt.getFullYear()}-${pad(runAt.getMonth() + 1)}-${pad(runAt.getDate())}T${pad(runAt.getHours())}:${pad(runAt.getMinutes())}`;
+  await page.getByLabel("Run at").fill(localValue);
+  const saved = page.waitForResponse(
+    (response) => response.url().includes("/rpc/routines/create") && response.ok(),
+  );
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await saved;
+  await page.getByRole("button", { name: "Back" }).click();
+  const onceRow = panel.getByRole("button", { name: /Launch reminder/ });
+  await expect(onceRow).toContainText("Once");
+  await expect(onceRow).toContainText("Next run");
+  await captureScreenshot(page, testInfo, "18-routine-once-armed");
+});
+
 function localSchedule(iso: string, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,

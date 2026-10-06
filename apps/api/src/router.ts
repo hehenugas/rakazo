@@ -97,6 +97,8 @@ import {
   scriptedCatalogEntry,
   selectDefaultCredentialId,
   serializeModelSecret,
+  appendRoutineTranscriptNotice,
+  routineConfirmLines,
   storeBotSecret,
   takeoverLeaseMs,
   toComputerRef,
@@ -138,6 +140,8 @@ import {
   clampCatalogThinkingLevel,
   containsSecret,
   expandSkillReferencesInPrompt,
+  formatCron,
+  formatInstant,
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
   nextCronDateAcrossStrict,
@@ -3310,9 +3314,25 @@ export function createRouter(deps: RouterDeps) {
             message: "A one-time schedule can't be combined with other schedules.",
           });
         }
+        let armedOneShotAt: Date | null = null;
         if (input.active && isOneShotRoutineCrons(input.crons)) {
+          // Editor-created one-shots carry an explicit run time; chat-created
+          // ones are armed by schedule_create instead.
+          if (!input.runAt) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Add a run time for this one-shot.",
+            });
+          }
+          const parsed = new Date(input.runAt);
+          if (!Number.isFinite(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "Run time must be in the future.",
+            });
+          }
+          armedOneShotAt = parsed;
+        } else if (input.runAt !== undefined) {
           throw new ORPCError("BAD_REQUEST", {
-            message: "One-shot schedules must be created from chat.",
+            message: "A run time is only for one-shots that have not run yet.",
           });
         }
         const bot = await repos.getBot(context.actor, input.botId);
@@ -3321,6 +3341,8 @@ export function createRouter(deps: RouterDeps) {
         if (input.crons.length > 0 && !isOneShotRoutineCrons(input.crons)) {
           const computedNextRunAt = nextRoutineDate(input.crons, input.timezone);
           nextRunAt = input.active ? computedNextRunAt : null;
+        } else if (input.active && isOneShotRoutineCrons(input.crons)) {
+          nextRunAt = armedOneShotAt;
         }
         const row = await deps.prisma.routine.create({
           data: {
@@ -3349,9 +3371,8 @@ export function createRouter(deps: RouterDeps) {
           });
           await appendRoutineTranscriptNotice(
             deps,
-            context.actor,
-            bot,
-            `Routine "${row.name}" created`,
+            { spaceId: context.actor.spaceId, botId: bot.id, threadId: bot.thread.id },
+            [{ kind: "card", lines: routineConfirmLines(row) }],
           );
         }
         if (row.active && row.nextRunAt) {
@@ -3466,12 +3487,22 @@ export function createRouter(deps: RouterDeps) {
             type: "routine.updated",
             payload: { routineId: row.id, active: row.active },
           });
-          if (scheduleChanged || (input.active !== undefined && input.active !== existing.active)) {
+          if (scheduleChanged) {
             await appendRoutineTranscriptNotice(
               deps,
-              context.actor,
-              bot,
-              `Routine "${row.name}" ${row.active ? "active" : "paused"}`,
+              { spaceId: context.actor.spaceId, botId: bot.id, threadId: bot.thread.id },
+              [{ kind: "card", lines: routineConfirmLines(row) }],
+            );
+          } else if (input.active !== undefined && input.active !== existing.active) {
+            await appendRoutineTranscriptNotice(
+              deps,
+              { spaceId: context.actor.spaceId, botId: bot.id, threadId: bot.thread.id },
+              [
+                {
+                  kind: "meta",
+                  text: `Routine "${row.name}" ${row.active ? "active" : "paused"}`,
+                },
+              ],
             );
           }
         }
@@ -5880,41 +5911,6 @@ function updaterConfig(deps: RouterDeps): UpdaterProxyConfig {
     gitSha: deps.env.gitSha,
     imageTag: deps.env.imageTag ?? null,
   };
-}
-
-async function appendRoutineTranscriptNotice(
-  deps: RouterDeps,
-  actor: Actor,
-  bot: { id: string; thread: { id: string } | null },
-  text: string,
-) {
-  if (!bot.thread) return;
-  try {
-    const message = await deps.prisma.$transaction(async (tx) => {
-      const created = await createThreadMessageInTransaction(tx, {
-        threadId: bot.thread!.id,
-        role: "bot",
-        botId: bot.id,
-        blocks: [{ kind: "meta", text }],
-        clientNonce: `routine-notice:${randomUUID()}`,
-      });
-      await appendEventInTransaction(tx, {
-        spaceId: actor.spaceId,
-        threadId: bot.thread!.id,
-        botId: bot.id,
-        type: "thread.message.created",
-        payload: {
-          messageId: created.id,
-          role: "bot",
-          blocks: [{ kind: "meta", text }],
-        },
-      });
-      return created;
-    });
-    return message;
-  } catch (error) {
-    getLogger().error("routine transcript notice", error);
-  }
 }
 
 function projectDto(row: {

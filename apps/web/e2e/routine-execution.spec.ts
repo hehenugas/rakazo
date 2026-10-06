@@ -31,6 +31,7 @@ test("Slack message trigger uses the mounted messaging provider and persists", a
     .getByPlaceholder("What should this routine do each time it runs?")
     .fill("Review the verified message event");
   await page.getByRole("button", { name: "Add trigger" }).click();
+  await page.getByRole("menuitem", { name: "Event triggers" }).hover();
   await page.getByRole("menuitem", { name: "Slack message", exact: true }).click();
 
   const panel = page.getByTestId("side-panel");
@@ -71,6 +72,7 @@ test("GitHub event trigger exposes signed delivery settings and persists", async
     .getByPlaceholder("What should this routine do each time it runs?")
     .fill("Inspect the signed GitHub event");
   await page.getByRole("button", { name: "Add trigger" }).click();
+  await page.getByRole("menuitem", { name: "Event triggers" }).hover();
   await page.getByRole("menuitem", { name: "Git event", exact: true }).click();
 
   await expect(
@@ -117,6 +119,7 @@ test("Korean webhook routine keeps technical field labels in English", async ({
     .getByPlaceholder("이 루틴이 실행될 때마다 무엇을 해야 하나요?")
     .fill("웹훅을 확인합니다.");
   await page.getByRole("button", { name: "트리거 추가" }).click();
+  await page.getByRole("menuitem", { name: "이벤트 트리거" }).hover();
   await page.getByRole("menuitem", { name: "웹훅", exact: true }).click();
 
   await expect(page.getByText("웹훅이 실행될 때", { exact: true })).toBeVisible();

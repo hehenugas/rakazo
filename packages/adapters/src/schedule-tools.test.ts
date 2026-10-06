@@ -252,7 +252,12 @@ describe("schedule tool persistence", () => {
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
+            prompt: "Tell a joke",
             crons: ["*/1 * * * *"],
+            timezone: "UTC",
+            webhookEnabled: false,
+            githubEnabled: false,
+            messageProvider: null,
             nextRunAt: new Date(),
           })),
           delete: remove,
@@ -289,7 +294,12 @@ describe("schedule tool persistence", () => {
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
+            prompt: "Tell a joke",
             crons: ["*/1 * * * *"],
+            timezone: "UTC",
+            webhookEnabled: false,
+            githubEnabled: false,
+            messageProvider: null,
             nextRunAt: new Date(),
           })),
           delete: remove,
@@ -326,7 +336,12 @@ describe("schedule tool persistence", () => {
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
+            prompt: "Tell a joke",
             crons: ["*/1 * * * *"],
+            timezone: "UTC",
+            webhookEnabled: false,
+            githubEnabled: false,
+            messageProvider: null,
             nextRunAt: new Date(),
           })),
           delete: vi.fn(async () => {
@@ -368,7 +383,12 @@ describe("schedule tool persistence", () => {
           create: vi.fn(async () => ({
             id: "routine-1",
             name: "Morning joke",
+            prompt: "Tell a joke",
             crons: ["*/1 * * * *"],
+            timezone: "UTC",
+            webhookEnabled: false,
+            githubEnabled: false,
+            messageProvider: null,
             nextRunAt: new Date(),
           })),
           delete: vi.fn(async () => {

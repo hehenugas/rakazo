@@ -1,4 +1,5 @@
 import type { Routine } from "@rakazo/contracts";
+import { formatCron, formatInstant } from "@rakazo/core";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
@@ -8,7 +9,7 @@ import { useMobileTokens } from "../lib/native";
 
 function routineTriggerSummary(routine: Routine, t: (message: string) => string) {
   return [
-    ...routine.crons,
+    ...routine.crons.map((cron) => formatCron(cron)),
     ...(routine.webhookEnabled ? [t("Webhook")] : []),
     ...(routine.githubEnabled ? [t("Git event")] : []),
     ...(routine.messageProvider === "slack"
@@ -76,47 +77,56 @@ export default function RoutinesScreen() {
             </Text>
           )
         }
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: "/routine",
-                params: { botId: botId ?? "", routineId: item.id, botName: botName ?? "" },
-              })
-            }
-            style={({ pressed }) => ({
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: tokens.card,
-              padding: 16,
-              gap: 6,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text
-                numberOfLines={1}
-                style={{ color: tokens.foreground, fontSize: 16, fontWeight: "600", flex: 1 }}
-              >
-                {item.name}
+        renderItem={({ item }) => {
+          const nextRun =
+            item.active && item.nextRunAt ? formatInstant(item.nextRunAt, item.timezone) : "";
+          return (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: "/routine",
+                  params: { botId: botId ?? "", routineId: item.id, botName: botName ?? "" },
+                })
+              }
+              style={({ pressed }) => ({
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: tokens.card,
+                padding: 16,
+                gap: 6,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: tokens.foreground, fontSize: 16, fontWeight: "600", flex: 1 }}
+                >
+                  {item.name}
+                </Text>
+                <Text
+                  style={{
+                    color: item.active ? tokens.success : tokens.mutedForeground,
+                    fontSize: 13,
+                    fontWeight: "500",
+                  }}
+                >
+                  {item.active ? t("Active") : t("Paused")}
+                </Text>
+              </View>
+              <Text numberOfLines={1} style={{ color: tokens.mutedForeground, fontSize: 14 }}>
+                {routineTriggerSummary(item, t)}
               </Text>
-              <Text
-                style={{
-                  color: item.active ? tokens.success : tokens.mutedForeground,
-                  fontSize: 13,
-                  fontWeight: "500",
-                }}
-              >
-                {item.active ? t("Active") : t("Paused")}
-              </Text>
-            </View>
-            <Text numberOfLines={1} style={{ color: tokens.mutedForeground, fontSize: 14 }}>
-              {routineTriggerSummary(item, t)}
-            </Text>
-          </Pressable>
-        )}
+              {nextRun ? (
+                <Text numberOfLines={1} style={{ color: tokens.mutedForeground, fontSize: 13 }}>
+                  {t("Next run")} {nextRun}
+                </Text>
+              ) : null}
+            </Pressable>
+          );
+        }}
       />
     </>
   );

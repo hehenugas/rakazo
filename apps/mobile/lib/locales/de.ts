@@ -3,12 +3,20 @@ export const DE_MESSAGES: Record<string, string> = {
   "Chat Settings": "Chat-Einstellungen",
   "Configure a plugin catalog on the server to connect apps.":
     "Richte auf dem Server einen Plugin-Katalog ein, um Apps zu verbinden.",
+  "Could not delete routine": "Routine konnte nicht gelöscht werden",
+  "Could not update routine": "Routine konnte nicht aktualisiert werden",
+  "Delete \"{name}\"? This cannot be undone.": "„{name}“ löschen? Dies kann nicht rückgängig gemacht werden.",
+  "Delete routine": "Routine löschen",
+  "Instruction": "Anweisung",
+  "Next run": "Nächste Ausführung",
   "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed.":
     "Füge die OpenAI-kompatible Adresse deines Servers ein. Rakazo ergänzt /v1 bei Bedarf.",
+  "Run history": "Ausführungsverlauf",
   "Settings: General": "Einstellungen: Allgemein",
   "Settings: Usage": "Einstellungen: Nutzung",
   "Sign-in did not return a session": "Die Anmeldung hat keine Sitzung zurückgegeben",
   "Sign-up did not return a session": "Die Registrierung hat keine Sitzung zurückgegeben",
+  "Timezone": "Zeitzone",
   "{count} model": "{count} Modell",
   "{count} models": "{count} Modelle",
   // app/_layout.tsx

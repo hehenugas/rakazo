@@ -7,6 +7,7 @@ import {
   cronFromPreset,
   defaultCronPreset,
   formatCron,
+  formatInstant,
   isOneShotRoutineCrons,
   presetFromCron,
 } from "@rakazo/core";
@@ -20,10 +21,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
+  NativeSelect,
+  NativeSelectOption,
   Textarea,
 } from "@rakazo/ui-web";
 import { ChevronLeft, Clock, GitBranch, Globe, MessageSquare, Pause, Plus, X } from "lucide-react";
 import { useId } from "react";
+import { localTimezone } from "../lib/local-timezone";
 import { RoutineRunHistory } from "./RoutineRunHistory";
 import { RoutineSchedule } from "./RoutineSchedule";
 
@@ -44,14 +48,16 @@ export function routineNeedsOneShotArm(
 }
 
 const SCHEDULE_PRESETS: CronFreq[] = [
-  "Every hour",
+  "Once",
   "Every day",
   "Weekdays",
   "Every week",
   "Every month",
-  "Interval",
-  "Advanced",
+  "Yearly",
 ];
+
+/** Hourly/interval/raw cron stay behind the Advanced group (journey parity). */
+const ADVANCED_PRESETS: CronFreq[] = ["Every hour", "Interval", "Advanced"];
 
 const COMING_SOON = [
   { id: "teams", label: () => t`Teams message` },
@@ -64,6 +70,7 @@ export type RoutineDraftState = {
   name: string;
   prompt: string;
   schedules: CronPreset[];
+  timezone: string;
   webhookEnabled: boolean;
   githubEnabled: boolean;
   messageProvider: string | null;
@@ -76,6 +83,7 @@ export function emptyRoutineDraft(): RoutineDraftState {
     name: "",
     prompt: "",
     schedules: [],
+    timezone: localTimezone(),
     webhookEnabled: false,
     githubEnabled: false,
     messageProvider: null,
@@ -89,6 +97,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
     name: routine.name,
     prompt: routine.prompt,
     schedules: routine.crons.map(presetFromCron),
+    timezone: routine.timezone,
     webhookEnabled: routine.webhookEnabled,
     githubEnabled: routine.githubEnabled,
     messageProvider: routine.messageProvider,
@@ -141,6 +150,8 @@ export function RoutineListRow({
   onOpen: () => void;
   onStop: () => void;
 }) {
+  const nextRun =
+    routine.active && routine.nextRunAt ? formatInstant(routine.nextRunAt, routine.timezone) : "";
   return (
     <div className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 hover:bg-accent">
       <button
@@ -161,6 +172,14 @@ export function RoutineListRow({
           </span>
           <span className="block truncate text-[12.5px] text-muted-foreground/80">
             {routineTriggerSummary(routine)}
+            {nextRun ? (
+              <>
+                {" · "}
+                <Trans>Next run</Trans>
+                {": "}
+                {nextRun}
+              </>
+            ) : null}
           </span>
         </span>
       </button>
@@ -181,7 +200,6 @@ export function RoutineEditor({
   draft,
   onChange,
   editing,
-  timezone,
   webhook,
   githubPath,
   messageProviders,
@@ -198,7 +216,6 @@ export function RoutineEditor({
   draft: RoutineDraftState;
   onChange: (next: RoutineDraftState) => void;
   editing: Routine | null;
-  timezone: string;
   webhook: { path: string; secret: string | null; configured: boolean };
   githubPath: string;
   messageProviders: string[];
@@ -222,13 +239,19 @@ export function RoutineEditor({
     draft.githubEnabled ||
     Boolean(draft.messageProvider);
   const canTest = Boolean(editing) && !saving && !running;
-  const needsOneShotArm =
-    editing != null && routineNeedsOneShotArm(editing, draft.schedules.map(cronFromPreset));
+  const draftHasOnce = draft.schedules.some((preset) => preset.freq === "Once");
+  const needsOneShotArm = editing
+    ? routineNeedsOneShotArm(editing, draft.schedules.map(cronFromPreset))
+    : draftHasOnce;
+  const nextRunAt =
+    editing?.active && editing.nextRunAt ? formatInstant(editing.nextRunAt, draft.timezone) : "";
 
   function addSchedule(freq: CronFreq) {
     const base = defaultCronPreset();
     const next: CronPreset =
-      freq === "Advanced" ? { ...base, freq, cron: cronFromPreset(base) } : { ...base, freq };
+      freq === "Advanced" || freq === "Once"
+        ? { ...base, freq, cron: cronFromPreset({ ...base, freq }) }
+        : { ...base, freq };
     onChange({ ...draft, schedules: [...draft.schedules, next] });
   }
 
@@ -331,10 +354,30 @@ export function RoutineEditor({
       </label>
 
       <div className="mt-5 text-sm text-muted-foreground">
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <Trans>When to run</Trans>
-          <span className="text-xs text-muted-foreground/70">{timezone}</span>
+          <NativeSelect
+            size="sm"
+            className="h-7 w-auto py-0 text-xs"
+            value={draft.timezone}
+            aria-label={t`Timezone`}
+            onChange={(event) => onChange({ ...draft, timezone: event.target.value })}
+          >
+            {timezoneChoices().map((zone) => (
+              <NativeSelectOption key={zone} value={zone}>
+                {zone}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         </div>
+
+        {nextRunAt ? (
+          <div className="mt-1.5 text-xs text-muted-foreground/80">
+            <Trans>Next run</Trans>
+            {": "}
+            <span className="text-foreground/80">{nextRunAt}</span>
+          </div>
+        ) : null}
 
         <div className="mt-2 space-y-2">
           {draft.schedules.map((preset, index) => (
@@ -430,51 +473,70 @@ export function RoutineEditor({
                     {schedulePresetLabel(freq)}
                   </DropdownMenuItem>
                 ))}
+                <span
+                  aria-hidden
+                  className="block px-2 pt-2 pb-1 text-[11px] tracking-wide text-muted-foreground/60 uppercase"
+                >
+                  <Trans>Advanced</Trans>
+                </span>
+                {ADVANCED_PRESETS.map((freq) => (
+                  <DropdownMenuItem key={freq} onClick={() => addSchedule(freq)}>
+                    {schedulePresetLabel(freq)}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <span className="block" title={slackAvailable ? undefined : t`Slack not enabled`}>
-              <DropdownMenuItem
-                disabled={draft.messageProvider === "slack" || !slackAvailable}
-                aria-describedby={slackAvailable ? undefined : slackDisabledReasonId}
-                onClick={() => addMessageProvider("slack")}
-              >
-                <MessageSquare />
-                <Trans>Slack message</Trans>
-              </DropdownMenuItem>
-              {!slackAvailable ? (
-                <span id={slackDisabledReasonId} className="sr-only">
-                  <Trans>Slack not enabled</Trans>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Globe />
+                <Trans>Event triggers</Trans>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-[170px]">
+                <span className="block" title={slackAvailable ? undefined : t`Slack not enabled`}>
+                  <DropdownMenuItem
+                    disabled={draft.messageProvider === "slack" || !slackAvailable}
+                    aria-describedby={slackAvailable ? undefined : slackDisabledReasonId}
+                    onClick={() => addMessageProvider("slack")}
+                  >
+                    <MessageSquare />
+                    <Trans>Slack message</Trans>
+                  </DropdownMenuItem>
+                  {!slackAvailable ? (
+                    <span id={slackDisabledReasonId} className="sr-only">
+                      <Trans>Slack not enabled</Trans>
+                    </span>
+                  ) : null}
                 </span>
-              ) : null}
-            </span>
 
-            {COMING_SOON.map((item) => (
-              <span
-                key={item.id}
-                className="block"
-                title={item.id === "teams" ? t`Teams not enabled` : t`Coming soon`}
-              >
-                <DropdownMenuItem disabled>
+                {COMING_SOON.map((item) => (
                   <span
-                    aria-hidden
-                    className="inline-block size-3.5 rounded-[4px]"
-                    style={{ background: comingSoonColor(item.id), opacity: 0.55 }}
-                  />
-                  {item.label()}
+                    key={item.id}
+                    className="block"
+                    title={item.id === "teams" ? t`Teams not enabled` : t`Coming soon`}
+                  >
+                    <DropdownMenuItem disabled>
+                      <span
+                        aria-hidden
+                        className="inline-block size-3.5 rounded-[4px]"
+                        style={{ background: comingSoonColor(item.id), opacity: 0.55 }}
+                      />
+                      {item.label()}
+                    </DropdownMenuItem>
+                  </span>
+                ))}
+
+                <DropdownMenuItem disabled={draft.githubEnabled} onClick={() => void addGithub()}>
+                  <GitBranch />
+                  <Trans>Git event</Trans>
                 </DropdownMenuItem>
-              </span>
-            ))}
 
-            <DropdownMenuItem disabled={draft.githubEnabled} onClick={() => void addGithub()}>
-              <GitBranch />
-              <Trans>Git event</Trans>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem disabled={draft.webhookEnabled} onClick={() => void addWebhook()}>
-              <Globe />
-              <Trans>Webhook</Trans>
-            </DropdownMenuItem>
+                <DropdownMenuItem disabled={draft.webhookEnabled} onClick={() => void addWebhook()}>
+                  <Globe />
+                  <Trans>Webhook</Trans>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -623,6 +685,8 @@ function InboundTriggerCard({
 
 function schedulePresetLabel(freq: CronFreq): string {
   switch (freq) {
+    case "Once":
+      return t`Once`;
     case "Every hour":
       return t`Every hour`;
     case "Every day":
@@ -633,6 +697,8 @@ function schedulePresetLabel(freq: CronFreq): string {
       return t`Every week`;
     case "Every month":
       return t`Every month`;
+    case "Yearly":
+      return t`Yearly`;
     case "Interval":
       return t`Interval`;
     case "Advanced":
@@ -640,6 +706,44 @@ function schedulePresetLabel(freq: CronFreq): string {
     default:
       return freq;
   }
+}
+
+/**
+ * Full IANA list when the browser exposes it, else a curated common set — the
+ * editor needs every valid zone to be selectable, but must not crash older
+ * engines that lack `Intl.supportedValuesOf`.
+ */
+function timezoneChoices(): string[] {
+  const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
+    .supportedValuesOf;
+  if (typeof supported === "function") {
+    try {
+      const zones = supported.call(Intl, "timeZone");
+      if (Array.isArray(zones) && zones.length > 0) return zones;
+    } catch {
+      // Fall through to the curated list.
+    }
+  }
+  return [
+    "UTC",
+    localTimezone(),
+    "America/Los_Angeles",
+    "America/Denver",
+    "America/Chicago",
+    "America/New_York",
+    "America/Sao_Paulo",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Europe/Moscow",
+    "Asia/Dubai",
+    "Asia/Jakarta",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Asia/Seoul",
+    "Australia/Sydney",
+    "Pacific/Auckland",
+  ].filter((zone, index, all) => all.indexOf(zone) === index);
 }
 
 function comingSoonColor(id: string): string {

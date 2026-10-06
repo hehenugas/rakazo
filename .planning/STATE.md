@@ -8,7 +8,7 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 
 ## Current Phase
 
-**Phase 18 — Routines & Scheduling Experience Parity (DOING — ZCode/GLM)**
+**Phase 19 — Team Bot Publish & Shared Setup Parity (DOING — ZCode/GLM)**
 
 ## Previous Milestones
 
@@ -37,8 +37,8 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 | 15 Main Bot/Work-Flow Feel Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 16 Responsive Parity & M2 Release | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 17 Experience Contract & Journey Baseline | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 18 Routines & Scheduling Experience Parity | DOING | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 19 Team Bot Publish & Shared Setup Parity | TODO | — | — | 2026-10-06 |
+| 18 Routines & Scheduling Experience Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
+| 19 Team Bot Publish & Shared Setup Parity | DOING | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 20 Composer & Message Delivery Parity | TODO | — | — | 2026-10-06 |
 | 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
 | 22 Projects/Delegation/Main Bot Parity | TODO | — | — | 2026-10-06 |

@@ -739,7 +739,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "schedule_create",
     description:
-      'Create a reminder or recurring job for this bot. Use for "remind me in 10 minutes" or "every morning send a joke". Repeats: cron or every/unit (min 1 minute). One-shot: runAt, delayMinutes, or delaySeconds.',
+      'Create a reminder or recurring routine for this bot from what the user asked for ("every weekday at 8", "remind me in 10 minutes"). Ask only for material details that are missing (what to repeat, when it should run) — never make the user write cron. After the tool succeeds, confirm in one short reply: the routine name, the schedule in words (scheduleText), the timezone, and the next run time (nextRunAt). Repeats: cron or every/unit (min 1 minute). One-shot: runAt, delayMinutes, or delaySeconds.',
     inputSchema: scheduleCreateInputSchema,
   },
   {

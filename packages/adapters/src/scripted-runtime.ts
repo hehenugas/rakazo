@@ -467,6 +467,24 @@ code-b
       },
     ];
   }
+  if (lower.includes("create a routine") || lower.includes("schedule a routine")) {
+    return [
+      {
+        assistant: "scheduling that for you.",
+        toolCalls: [
+          {
+            name: "schedule_create",
+            args: {
+              name: "Weekday digest",
+              prompt: prompt,
+              cron: "0 9 * * 1-5",
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
   if (
     lower.includes("silence finish notifications") ||
     lower.includes("turn off finish notifications")

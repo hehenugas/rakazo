@@ -1,13 +1,22 @@
+import { randomUUID } from "node:crypto";
 import type { JobPublisher } from "@rakazo/adapter-kit";
 import { routineJobKey, routineWakeupJob } from "@rakazo/adapter-kit";
 import {
   cronFromPreset,
+  formatCron,
+  formatInstant,
   isOneShotRoutineCron,
   isOneShotRoutineCrons,
   nextCronDate,
   ONCE_ROUTINE_CRON,
 } from "@rakazo/core";
-import type { PrismaClient, ThreadEvents } from "@rakazo/db";
+import {
+  appendEventInTransaction,
+  createThreadMessageInTransaction,
+  type PrismaClient,
+  type ThreadEvents,
+} from "@rakazo/db";
+import { getLogger } from "@rakazo/logging";
 
 export { isOneShotRoutineCron, ONCE_ROUTINE_CRON };
 
@@ -199,6 +208,87 @@ export interface ScheduleToolDeps {
   jobs: JobPublisher;
 }
 
+/** Human-readable trigger summary for a routine confirmation card. */
+export function routineWhenSummary(row: {
+  crons: string[];
+  webhookEnabled: boolean;
+  githubEnabled: boolean;
+  messageProvider: string | null;
+}): string {
+  const parts: string[] = [];
+  if (row.webhookEnabled) parts.push("When a webhook fires");
+  if (row.githubEnabled) parts.push("Git event");
+  if (row.messageProvider === "slack") parts.push("Slack message");
+  else if (row.messageProvider) parts.push("Message event");
+  for (const cron of row.crons) parts.push(formatCron(cron));
+  return parts.join(" · ");
+}
+
+/**
+ * Concise confirmation lines: instruction, schedule, timezone, next run. The
+ * single source for every Routine-created/updated confirmation so the chat and
+ * editor paths read identically.
+ */
+export function routineConfirmLines(row: {
+  name: string;
+  prompt: string;
+  crons: string[];
+  timezone: string;
+  webhookEnabled: boolean;
+  githubEnabled: boolean;
+  messageProvider: string | null;
+  nextRunAt: Date | null;
+}): Array<{ k: string; v: string }> {
+  const instruction = row.prompt.length > 90 ? `${row.prompt.slice(0, 89)}…` : row.prompt;
+  const lines = [
+    { k: "Routine", v: row.name },
+    { k: "Instruction", v: instruction },
+    { k: "When", v: routineWhenSummary(row) },
+    { k: "Timezone", v: row.timezone },
+  ];
+  if (row.nextRunAt) {
+    lines.push({ k: "Next run", v: formatInstant(row.nextRunAt.toISOString(), row.timezone) });
+  }
+  return lines;
+}
+
+type RoutineNoticeBlocks =
+  | [{ kind: "meta"; text: string }]
+  | [{ kind: "card"; lines: Array<{ k: string; v: string }> }];
+
+/** Post a durable Routine confirmation message into the owning thread. */
+export async function appendRoutineTranscriptNotice(
+  deps: { prisma: PrismaClient },
+  input: { spaceId: string; botId: string; threadId: string },
+  blocks: RoutineNoticeBlocks,
+): Promise<void> {
+  try {
+    await deps.prisma.$transaction(async (tx) => {
+      const created = await createThreadMessageInTransaction(tx, {
+        threadId: input.threadId,
+        role: "bot",
+        botId: input.botId,
+        blocks,
+        clientNonce: `routine-notice:${randomUUID()}`,
+      });
+      await appendEventInTransaction(tx, {
+        spaceId: input.spaceId,
+        threadId: input.threadId,
+        botId: input.botId,
+        type: "thread.message.created",
+        payload: {
+          messageId: created.id,
+          role: "bot",
+          blocks,
+        },
+      });
+      return created;
+    });
+  } catch (error) {
+    getLogger().error("routine transcript notice", error);
+  }
+}
+
 /** Persist and enqueue a bot routine that wakes in the originating thread. */
 export async function createScheduleFromTool(
   deps: ScheduleToolDeps,
@@ -265,12 +355,18 @@ export async function createScheduleFromTool(
     // Match routines.create: the reminder is live even if the thread signal fails.
   }
 
+  await appendRoutineTranscriptNotice(deps, input, [
+    { kind: "card", lines: routineConfirmLines(row) },
+  ]);
+
   return {
     ok: true as const,
     routineId: row.id,
     name: row.name,
     cron: row.crons[0],
+    scheduleText: formatCron(resolved.cron),
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
+    timezone: row.timezone,
     oneShot: resolved.oneShot,
   };
 }
