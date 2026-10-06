@@ -4,7 +4,7 @@
 
 Create an open-source, self-hostable Grok Bot alternative by forking Rakazo and preserving its provider-neutral runtime, computers, memory, integrations, routines, and multi-agent primitives while making the externally observable product experience feel as close as practical to the current Grok Bot reference.
 
-The target is an **independent implementation with close visual, interaction, and workflow parity** to public Grok Bot references. M1 establishes capability and information-architecture parity; M2 raises the acceptance bar to measured UI/UX parity across geometry, hierarchy, copy, state transitions, timing, keyboard behavior, and responsive flow. Do not copy proprietary source code, private assets, or hidden implementation details.
+The target is an **independent implementation with close product-experience parity** to public Grok Bot references. M1 established capability and information architecture; M2 aligned the visible shell and major UI surfaces; M3 focuses on journey parity — where features live, how users start them, the sequence of steps, ownership/lifecycle semantics, action labels, error/retry behavior, approvals, and desktop/mobile capability split. Pixel-perfect reproduction is explicitly not required. Do not copy proprietary source code, private assets, or hidden implementation details.
 
 ## Primary Product Goal
 
@@ -72,6 +72,7 @@ The project treats the following as first-class gaps:
 13. Mobile parity for the new information architecture
 14. Release hardening, migrations, auditability, and upstream-sync discipline
 15. Measured Grok Bot UI/UX parity across shell, roster, composer, transcript, details, Team Bot, coordination, and responsive/mobile flows
+16. Grok Bot experience/journey parity for Routines, Team Bot lifecycle, composer delivery, transcript/voice/approvals, Projects/delegation, and Main Bot attention
 
 ## Product Principles
 
@@ -101,14 +102,19 @@ Prefer additive models, clear adapters, isolated UI modules, and migrations that
 
 ### P7 — Parity is verified state, not feature presence
 
-For M2 UI/UX work, a feature is not “parity” merely because an equivalent control exists. The reference state, geometry, visible copy, interaction behavior, timing, keyboard flow, and responsive transformation must be captured and verified. Stable surfaces should use deterministic screenshots and visual diffing.
+A feature is not “parity” merely because an equivalent control exists. Its real user journey, lifecycle, ownership, state transitions, error/retry semantics, and important learned interactions must be verified.
+
+### P8 — M3 optimizes for no relearning, not identical pixels
+
+A Grok Bot user should know where to go and what will happen without learning a fork-specific workflow. Exact pixels, font rendering, colors, shadows, and screenshot-diff percentages are not M3 acceptance gates. Deterministic screenshots remain useful for hierarchy and regression review.
 
 ## Explicit Non-Goals
 
 Unless added to a future milestone:
 
 - no visual node-canvas workflow builder like n8n
-- no copying proprietary source code, private assets, or hidden implementation details; independently implemented pixel-level alignment to observable public UI is a valid M2 goal
+- no copying proprietary source code, private assets, or hidden implementation details
+- no requirement for pixel-perfect Grok reproduction; layout hierarchy and product experience matter more than exact measurements
 - no xAI-only model dependency
 - no transfer of secrets/history/private memory in templates
 - no weakening of Rakazo approval/security boundaries for parity

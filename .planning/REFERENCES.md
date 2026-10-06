@@ -12,11 +12,23 @@ Use current official sources when implementation details are uncertain or may ha
 - Grok Bot changelog: https://x.ai/changelog/bot
 - Grok Bot design article: https://x.ai/news/designing-grok-bot
 
+## M3 Current Product Reference — 2026-10-06
+
+Current official sources are sufficient to pin important M3 journeys even without authenticated screenshots:
+
+- `https://docs.x.ai/grok-bot/skills-routines-and-automations` — Routine = workflow owned by one Bot; start with a one-time task; manage via View conversation details → Routines; enable/pause, Test run, edit schedule/instruction, inspect history, delete.
+- `https://docs.x.ai/grok-bot/mobile` — mobile Routine view exposes schedule, next run, instruction, Run history, Active/pause, delete; editing/testing remains desktop-only in the current reference.
+- `https://docs.x.ai/grok-bot/team-bots` — Publish to Team; Copy Bot vs Start fresh; setup choices; owner-controlled shared setup; teammate-private conversations; routines are personal per member.
+- `https://docs.x.ai/grok-bot/bots` — New chat/Create new Bot, View conversation details-centered management, hide/unhide, template/share mental model.
+- `https://x.ai/changelog/bot` — plugin-centric Marketplace/Search plugins, Connect apps featured treatment, composer list behavior, failed-send Resend/Delete, Team Bot setup/publish lifecycle, voice transcript highlight/seek, Project as a Cloud Agent that plans and runs its own agents, and related interaction-state changes.
+
+M3 treats those descriptions as executable behavioral references. Pixel identity is not required.
+
 ## M2 Reference Handling
 
-M2 uses public, observable Grok Bot behavior as a pinned UX reference rather than relying on memory or broad “Grok-like” descriptions.
+M2 used public, observable Grok Bot behavior as a pinned UX reference rather than relying on memory or broad “Grok-like” descriptions.
 
-For Phase 10 and every later parity phase:
+For historical M2 Phase 10–16 work:
 
 - record the capture date and source for each canonical state
 - prefer current official product/docs/changelog/design material

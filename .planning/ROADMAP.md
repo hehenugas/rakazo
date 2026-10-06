@@ -127,7 +127,66 @@ M2 is complete only when:
 
 - phases 10–16 are DONE
 - every canonical reference state has current evidence
-- stable visual diffs are inside documented tolerances
-- zero undocumented P0/P1 parity deltas remain
+- stable visual regression evidence is current
+- zero undocumented P0/P1 parity deltas remain within the M2 scope
 - keyboard and responsive flows match the pinned reference or have an explicit security/accessibility/native-platform exception
 - Phase 16 full verification and maintainer parity review pass
+
+---
+
+## Milestone M3 — Grok Bot Experience Parity
+
+M3 closes the remaining workflow gap. It does **not** pursue pixel-perfect cloning. A Grok Bot user should find equivalent capabilities in the same conceptual place and complete them through the same learned journey, lifecycle, ownership, and recovery semantics.
+
+| Phase | Name | Depends On | Status |
+|---|---|---|---|
+| 17 | Experience Parity Contract & Journey Baseline | 16 | TODO |
+| 18 | Routines & Scheduling Experience Parity | 17 | TODO |
+| 19 | Team Bot Publish & Shared Setup Parity | 17, 18 | TODO |
+| 20 | Composer & Message Delivery Experience Parity | 17 | TODO |
+| 21 | Transcript, Voice, Approvals & Connect Apps Parity | 17, 20 | TODO |
+| 22 | Projects, Delegation & Main Bot Experience Parity | 17, 18–21 | TODO |
+| 23 | Cross-Platform Experience Parity Release Gate | 18–22 | TODO |
+
+## M3 Phase Outcomes
+
+### Phase 17 — Experience Parity Contract & Journey Baseline
+
+Refresh current official references, replace pixel-oriented gates with journey parity, and map every known gap to an owning phase.
+
+### Phase 18 — Routines & Scheduling Experience Parity
+
+Make recurring work conversation-first, show human schedules/timezone/next run, keep Details → Routines as management home, and move cron/event power behind Advanced.
+
+### Phase 19 — Team Bot Publish & Shared Setup Parity
+
+Implement owner-only setup, Copy Bot/Start fresh where applicable, Publish/Unpublish, safe shared setup, teammate discoverability after publish, and actor-private chats/routines.
+
+### Phase 20 — Composer & Message Delivery Experience Parity
+
+Implement learned list editing, Add to prompt, immediate send/slow progress semantics, durable failed-message Resend/Delete, and in-flight user messaging.
+
+### Phase 21 — Transcript, Voice, Approvals & Connect Apps Parity
+
+Add synchronized voice transcript/seek, summary-first approvals, secure credential requests, plugin-centric discovery/sign-in, and task resume after connection.
+
+### Phase 22 — Projects, Delegation & Main Bot Experience Parity
+
+Turn Projects into active orchestrated work, bind parent/child ownership, implement safe stop cascading, and make Main Bot attention event-aware and deduplicated.
+
+### Phase 23 — Cross-Platform Experience Parity Release Gate
+
+Verify full journeys across web, Electron, and mobile with CI, security, accessibility, migration, realtime, and maintainer experience review.
+
+## M3 Exit
+
+M3 is complete only when:
+
+- phases 17–23 are DONE
+- all M3 requirements in `REQUIREMENTS.md` are satisfied or explicitly waived for a documented security/platform reason
+- zero known P0/P1 journey parity deltas remain
+- ordinary Grok-like flows do not expose raw infrastructure when a simpler learned path exists
+- full relevant CI/platform/security/migration checks pass
+- Phase 23 maintainer experience-parity review passes
+
+Pixel-perfect Grok screenshot matching is **not** an M3 exit criterion.

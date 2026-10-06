@@ -48,7 +48,27 @@ M1 acceptance proved feature and information-architecture parity. M2 intentional
 
 ### D-012 — Visual diff is an M2 acceptance gate
 
-Stable canonical states must use deterministic screenshot comparison plus a parity scorecard. A feature existing is not evidence of parity. Structural mismatches fail even when a permissive numeric pixel threshold would pass; masks and tolerances require written justification.
+Stable canonical states use deterministic screenshot comparison for M2 regression evidence. This remains historical M2 tooling and does not become a pixel-perfect requirement for later milestones.
+
+### D-013 — M3 parity means no product relearning
+
+For M3, match information architecture, entry point, terminology, step order, ownership/lifecycle, state transitions, action semantics, approval boundaries, error/retry/cancel behavior, important keyboard habits, and desktop/mobile capability split. Exact pixels, font rendering, color values, shadows, and screenshot-diff percentages are not acceptance gates.
+
+### D-014 — Public docs/changelog can pin behavior without screenshots
+
+If current official Grok Bot documentation or changelog explicitly describes a workflow or interaction, an implementation task may not be waived as `pending-reference` solely because authenticated product screenshots are unavailable.
+
+### D-015 — Routines are conversation-first, editor-second
+
+The primary Routine mental model is delegating recurring work to a Bot in conversation. Details → Routines is the management home. Ordinary schedule concepts are human-readable; raw cron and Rakazo-only event power remain available through progressive disclosure.
+
+### D-016 — Team Bot availability begins at Publish
+
+A Team Bot under setup is owner-private. Shared definition/setup and actor-private conversations/routines are separate concerns. Publish makes the Team Bot available to teammates; Unpublish removes that availability without leaking or merging member-private state.
+
+### D-017 — Projects represent orchestration
+
+A Project is not merely durable task CRUD. It represents an orchestrator/Cloud Agent-style workflow that creates a plan, coordinates owned child work, exposes blockers/progress, and has predictable parent/child cancellation semantics while staying provider-neutral internally.
 
 ## Pending Decisions
 

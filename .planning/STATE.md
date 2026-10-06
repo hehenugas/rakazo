@@ -2,17 +2,18 @@
 
 ## Current Milestone
 
-**M1 — Grok Bot Parity Foundation (DONE 2026-10-06)**
+**M3 — Grok Bot Experience Parity (PLANNED 2026-10-06)**
+
+M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfect parity; it closes journey/lifecycle gaps that a Grok Bot user would otherwise have to relearn.
 
 ## Current Phase
 
-**None — every phase 00–16 is DONE.**
+**Phase 17 — Experience Parity Contract & Journey Baseline (TODO — unclaimed)**
 
-## Next Milestone
+## Previous Milestones
 
-**M2 — Grok Bot UI/UX Parity (DONE 2026-10-06 — Phases 10-15 done, Phase 16 gates pass, maintainer parity-review approval granted)**
-
-No next milestone is planned yet; the pending `?` rows in the Phase 10 parity matrix still await authenticated Grok captures (procedure in `reference/SOURCE.md`, decision P-006) and are pending-reference, not deltas.
+- **M1 — Grok Bot Parity Foundation — DONE 2026-10-06**
+- **M2 — Grok Bot UI/UX Parity — DONE 2026-10-06**
 
 ## Phase Status
 
@@ -35,10 +36,17 @@ No next milestone is planned yet; the pending `?` rows in the Phase 10 parity ma
 | 14 Details/Connect Apps/Team Bot Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 15 Main Bot/Work-Flow Feel Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-05 |
 | 16 Responsive Parity & M2 Release | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
+| 17 Experience Contract & Journey Baseline | TODO | — | — | 2026-10-06 |
+| 18 Routines & Scheduling Experience Parity | TODO | — | — | 2026-10-06 |
+| 19 Team Bot Publish & Shared Setup Parity | TODO | — | — | 2026-10-06 |
+| 20 Composer & Message Delivery Parity | TODO | — | — | 2026-10-06 |
+| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
+| 22 Projects/Delegation/Main Bot Parity | TODO | — | — | 2026-10-06 |
+| 23 Cross-Platform Experience Release Gate | TODO | — | — | 2026-10-06 |
 
 ## Active Blockers
 
-- None. The maintainer granted both approvals on 2026-10-06: the M1 release-candidate approval (P09-23) and the M2 parity-review approval (P16-22). M1 and M2 are complete.
+- None. M3 planning is ready; Phase 17 is unclaimed.
 
 ## Global Verification
 
@@ -63,4 +71,4 @@ When a phase changes status, update this file in the same commit as the correspo
 
 Do not mark a phase DONE unless every mandatory item in its `CHECKLIST.md` is checked and its DONE gate is satisfied.
 
-M1 and M2 are complete as of 2026-10-06. If a future phase touches Grok Bot parity surfaces, the shared UI contract at `.planning/phases/10-reference-visual-contract/UI-SPEC.md`, the canonical reference matrix, and the visual/behavior verification gates remain the measure — never feature presence alone.
+M1 and M2 are complete historical milestones. For M3 phases 17–23, `.planning/REQUIREMENTS.md` and `.planning/phases/17-experience-parity-contract/EXPERIENCE-SPEC.md` are the primary acceptance contract. The old M2 visual-diff harness remains useful for regression, but authenticated Grok screenshots and pixel-diff percentages are not required to close M3. A task cannot be waived as pending-reference when current official docs/changelog already specify the relevant journey.

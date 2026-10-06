@@ -9,12 +9,14 @@ An agent must:
 1. Read `.planning/PROJECT.md`.
 2. Read `.planning/ROADMAP.md`.
 3. Read `.planning/STATE.md`.
-4. For M2 phases 10–16, read `.planning/phases/10-reference-visual-contract/UI-SPEC.md` and the current Phase 10 parity/reference matrix or evidence index.
-5. Read the target phase's `SPEC.md`.
-6. Read the target phase's `CHECKLIST.md`.
-7. Read the target phase's `HANDOFF.md`.
-8. Inspect repository instructions such as `AGENTS.md`.
-9. Inspect current git status before changing code.
+4. Read `.planning/REQUIREMENTS.md` when the active milestone defines it.
+5. For M2 phases 10–16, read `.planning/phases/10-reference-visual-contract/UI-SPEC.md` and the Phase 10 parity/reference matrix.
+6. For M3 phases 17–23, read `.planning/phases/17-experience-parity-contract/EXPERIENCE-SPEC.md`; current official docs/changelog override an older `pending-reference` assumption when they explicitly describe the journey.
+7. Read the target phase's `SPEC.md`.
+8. Read the target phase's `CHECKLIST.md`.
+9. Read the target phase's `HANDOFF.md`.
+10. Inspect repository instructions such as `AGENTS.md`.
+11. Inspect current git status before changing code.
 
 ## Claiming Work
 
@@ -77,7 +79,8 @@ A phase becomes DONE only when:
 - phase acceptance criteria pass
 - relevant unit/integration/E2E tests pass
 - UI phases have current screenshot evidence
-- M2 UI phases pass the documented visual-diff/parity scorecard for their canonical states
+- M2 UI phases pass their historical visual/parity gates where applicable
+- M3 phases pass the applicable journey requirements in `REQUIREMENTS.md`; exact pixel comparison is not required
 - accessibility sanity checks pass for changed UI
 - no known P0/P1 regression remains
 - phase handoff contains a final summary
@@ -107,6 +110,13 @@ phase/06-main-bot
 phase/07-connect-apps
 phase/08-mobile
 phase/09-hardening
+phase/17-experience-contract
+phase/18-routines-scheduling
+phase/19-team-bots-publish
+phase/20-composer-delivery
+phase/21-transcript-voice-apps
+phase/22-projects-main-bot
+phase/23-experience-release
 ```
 
 Prefer small reviewable commits. Do not mix unrelated phase work in one commit.
