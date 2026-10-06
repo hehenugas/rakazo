@@ -86,10 +86,10 @@ M2 closes the remaining “it has the feature, but it does not feel like Grok Bo
 | 10 | Reference Lock & Visual Diff Foundation | 01–08 | DONE |
 | 11 | Shell, Roster & Navigation Parity | 10 | DONE |
 | 12 | Composer & Input Behavior Parity | 10, 11 | DONE |
-| 13 | Transcript, Cards & Voice Parity | 10, 12 | TODO |
-| 14 | Details, Connect Apps & Team Bot Parity | 10, 11, 13 | TODO |
-| 15 | Main Bot & Work-Flow Feel Parity | 10, 13, 14 | TODO |
-| 16 | Responsive Parity & M2 Release Gate | 11–15 | TODO |
+| 13 | Transcript, Cards & Voice Parity | 10, 12 | DONE |
+| 14 | Details, Connect Apps & Team Bot Parity | 10, 11, 13 | DONE |
+| 15 | Main Bot & Work-Flow Feel Parity | 10, 13, 14 | DONE |
+| 16 | Responsive Parity & M2 Release Gate | 11–15 | DOING (maintainer parity-review approval pending) |
 
 ## M2 Phase Outcomes
 

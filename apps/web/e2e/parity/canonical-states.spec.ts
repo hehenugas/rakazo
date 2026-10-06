@@ -293,6 +293,20 @@ test("editable email draft action", async ({ page }, testInfo) => {
   await captureParityState(page, testInfo, "18-editable-draft");
 });
 
+test("failed send presentation", async ({ page }, testInfo) => {
+  await signup(page, "parity-failed@rakazo.test", "password12", "Parity Failed");
+  await completeOnboarding(page);
+  await page.setViewportSize(PARITY_VIEWPORT);
+  await expect(page.getByTestId("composer-bar")).toBeVisible();
+  // "fail this run" makes the scripted runtime throw deterministically.
+  await page.getByTestId("composer-bar").getByRole("combobox").fill("fail this run");
+  await page.getByRole("button", { name: "Send" }).click();
+  const error = page.getByTestId("composer-error");
+  await expect(error).toBeVisible({ timeout: 30_000 });
+  await expect(error).toContainText("Scripted run failure");
+  await captureParityState(page, testInfo, "21-failed-send");
+});
+
 test("narrow desktop idle", async ({ page }) => {
   await signup(page, "parity-narrow@rakazo.test", "password12", "Parity Narrow");
   await completeOnboarding(page);
