@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — P09-01…P09-22 all pass; only P09-23 (release-candidate approval) open. Green full-pipeline CI run 37322886544 closes the suite gates.
+DONE — P09-01…P09-23 all pass; the maintainer granted the release-candidate approval on 2026-10-06 and M1 is complete.
 
 ## Owner
 
@@ -13,6 +13,11 @@ ZCode (GLM)
 `phase/00-bootstrap` @ origin (hehenugas) — pushed through `19af7588`.
 
 ## Work Log
+
+### 2026-10-06 — Release-candidate approval; M1 closed (ZCode/GLM)
+
+- The maintainer reviewed the release evidence (green full-pipeline CI through run 37400135980 on the final tree, documented migration gate, curated screenshot evidence) and granted the release-candidate approval.
+- P09-23 checked; phase 09 flipped to DONE; M1 marked complete in STATE/ROADMAP.
 
 ### 2026-10-04 — Planning initialized
 
@@ -74,8 +79,7 @@ ZCode (GLM)
 
 ## Blockers
 
-- None — only P09-23 (release-candidate approval) remains, which is the maintainer's decision.
-- P09-22 requires every prior phase DONE; P09-23 requires maintainer release-candidate approval.
+- None — phase DONE; M1 complete.
 
 ## Discovered Follow-ups
 
@@ -83,9 +87,8 @@ ZCode (GLM)
 
 ## Next Recommended Task
 
-1. Maintainer reviews the release evidence (`.planning/STATE.md` → Release Evidence) and grants the release-candidate approval.
-2. Check P09-23 + the VERIFY/DONE block, flip phase 09 to DONE, and close M1.
+1. None for this phase — M1 is closed. M2 (phases 10–16) is the active milestone; on 2026-10-06 the maintainer also granted the M2 parity-review approval, closing Phase 16 and M2.
 
 ## Final Summary
 
-Complete except P09-23 — every hardening task and verification item that does not require the maintainer's release-candidate approval passes (green run 37322886544); M1 completion is one approval away.
+DONE — every hardening task and verification item passes (green runs 37322886544 through 37400135980); the maintainer granted the release-candidate approval on 2026-10-06 and M1 is complete.

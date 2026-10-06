@@ -2,7 +2,7 @@
 
 ## Status
 
-DOING — ZCode (GLM) — pending P16-22
+DONE — ZCode (GLM)
 
 ## Tasks
 
@@ -27,16 +27,16 @@ DOING — ZCode (GLM) — pending P16-22
 - [x] P16-19 Update release notes and M2 evidence index. (CHANGELOG [Unreleased] carries the M2 tooling entries; evidence indexed under `.planning/evidence/phase-1{0..2}-*/` and the parity matrix.)
 - [x] P16-20 Review upstream merge/conflict surface before declaring M2 releasable. (2026-10-06: `git merge-tree main upstream/main` clean — no conflict surface.)
 - [x] P16-21 Audit phases 10–15 checklist/HANDOFF/STATE consistency. (All six phases: 0 unchecked items, DONE status, HANDOFF final summaries; STATE/ROADMAP synced.)
-- [ ] P16-22 Obtain maintainer parity-review approval before marking M2 DONE.
+- [x] P16-22 Obtain maintainer parity-review approval before marking M2 DONE. (2026-10-06: maintainer reviewed the M2 gate evidence — CI green on the final tree incl. run 37400135980, canonical 19/19 + composer 7/7 baselines, zero undocumented P0/P1 deltas, two volatile-timestamp masks, clean upstream merge surface — and granted the approval; M2 marked DONE.)
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks are checked.
-- [ ] VERIFY-02 Full verification pipeline passes or approved pre-existing failures are documented.
-- [ ] VERIFY-03 Final desktop/mobile screenshot set is current.
-- [ ] VERIFY-04 Final parity matrix has no undocumented P0/P1 deltas.
-- [ ] VERIFY-05 HANDOFF.md and STATE.md are updated.
+- [x] VERIFY-01 All mandatory tasks are checked.
+- [x] VERIFY-02 Full verification pipeline passes or approved pre-existing failures are documented.
+- [x] VERIFY-03 Final desktop/mobile screenshot set is current.
+- [x] VERIFY-04 Final parity matrix has no undocumented P0/P1 deltas.
+- [x] VERIFY-05 HANDOFF.md and STATE.md are updated.
 
 ## DONE
 
-- [ ] Phase marked DONE only after all verification items and maintainer parity review pass.
+- [x] Phase marked DONE only after all verification items and maintainer parity review pass.

@@ -13,7 +13,7 @@
 | 06 | Main Bot & Proactivity | 02, 05 | DONE |
 | 07 | Connect Apps, X & Voice Memo | 03, 04 | DONE |
 | 08 | Mobile Parity | 02–07 | DONE |
-| 09 | Hardening & Release | 00–08 | DOING (release-candidate approval pending) |
+| 09 | Hardening & Release | 00–08 | DONE |
 
 ## Phase Outcomes
 
@@ -89,7 +89,7 @@ M2 closes the remaining “it has the feature, but it does not feel like Grok Bo
 | 13 | Transcript, Cards & Voice Parity | 10, 12 | DONE |
 | 14 | Details, Connect Apps & Team Bot Parity | 10, 11, 13 | DONE |
 | 15 | Main Bot & Work-Flow Feel Parity | 10, 13, 14 | DONE |
-| 16 | Responsive Parity & M2 Release Gate | 11–15 | DOING (maintainer parity-review approval pending) |
+| 16 | Responsive Parity & M2 Release Gate | 11–15 | DONE |
 
 ## M2 Phase Outcomes
 

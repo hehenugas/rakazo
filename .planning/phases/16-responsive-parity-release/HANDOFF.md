@@ -2,7 +2,7 @@
 
 ## Current Status
 
-DOING — every gate task passes (2026-10-06); only P16-22 (maintainer parity-review approval) remains.
+DONE — every gate task including P16-22 passes (2026-10-06); the maintainer granted the parity-review approval and M2 is complete.
 
 ## Owner
 
@@ -13,6 +13,11 @@ ZCode (GLM)
 Local `main` (fork), pushed to `origin/main`.
 
 ## Work Log
+
+### 2026-10-06 — Maintainer parity-review approval; M2 closed (ZCode/GLM)
+
+- The maintainer reviewed the M2 gate evidence (CI green on the final tree through run 37400135980, canonical 19/19 + composer 7/7 baselines, zero undocumented P0/P1 deltas in the parity matrix, two volatile-timestamp masks, clean upstream merge surface) and granted the parity-review approval.
+- P16-22 checked; VERIFY/DONE block closed; phase 16 flipped to DONE; M2 marked complete in STATE/ROADMAP.
 
 ### 2026-10-06 — M2 release gate run (ZCode/GLM)
 
@@ -29,12 +34,12 @@ Local `main` (fork), pushed to `origin/main`.
 
 ## Blockers
 
-Phases 10–15 must be DONE.
+None — phase DONE; M2 complete.
 
 ## Next Recommended Task
 
-Do not start release-gate work early. Keep the parity matrix current during earlier phases so Phase 16 is verification, not rediscovery.
+None for this phase. The pending `?` rows in the parity matrix still await authenticated Grok captures (procedure in `reference/SOURCE.md`, decision P-006) whenever an authenticated capture session becomes possible; they are pending-reference, not deltas.
 
 ## Final Summary
 
-Every M2 gate passes except P16-22 — the maintainer parity-review approval that marks M2 DONE (same shape as the M1 release-approval gate).
+DONE — every M2 gate passes and the maintainer granted the parity-review approval on 2026-10-06; M2 is complete.

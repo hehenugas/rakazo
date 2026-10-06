@@ -2,7 +2,7 @@
 
 ## Status
 
-**DOING — ZCode (GLM)**
+**DONE — ZCode (GLM)**
 
 ## Tasks
 
@@ -28,17 +28,17 @@
 - [x] P09-20 Write release and migration notes. (See CHANGELOG Migration notes: three additive migrations apply automatically via `prisma migrate deploy`; no manual steps, no new environment variables.)
 - [x] P09-21 Resolve all P0/P1 issues. (2026-10-05: the 9 CI-found web e2e regressions from the shell adaptation were fixed — panel deep-link race, routines panel staleness, and the test locator debt — and the suite is green; no open P0/P1.)
 - [x] P09-22 Audit every prior phase checklist and STATE entry. (2026-10-05: phases 00-08 have zero unchecked items and DONE status in their CHECKLIST/HANDOFF; STATE rows match; ROADMAP table synced.)
-- [ ] P09-23 Mark M1 complete only after release candidate approval.
+- [x] P09-23 Mark M1 complete only after release candidate approval. (2026-10-06: maintainer reviewed the release evidence — green full-pipeline CI through run 37400135980 on the final tree — and granted the approval; M1 marked complete.)
 
 
 ## Phase Verification
 
-- [ ] VERIFY-01 All mandatory tasks above are checked.
-- [ ] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
-- [ ] VERIFY-03 No unresolved P0/P1 regression remains.
-- [ ] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
-- [ ] VERIFY-05 STATE.md is updated.
+- [x] VERIFY-01 All mandatory tasks above are checked.
+- [x] VERIFY-02 Relevant tests pass or approved pre-existing failures are documented.
+- [x] VERIFY-03 No unresolved P0/P1 regression remains.
+- [x] VERIFY-04 HANDOFF.md contains final implementation and verification summary.
+- [x] VERIFY-05 STATE.md is updated.
 
 ## DONE
 
-- [ ] Phase marked **DONE** only after all verification items pass.
+- [x] Phase marked **DONE** only after all verification items pass.
