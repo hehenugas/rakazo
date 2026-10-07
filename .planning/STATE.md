@@ -8,7 +8,7 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 
 ## Current Phase
 
-**Phase 20 — Composer & Message Delivery Experience Parity (TODO — next up)**
+**Phase 21 — Transcript, Voice, Approvals & Connect Apps Parity (TODO — next up)**
 
 ## Previous Milestones
 
@@ -39,8 +39,10 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 | 17 Experience Contract & Journey Baseline | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 18 Routines & Scheduling Experience Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 19 Team Bot Publish & Shared Setup Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 20 Composer & Message Delivery Parity | TODO | — | — | 2026-10-06 |
-| 20 Composer & Message Delivery Parity | TODO | — | — | 2026-10-06 |
+| 20 Composer & Message Delivery Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
+| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
+| 20 Composer & Message Delivery Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
+| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
 | 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
 | 22 Projects/Delegation/Main Bot Parity | TODO | — | — | 2026-10-06 |
 | 23 Cross-Platform Experience Release Gate | TODO | — | — | 2026-10-06 |

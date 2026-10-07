@@ -119,6 +119,101 @@ export function applyThreadSendReceipt(
   return { ...snapshot, run, activeRuns: [run] };
 }
 
+/** A locally-echoed send awaiting its durable copy (pinned v0.57.0 behavior). */
+export type OptimisticSend = {
+  nonce: string;
+  threadId: string;
+  text: string;
+  createdAt: string;
+};
+
+export function optimisticMessageId(nonce: string): string {
+  return `local:${nonce}`;
+}
+
+function messageText(message: ThreadMessage): string {
+  return message.blocks
+    .filter(
+      (block): block is Extract<ThreadMessage["blocks"][number], { kind: "text" }> =>
+        block.kind === "text",
+    )
+    .map((block) => block.text)
+    .join("\n");
+}
+
+/**
+ * Show the user's message immediately (v0.57.0: "Messages you send show as
+ * sent right away"); the durable copy reconciles it later.
+ */
+export function applyOptimisticSend(
+  snapshot: ThreadSnapshot | null,
+  send: OptimisticSend,
+): ThreadSnapshot | null {
+  if (!snapshot) return snapshot;
+  const lastSeq = snapshot.messages.at(-1)?.seq ?? 0;
+  const message: ThreadMessage = {
+    id: optimisticMessageId(send.nonce),
+    threadId: snapshot.threadId,
+    seq: lastSeq + 1,
+    role: "user",
+    blocks: [{ kind: "text", text: send.text }],
+    createdAt: send.createdAt,
+  };
+  return { ...snapshot, messages: [...snapshot.messages, message] };
+}
+
+export function removeOptimisticMessage(
+  snapshot: ThreadSnapshot | null,
+  nonce: string,
+): ThreadSnapshot | null {
+  if (!snapshot) return snapshot;
+  const localId = optimisticMessageId(nonce);
+  if (!snapshot.messages.some((message) => message.id === localId)) return snapshot;
+  return { ...snapshot, messages: snapshot.messages.filter((message) => message.id !== localId) };
+}
+
+/**
+ * A local echo leaves once its durable copy (same user text) is in the
+ * snapshot — whether it arrives via refresh or live event.
+ */
+export function dropReconciledOptimisticMessages(
+  snapshot: ThreadSnapshot | null,
+): ThreadSnapshot | null {
+  if (!snapshot?.messages.some((message) => message.id.startsWith("local:"))) {
+    return snapshot;
+  }
+  const durableTexts = new Set(
+    snapshot.messages
+      .filter(
+        (message) =>
+          message.role === "user" &&
+          !message.id.startsWith("local:") &&
+          !message.id.startsWith("progress:"),
+      )
+      .map(messageText),
+  );
+  const messages = snapshot.messages.filter(
+    (message) => !(message.id.startsWith("local:") && durableTexts.has(messageText(message))),
+  );
+  if (messages.length === snapshot.messages.length) return snapshot;
+  return { ...snapshot, messages };
+}
+
+/** True when a durable (non-local) user message with this exact text exists. */
+export function hasDurableUserText(
+  snapshot: ThreadSnapshot | null,
+  text: string,
+): boolean {
+  if (!snapshot) return false;
+  return snapshot.messages.some(
+    (message) =>
+      message.role === "user" &&
+      !message.id.startsWith("local:") &&
+      !message.id.startsWith("progress:") &&
+      messageText(message) === text,
+  );
+}
+
 /** Reason the newest run stopped, until the reader dismisses that run's failure. */
 export function threadRunError(
   snapshot: ThreadSnapshot | null,

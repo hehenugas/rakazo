@@ -13,6 +13,7 @@ export * from "./bot-sections.js";
 export * from "./call-nonce.js";
 export * from "./cloud-agent.js";
 export * from "./compose-update.js";
+export * from "./composer-list.js";
 export * from "./composer-mention-picker.js";
 export * from "./composer-mentions.js";
 export * from "./composer-slash.js";

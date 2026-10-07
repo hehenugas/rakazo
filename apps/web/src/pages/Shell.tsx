@@ -56,6 +56,7 @@ import {
   plainTextFromMarkdown,
   projectMessageReactions,
   reorderBotTo,
+  resolveComposerListKey,
   resolveComposerSendPlan,
   resolveMentionPickerKey,
   runThreadSubscription,
@@ -205,6 +206,7 @@ import {
   revokePendingAttachmentPreviews,
 } from "../lib/pending-attachments";
 import { markAfterPaint, markOnce } from "../lib/performance";
+import { readFailedSends, writeFailedSends } from "../lib/failed-send-storage";
 import { quoteDraftForSelection } from "../lib/quote-selection";
 import { getResponseStreamingEnabled, subscribeResponseStreaming } from "../lib/response-streaming";
 import type { Panel, RightPanelState } from "../lib/right-panel-state";
@@ -219,18 +221,24 @@ import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-st
 import { sharedInflight } from "../lib/shared-inflight";
 import {
   activeThreadRuns,
+  applyOptimisticSend,
   applyThreadSendReceipt,
   clearActiveThreadRuns,
   computerPanelAutoBoot,
   computerPanelAutoUsesBoot,
   computerPanelNeedsMaintenance,
   computerTakeoverBlocked,
+  dropReconciledOptimisticMessages,
+  hasDurableUserText,
   isComputerStatusEvent,
   isThreadSnapshotEvent,
+  type OptimisticSend,
+  optimisticMessageId,
   prependThreadMessagePage,
   reconcileRefreshedThread,
   reduceComputerStatus,
   reduceThreadSnapshot,
+  removeOptimisticMessage,
   threadRunError,
   userHoldsComputerControl,
 } from "../lib/thread-events";
@@ -409,6 +417,11 @@ export function ShellPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const [teamBots, setTeamBots] = useState<TeamBot[]>([]);
+  const [promptInsert, setPromptInsert] = useState<{ text: string; nonce: number } | null>(null);
+  const [draftRestore, setDraftRestore] = useState<{ text: string; nonce: number } | null>(null);
+  const [optimisticSends, setOptimisticSends] = useState<OptimisticSend[]>([]);
+  const [failedSends, setFailedSends] = useState<OptimisticSend[]>([]);
+  const [slowSend, setSlowSend] = useState(false);
   const botsRef = useRef(bots);
   botsRef.current = bots;
   const botOrderEpochRef = useRef(0);
@@ -556,8 +569,26 @@ export function ShellPage() {
   }
 
   function commitSnapshot(next: ThreadSnapshot | null) {
-    snapshotRef.current = next;
-    setSnapshot(withLiveStreamingProgress(next, streamResponsesRef.current));
+    const reconciled = dropReconciledOptimisticMessages(next);
+    snapshotRef.current = reconciled;
+    // A local echo whose durable copy landed no longer needs an in-flight slot.
+    setOptimisticSends((current) =>
+      current.filter((send) =>
+        reconciled?.messages.some((message) => message.id === optimisticMessageId(send.nonce)),
+      ),
+    );
+    // A failed send stays actionable until its echo is gone AND the server has
+    // the message (an abort race) — then Resend would duplicate, so drop it.
+    setFailedSends((current) =>
+      current.filter(
+        (send) =>
+          reconciled?.messages.some((message) => message.id === optimisticMessageId(send.nonce)) ||
+          (send.threadId === reconciled?.threadId
+            ? !hasDurableUserText(reconciled, send.text)
+            : true),
+      ),
+    );
+    setSnapshot(withLiveStreamingProgress(reconciled, streamResponsesRef.current));
   }
 
   useEffect(() => {
@@ -2137,7 +2168,7 @@ export function ShellPage() {
     setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
   }, []);
   const sendMessage = useCallback(
-    async (text: string, mentions: ComposerMention[] = []) => {
+    async (text: string, mentions: ComposerMention[] = [], resendNonce?: string) => {
       const initialBotTarget = activeBotId.current;
       const initialGroupTarget = activeGroupId.current;
       if ((!initialBotTarget && !initialGroupTarget) || sending) return;
@@ -2165,6 +2196,8 @@ export function ShellPage() {
       sendingRef.current = true;
       setSending(true);
       setSendError(null);
+      let optimistic: OptimisticSend | null = null;
+      let slowTimer: number | undefined;
       const dropDelayedSetup = () => {
         // Only after successful engagement so a failed upload/send keeps the setup card.
         if (initialBotTarget && focusPromptBotIdRef.current === initialBotTarget) {
@@ -2216,7 +2249,27 @@ export function ShellPage() {
           );
           artifactIds.push(artifact.id);
         }
-        const clientNonce = newClientNonce();
+        const clientNonce = resendNonce ?? newClientNonce();
+        // Optimistic echo (v0.57.0): the bubble shows immediately; the slow
+        // progress bar only appears after two seconds.
+        {
+          const current = snapshotRef.current;
+          const matches = groupTarget
+            ? current?.groupId === groupTarget
+            : botTarget != null && current?.botId === botTarget;
+          if (!resendNonce && current && matches) {
+            const send: OptimisticSend = {
+              nonce: clientNonce,
+              threadId: current.threadId,
+              text: trimmed || "",
+              createdAt: new Date().toISOString(),
+            };
+            optimistic = send;
+            updateSnapshot((prev) => applyOptimisticSend(prev, send));
+            setOptimisticSends((currentSends) => [...currentSends, send]);
+          }
+        }
+        slowTimer = window.setTimeout(() => setSlowSend(true), 2000);
         if (groupTarget) {
           await rpc.threads.send({
             groupId: groupTarget,
@@ -2268,7 +2321,18 @@ export function ShellPage() {
         if (groupTarget) void refreshGroupThreadRef.current(groupTarget).catch(() => undefined);
         else if (botTarget) void refreshThreadRef.current(botTarget).catch(() => undefined);
       } catch (error) {
-        if (reroutedToGroup && groupTarget) {
+        const failed = optimistic;
+        if (failed) {
+          const localId = optimisticMessageId(failed.nonce);
+          if (snapshotRef.current?.messages.some((message) => message.id === localId)) {
+            // The bubble itself carries the failure (v0.62.0: Failed to send
+            // with Resend and Delete) — no global banner.
+            setOptimisticSends((current) => current.filter((send) => send.nonce !== failed.nonce));
+            setFailedSends((current) => [...current, failed]);
+          } else {
+            setSendError(error instanceof Error ? error.message : t`Failed to send message`);
+          }
+        } else if (reroutedToGroup && groupTarget) {
           setSendError(error instanceof Error ? error.message : t`Failed to send message`);
         } else if (groupTarget && activeGroupId.current === groupTarget) {
           setSendError(error instanceof Error ? error.message : t`Failed to send message`);
@@ -2276,6 +2340,8 @@ export function ShellPage() {
           setSendError(error instanceof Error ? error.message : t`Failed to send message`);
         }
       } finally {
+        window.clearTimeout(slowTimer);
+        setSlowSend(false);
         sendingRef.current = false;
         setSending(false);
       }
@@ -2291,6 +2357,49 @@ export function ShellPage() {
       t,
     ],
   );
+  const resendFailed = useCallback(
+    (send: OptimisticSend) => {
+      setFailedSends((current) => current.filter((item) => item.nonce !== send.nonce));
+      // Same nonce: a send that actually landed replays instead of duplicating.
+      void sendMessage(send.text, [], send.nonce);
+    },
+    [sendMessage],
+  );
+  const deleteFailed = useCallback((send: OptimisticSend) => {
+    setFailedSends((current) => current.filter((item) => item.nonce !== send.nonce));
+    updateSnapshot((current) => removeOptimisticMessage(current, send.nonce));
+    // Deleted text returns to the composer so nothing the user typed is lost.
+    setDraftRestore({ text: send.text, nonce: Date.now() });
+  }, []);
+
+  // Failed sends survive reloads: load the persisted set for this user…
+  const failedSendUserId = bootstrapMe?.userId ?? null;
+  useEffect(() => {
+    if (!failedSendUserId) return;
+    setFailedSends(readFailedSends(failedSendUserId));
+  }, [failedSendUserId]);
+  // …and mirror every change back to storage.
+  useEffect(() => {
+    if (!failedSendUserId) return;
+    writeFailedSends(failedSendUserId, failedSends);
+  }, [failedSendUserId, failedSends]);
+  // After a reload the thread snapshot has no echo for a persisted failure —
+  // re-apply it so the bubble's Resend/Delete stays actionable. Sends the
+  // server actually processed are dropped by the commitSnapshot prune instead.
+  useEffect(() => {
+    if (!snapshot?.threadId) return;
+    const missing = failedSends.filter(
+      (send) =>
+        send.threadId === snapshot.threadId &&
+        !snapshot.messages.some((message) => message.id === optimisticMessageId(send.nonce)) &&
+        !hasDurableUserText(snapshot, send.text),
+    );
+    if (missing.length === 0) return;
+    updateSnapshot((current) =>
+      missing.reduce((acc, send) => applyOptimisticSend(acc, send), current),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-applies per snapshot commit
+  }, [snapshot, failedSends]);
   const sendVoiceMemo = useCallback(
     async (file: File, transcript: string) => {
       const botTarget = activeBotId.current;
@@ -3956,6 +4065,22 @@ export function ShellPage() {
               setReplyTarget(message);
               setReplyQuote(quote);
             }}
+            onAddToPrompt={(text) => {
+              // Pinned v0.62.0 behavior: quote the selection into the next
+              // message without starting a reply.
+              setPromptInsert({ text, nonce: Date.now() });
+            }}
+            failedSends={failedSends.filter((send) => send.threadId === snapshot?.threadId)}
+            onResendFailed={resendFailed}
+            onDeleteFailed={deleteFailed}
+            optimisticPending={(() => {
+              const pending = snapshot?.threadId
+                ? optimisticSends.find((send) => send.threadId === snapshot.threadId)
+                : undefined;
+              return pending
+                ? { messageId: optimisticMessageId(pending.nonce), slow: slowSend }
+                : null;
+            })()}
             onReact={reactToMessage}
             onJumpToMessage={jumpToReplyMessage}
             onOpenPeerMessages={(peer) => {
@@ -3995,6 +4120,10 @@ export function ShellPage() {
             onAttachmentPick={onAttachmentPick}
             onRemoveAttachment={removeAttachment}
             onSend={sendMessage}
+            promptInsert={promptInsert}
+            onPromptInsertHandled={() => setPromptInsert(null)}
+            draftRestore={draftRestore}
+            onDraftRestoreHandled={() => setDraftRestore(null)}
             onStop={stopRun}
             onVoiceMemo={sendVoiceMemo}
             voiceMemoTranscribe={Boolean(voiceStatus?.transcribe)}
@@ -5778,7 +5907,12 @@ const Transcript = memo(function Transcript({
   onAnswer,
   onReply,
   onQuote,
+  onAddToPrompt,
   onReact,
+  failedSends,
+  onResendFailed,
+  onDeleteFailed,
+  optimisticPending,
   onJumpToMessage,
   onOpenPeerMessages,
   memberName,
@@ -5807,7 +5941,12 @@ const Transcript = memo(function Transcript({
   onAnswer: (message: ThreadMessage, text: string, username?: string) => Promise<void>;
   onReply: (message: ThreadMessage) => void;
   onQuote: (message: ThreadMessage, quote: string) => void;
+  onAddToPrompt: (text: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
+  failedSends: OptimisticSend[];
+  onResendFailed: (send: OptimisticSend) => void;
+  onDeleteFailed: (send: OptimisticSend) => void;
+  optimisticPending: { messageId: string; slow: boolean } | null;
   onJumpToMessage: (messageId: string) => void;
   onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string }) => void;
   memberName?: (botId: string | undefined) => string | undefined;
@@ -5886,6 +6025,9 @@ const Transcript = memo(function Transcript({
     });
   }, [messageById]);
 
+  const quoteDraftRef = useRef<{ message: ThreadMessage; text: string; range: Range } | null>(null);
+  quoteDraftRef.current = quoteDraft;
+
   // Keyboard and assistive-tech selections never reach a mouseup, so the pill
   // lifecycle listens on selectionchange; the mouse flag keeps it hidden while
   // a drag is still in flight.
@@ -5903,7 +6045,19 @@ const Transcript = memo(function Transcript({
       if (!selectingWithMouse.current) evaluateSelection();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setQuoteDraft(null);
+      if (event.key === "Escape") {
+        setQuoteDraft(null);
+        return;
+      }
+      // Pinned v0.62.0 shortcut: Cmd/Ctrl+L quotes the selection into the prompt.
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "l") {
+        const draft = quoteDraftRef.current;
+        if (!draft) return;
+        event.preventDefault();
+        onAddToPrompt(draft.text);
+        window.getSelection()?.removeAllRanges();
+        setQuoteDraft(null);
+      }
     };
     // A drag that ends outside the window never fires document mouseup; reset
     // the flag on blur so keyboard selections keep working afterwards.
@@ -6133,6 +6287,10 @@ const Transcript = memo(function Transcript({
                   <MessageView
                     artifactTarget={artifactTarget}
                     message={message}
+                    failedSends={failedSends}
+                    onResendFailed={onResendFailed}
+                    onDeleteFailed={onDeleteFailed}
+                    optimisticPending={optimisticPending}
                     canAnswer={message.id === answerableAskMessageId}
                     onOpenBot={onOpenBot}
                     onOpenPeerMessages={onOpenPeerMessages}
@@ -6214,6 +6372,11 @@ const Transcript = memo(function Transcript({
             window.getSelection()?.removeAllRanges();
             setQuoteDraft(null);
           }}
+          onAddToPrompt={() => {
+            onAddToPrompt(quoteDraft.text);
+            window.getSelection()?.removeAllRanges();
+            setQuoteDraft(null);
+          }}
         />
       ) : null}
       <button
@@ -6241,9 +6404,11 @@ const Transcript = memo(function Transcript({
 const QuoteSelectionButton = memo(function QuoteSelectionButton({
   range,
   onQuote,
+  onAddToPrompt,
 }: {
   range: Range;
   onQuote: () => void;
+  onAddToPrompt: () => void;
 }) {
   const { t } = useLingui();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -6282,27 +6447,45 @@ const QuoteSelectionButton = memo(function QuoteSelectionButton({
     };
   }, [range]);
 
+  const pillStyle = placement
+    ? { top: placement.top, left: placement.left }
+    : ({ visibility: "hidden" } as const);
+  const pillClass = cn(
+    "fixed z-50 flex -translate-x-1/2 items-center overflow-hidden rounded-full border border-border bg-background shadow-md",
+    placement?.above === false ? "translate-y-0" : "-translate-y-full",
+  );
+  const actionClass =
+    "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted";
   return createPortal(
-    <button
-      ref={buttonRef}
-      type="button"
-      data-quote-selection
-      data-testid="quote-selection"
-      onMouseDown={(event) => {
-        // Keep the highlight alive until the click commits the quote.
-        event.preventDefault();
-        event.stopPropagation();
-      }}
-      onClick={onQuote}
-      style={placement ? { top: placement.top, left: placement.left } : { visibility: "hidden" }}
-      className={cn(
-        "fixed z-50 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-[13px] font-medium text-foreground shadow-md hover:bg-muted",
-        placement?.above === false ? "translate-y-0" : "-translate-y-full",
-      )}
-    >
-      <TextQuote size={13} strokeWidth={2} />
-      {t`Quote`}
-    </button>,
+    <div data-quote-selection style={pillStyle} className={pillClass}>
+      <button
+        ref={buttonRef}
+        type="button"
+        data-testid="quote-selection"
+        onMouseDown={(event) => {
+          // Keep the highlight alive until the click commits the quote.
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={onQuote}
+        className={actionClass}
+      >
+        <TextQuote size={13} strokeWidth={2} />
+        {t`Quote`}
+      </button>
+      <button
+        type="button"
+        data-testid="add-to-prompt"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={onAddToPrompt}
+        className={actionClass}
+      >
+        {t`Add to prompt`}
+      </button>
+    </div>,
     document.body,
   );
 });
@@ -6323,6 +6506,10 @@ const Composer = memo(function Composer({
   onAttachmentPick,
   onRemoveAttachment,
   onSend,
+  promptInsert,
+  onPromptInsertHandled,
+  draftRestore,
+  onDraftRestoreHandled,
   onStop,
   onVoice,
   onVoiceMemo,
@@ -6351,6 +6538,10 @@ const Composer = memo(function Composer({
   onAttachmentPick: (files: FileList | null) => void | Promise<void>;
   onRemoveAttachment: (attachment: PendingAttachment) => void;
   onSend: (text: string, mentions?: ComposerMention[]) => Promise<void>;
+  promptInsert: { text: string; nonce: number } | null;
+  onPromptInsertHandled: () => void;
+  draftRestore: { text: string; nonce: number } | null;
+  onDraftRestoreHandled: () => void;
   onStop: () => Promise<void>;
   onVoice?: () => void;
   onVoiceMemo?: (file: File, transcript: string) => Promise<void>;
@@ -6457,6 +6648,42 @@ const Composer = memo(function Composer({
     if (nextSlash !== null && slashQuery === null) onSlashOpen?.();
     setSlashQuery(nextSlash);
   }
+
+  // Pinned v0.62.0 "Add to prompt": quote the requested selection into the
+  // draft at the caret without starting a reply.
+  const lastPromptInsert = useRef<number | null>(null);
+  useEffect(() => {
+    if (!promptInsert || promptInsert.nonce === lastPromptInsert.current) return;
+    lastPromptInsert.current = promptInsert.nonce;
+    const block = promptInsert.text
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n");
+    const el = textareaRef.current;
+    const at = el?.selectionStart ?? draft.length;
+    const prefix = draft.slice(0, at);
+    const glue = prefix.length > 0 && !prefix.endsWith("\n") ? "\n" : "";
+    const next = `${prefix}${glue}${block}\n${draft.slice(at)}`;
+    updateDraft(next);
+    const caret = prefix.length + glue.length + block.length + 1;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
+    onPromptInsertHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on the insert request nonce
+  }, [promptInsert]);
+
+  // A deleted failed send returns its text to the composer (nothing is lost).
+  const lastDraftRestore = useRef<number | null>(null);
+  useEffect(() => {
+    if (!draftRestore || draftRestore.nonce === lastDraftRestore.current) return;
+    lastDraftRestore.current = draftRestore.nonce;
+    const glue = draft.length > 0 && !draft.endsWith("\n") ? "\n" : "";
+    updateDraft(`${draft}${glue}${draftRestore.text}`);
+    onDraftRestoreHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on the restore request nonce
+  }, [draftRestore]);
 
   function focusComposer() {
     textareaRef.current?.focus();
@@ -6958,6 +7185,26 @@ const Composer = memo(function Composer({
               if (action.type === "send") {
                 event.preventDefault();
                 send();
+                return;
+              }
+              // Pinned list semantics: Shift+Enter continues a list item,
+              // Tab nests it — plain Enter still sends (v0.62.0).
+              const listAction = resolveComposerListKey({
+                key: event.key,
+                shiftKey: event.shiftKey,
+                isComposing: event.nativeEvent.isComposing || event.keyCode === 229,
+                value: draft,
+                selectionStart: event.currentTarget.selectionStart,
+                selectionEnd: event.currentTarget.selectionEnd,
+              });
+              if (listAction.type !== "none") {
+                event.preventDefault();
+                updateDraft(listAction.replacement);
+                const el = textareaRef.current;
+                if (el) {
+                  const { selectionStart, selectionEnd } = listAction;
+                  requestAnimationFrame(() => el.setSelectionRange(selectionStart, selectionEnd));
+                }
               }
             }}
             disabled={disabled}
@@ -7332,7 +7579,15 @@ const MessageView = memo(function MessageView({
   onSpeak,
   onOpenComputer,
   showToolActivity,
+  failedSends,
+  onResendFailed,
+  onDeleteFailed,
+  optimisticPending,
 }: {
+  failedSends: OptimisticSend[];
+  onResendFailed: (send: OptimisticSend) => void;
+  onDeleteFailed: (send: OptimisticSend) => void;
+  optimisticPending: { messageId: string; slow: boolean } | null;
   artifactTarget: ArtifactTarget;
   canAnswer: boolean;
   message: ThreadMessage;
@@ -7716,16 +7971,57 @@ const MessageView = memo(function MessageView({
           // User bubbles stay literal text on web and mobile. Only explicit URLs
           // and email addresses are links, so a sent address is tappable without
           // formatting bold or headings.
+          const failed = failedSends.find((send) => optimisticMessageId(send.nonce) === message.id);
+          const slow =
+            optimisticPending?.messageId === message.id && optimisticPending.slow && !failed;
           return (
-            <div key={i} className="flex w-fit max-w-full justify-end [@media(hover:none)]:w-full">
+            <div key={i} className="flex w-full flex-col items-end gap-1.5">
               <div
-                data-testid="message-user-bubble"
-                data-quote-message-id={quoteMessageId}
-                className="max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] bg-chat-user px-[18px] py-3 text-[15.5px] leading-[1.45] text-chat-user-foreground"
-                dir="auto"
+                className={`flex w-fit max-w-full justify-end [@media(hover:none)]:w-full ${slow ? "opacity-70" : ""}`}
               >
-                <LinkifiedText>{block.text}</LinkifiedText>
+                <div
+                  data-testid="message-user-bubble"
+                  data-optimistic={message.id.startsWith("local:") ? "" : undefined}
+                  data-quote-message-id={quoteMessageId}
+                  className="max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] bg-chat-user px-[18px] py-3 text-[15.5px] leading-[1.45] text-chat-user-foreground"
+                  dir="auto"
+                >
+                  <LinkifiedText>{block.text}</LinkifiedText>
+                </div>
               </div>
+              {failed ? (
+                <div
+                  data-testid="message-send-failed"
+                  className="flex items-center gap-2 pe-1 text-[12px] text-destructive"
+                >
+                  <Trans>Failed to send</Trans>
+                  <button
+                    type="button"
+                    data-testid="resend-failed"
+                    onClick={() => onResendFailed(failed)}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    <Trans>Resend</Trans>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="delete-failed"
+                    onClick={() => onDeleteFailed(failed)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Trans>Delete</Trans>
+                  </button>
+                </div>
+              ) : slow ? (
+                <div
+                  data-testid="send-progress"
+                  className="h-0.5 w-24 overflow-hidden rounded-full bg-border"
+                  role="progressbar"
+                  aria-label={t`Sending`}
+                >
+                  <div className="h-full w-1/2 animate-pulse rounded-full bg-muted-foreground/60" />
+                </div>
+              ) : null}
             </div>
           );
         }

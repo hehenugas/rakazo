@@ -77,6 +77,13 @@ test("selecting a text span quotes it into a reply", async ({ page }, testInfo) 
     .filter({ hasText: `quote-source-${stamp}` })
     .first();
   await expect(sourceRow).toBeVisible({ timeout: 20_000 });
+  // The optimistic echo swaps for the durable copy right after the send lands;
+  // selecting during that swap would lose the selection. Wait for durable.
+  await expect(
+    page
+      .locator('[data-testid="message-user-bubble"][data-optimistic]')
+      .filter({ hasText: `quote-source-${stamp}` }),
+  ).toHaveCount(0, { timeout: 30_000 });
 
   // Selection inside one message offers the Quote action; Escape dismisses it.
   await selectAndRelease(page, sourceRow, "**forty two percent**");
@@ -291,6 +298,11 @@ test("an armed reply survives the parent paging out of the transcript", async ({
   await composer.press("Enter");
   const parentRow = userRow(parentText);
   await expect(parentRow).toBeVisible({ timeout: 20_000 });
+  await expect(
+    page
+      .locator('[data-testid="message-user-bubble"][data-optimistic]')
+      .filter({ hasText: `evict-parent-${stamp}` }),
+  ).toHaveCount(0, { timeout: 30_000 });
 
   await selectAndRelease(page, parentRow, `evict-parent-${stamp}`);
   await page.getByTestId("quote-selection").click();
