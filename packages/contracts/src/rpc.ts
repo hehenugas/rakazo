@@ -31,6 +31,7 @@ import {
   ComputerStatusSchema,
   ComputerUpdateSchema,
   ConnectionCatalogItemSchema,
+  ConnectionEmailSendersSchema,
   ConnectionSchema,
   CreateAgentSkillInput,
   CreateBotInput,
@@ -97,6 +98,10 @@ import {
   IntegrationSetupStateSchema,
 } from "./integration-settings.js";
 import { MessageReactionSchema } from "./reactions.js";
+import {
+  ConnectionPresentationDeliverySchema,
+  PresentationDeliveryStatusSchema,
+} from "./presentation.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
 import { SearchQueryOutputSchema } from "./search.js";
 
@@ -406,13 +411,20 @@ export const appContract = {
           messageId: Id,
           draftId: Id,
           fields: DraftActionFieldsInput,
+          connectionId: Id.optional(),
         }),
       )
       .output(z.object({ ok: z.literal(true) })),
-    /** Reserved endpoint; returns unsupported until structured provider delivery is available. */
+    /** Deliver the stored deck through an explicitly selected connected Slides account. */
     deliverDeck: oc
-      .input(threadTarget.safeExtend({ artifactId: Id, destination: z.enum(["google_slides"]) }))
-      .output(z.object({ ok: z.literal(true) })),
+      .input(
+        threadTarget.safeExtend({
+          artifactId: Id,
+          destination: z.enum(["google_slides"]),
+          connectionId: Id,
+        }),
+      )
+      .output(PresentationDeliveryStatusSchema),
     react: oc
       .input(
         threadTarget.safeExtend({
@@ -782,6 +794,10 @@ export const appContract = {
       .input(z.object({ query: z.string().optional(), connectorId: z.string().optional() }))
       .output(z.array(ConnectionCatalogItemSchema)),
     list: oc.output(z.array(ConnectionSchema)),
+    emailSenders: oc
+      .input(z.object({ connectionId: Id }))
+      .output(ConnectionEmailSendersSchema),
+    presentationDelivery: oc.output(z.array(ConnectionPresentationDeliverySchema)),
     begin: oc
       .input(
         z.object({
@@ -893,6 +909,9 @@ export const appContract = {
     exportDeck: oc
       .input(z.object({ artifactId: Id, format: z.enum(["pptx"]) }))
       .output(z.object({ name: z.string(), mimeType: z.string(), contentBase64: z.string() })),
+    deckDeliveryStatus: oc
+      .input(z.object({ artifactId: Id, connectionId: Id }))
+      .output(PresentationDeliveryStatusSchema.nullable()),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   usage: {

@@ -25,6 +25,10 @@ M4 follows `.planning/M4-EXECUTION-PLAN.md`. M3 Phase 23 is still DOING; the mai
 | 30 Messaging & integration edge parity | DOING (P30-03 open) | 2026-10-12 |
 | 31 M4 release & upstream gate | DOING (CI, Electron, devices, maintainer approval open) | 2026-10-12 |
 
+## M5 (CODE COMPLETE — code-only; runtime/UI/tests NOT VERIFIED)
+
+M5 — Grok Bot Feature & Experience Completion is specified in `.planning/M5-EXECUTION-PLAN.md` (phases 32–36). Code is implemented and statically reviewed on `main`; typechecks passed. No runtime, UI, test, CI, device, or provider verification is claimed. See `.planning/M5-HANDOFF.md` for limits and owner checks. M3 Phase 23 and M4 Phase 31 release gates remain open and are not superseded.
+
 ## Previous Milestones
 
 - **M1 — Grok Bot Parity Foundation — DONE 2026-10-06**

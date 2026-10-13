@@ -101,6 +101,11 @@ msgstr ""
 msgid "{0} will still respond to direct mentions."
 msgstr ""
 
+#. placeholder {0}: routine.name
+#: src/pages/RoutineEditor.tsx
+msgid "{0}: Return to conversation"
+msgstr ""
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}'s screen"
@@ -207,6 +212,8 @@ msgstr ""
 msgid "Access token (optional)"
 msgstr "Token de acesso (opcional)"
 
+#: src/components/DeckCard.tsx
+#: src/components/DraftActionCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "Conta"
@@ -622,6 +629,11 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "Voltar para o login"
 
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Bar chart"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Base URL"
 msgstr "URL Base"
@@ -748,6 +760,10 @@ msgstr "Cancelado"
 msgid "Card view"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Category"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Change password"
 msgstr "Alterar senha"
@@ -771,10 +787,6 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Chat apps, group channels, and agent connections."
 msgstr ""
-
-#: src/pages/Shell.tsx
-msgid "Chat Settings"
-msgstr "Configurações do chat"
 
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
@@ -1022,6 +1034,7 @@ msgstr "Conectar um modelo"
 msgid "Connect API key"
 msgstr "Conecte-se com a chave API"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
@@ -1709,6 +1722,7 @@ msgstr "dias"
 msgid "Decline"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Default"
@@ -1782,6 +1796,14 @@ msgstr "excluído"
 #: src/pages/shell/dialogs.tsx
 msgid "Deleting…"
 msgstr "Excluindo…"
+
+#: src/components/DeckCard.tsx
+msgid "Delivered"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Delivery failed"
+msgstr ""
 
 #: src/components/AskCard.tsx
 msgid "Denied"
@@ -2161,6 +2183,10 @@ msgstr "Esqueceu a senha?"
 msgid "Free"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
+msgid "From"
+msgstr ""
+
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
 msgstr "Tela Cheia"
@@ -2447,6 +2473,11 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Light"
 msgstr "Claro"
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Line chart"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Linear issue"
@@ -3113,6 +3144,7 @@ msgstr ""
 msgid "Only you can change this setup, and every change reaches all teammates."
 msgstr ""
 
+#: src/components/DeckCard.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 msgid "Open"
@@ -3211,6 +3243,10 @@ msgstr "Chave da API da organização"
 msgid "Other model…"
 msgstr "Outro modelo..."
 
+#: src/components/DeckCard.tsx
+msgid "Outcome unknown"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "PagerDuty incident"
 msgstr ""
@@ -3258,6 +3294,15 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Pending"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Pie chart"
 msgstr ""
 
 #: src/pages/BotContextMenu.tsx
@@ -3643,6 +3688,7 @@ msgstr ""
 msgid "Resume"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/Shell.tsx
 msgid "Retry"
 msgstr ""
@@ -3908,14 +3954,6 @@ msgstr "URL do servidor"
 #: src/pages/Shell.tsx
 msgid "Settings"
 msgstr "Configurações"
-
-#: src/pages/Shell.tsx
-msgid "Settings: General"
-msgstr "Opções > Geral"
-
-#: src/pages/Shell.tsx
-msgid "Settings: Usage"
-msgstr "Configurações: Uso"
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4396,6 +4434,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Unpublished"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Unsupported"
 msgstr ""
 
 #. placeholder {0}: pending.file.name

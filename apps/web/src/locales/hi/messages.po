@@ -101,6 +101,11 @@ msgstr ""
 msgid "{0} will still respond to direct mentions."
 msgstr ""
 
+#. placeholder {0}: routine.name
+#: src/pages/RoutineEditor.tsx
+msgid "{0}: Return to conversation"
+msgstr ""
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}'s screen"
@@ -207,6 +212,8 @@ msgstr ""
 msgid "Access token (optional)"
 msgstr "एक्सेस टोकन (वैकल्पिक)"
 
+#: src/components/DeckCard.tsx
+#: src/components/DraftActionCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "खाता"
@@ -622,6 +629,11 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "साइन इन पर वापस जाएँ"
 
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Bar chart"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Base URL"
 msgstr "बेस URL"
@@ -748,6 +760,10 @@ msgstr "रद्द किया गया"
 msgid "Card view"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Category"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Change password"
 msgstr "पासवर्ड बदलें"
@@ -771,10 +787,6 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Chat apps, group channels, and agent connections."
 msgstr ""
-
-#: src/pages/Shell.tsx
-msgid "Chat Settings"
-msgstr "चैट सेटिंग्स"
 
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
@@ -1022,6 +1034,7 @@ msgstr "एक मॉडल कनेक्ट करें"
 msgid "Connect API key"
 msgstr "API कुंजी कनेक्ट करें"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
@@ -1709,6 +1722,7 @@ msgstr "दिन"
 msgid "Decline"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Default"
@@ -1782,6 +1796,14 @@ msgstr "डिलीट किया गया"
 #: src/pages/shell/dialogs.tsx
 msgid "Deleting…"
 msgstr "डिलीट किया जा रहा है…"
+
+#: src/components/DeckCard.tsx
+msgid "Delivered"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Delivery failed"
+msgstr ""
 
 #: src/components/AskCard.tsx
 msgid "Denied"
@@ -2161,6 +2183,10 @@ msgstr "पासवर्ड भूल गए?"
 msgid "Free"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
+msgid "From"
+msgstr ""
+
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
 msgstr "फ़ुलस्क्रीन"
@@ -2447,6 +2473,11 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Light"
 msgstr "लाइट"
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Line chart"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Linear issue"
@@ -3113,6 +3144,7 @@ msgstr ""
 msgid "Only you can change this setup, and every change reaches all teammates."
 msgstr ""
 
+#: src/components/DeckCard.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 msgid "Open"
@@ -3211,6 +3243,10 @@ msgstr "संगठन API कुंजी"
 msgid "Other model…"
 msgstr "अन्य मॉडल…"
 
+#: src/components/DeckCard.tsx
+msgid "Outcome unknown"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "PagerDuty incident"
 msgstr ""
@@ -3258,6 +3294,15 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Pending"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Pie chart"
 msgstr ""
 
 #: src/pages/BotContextMenu.tsx
@@ -3643,6 +3688,7 @@ msgstr ""
 msgid "Resume"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/Shell.tsx
 msgid "Retry"
 msgstr ""
@@ -3908,14 +3954,6 @@ msgstr "सर्वर URL"
 #: src/pages/Shell.tsx
 msgid "Settings"
 msgstr "सेटिंग्स"
-
-#: src/pages/Shell.tsx
-msgid "Settings: General"
-msgstr "सेटिंग्स: सामान्य"
-
-#: src/pages/Shell.tsx
-msgid "Settings: Usage"
-msgstr "सेटिंग्स: उपयोग"
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4396,6 +4434,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Unpublished"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Unsupported"
 msgstr ""
 
 #. placeholder {0}: pending.file.name

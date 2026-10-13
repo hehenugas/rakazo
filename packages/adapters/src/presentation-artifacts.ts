@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import type { ArtifactStore } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { ARTIFACT_DESCRIPTION_MAX_LENGTH, ARTIFACT_NAME_MAX_LENGTH } from "@rakazo/contracts";
-import { DECK_MIME, type Deck, deckArtifactName, deckPreview } from "@rakazo/core";
+import type { Deck } from "@rakazo/core";
+import { DECK_MIME, deckArtifactName, deckPreview } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { withResolvedArtifactVersion } from "@rakazo/db";
 
@@ -80,6 +81,7 @@ export async function saveDeckArtifact(
       artifactId: row.id,
       title: input.deck.title,
       slideCount: input.deck.slides.length,
+      style: input.deck.style ?? "clean",
       slides: deckPreview(input.deck),
     },
   };

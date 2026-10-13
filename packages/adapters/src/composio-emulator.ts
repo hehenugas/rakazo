@@ -4,6 +4,7 @@ import type {
   ConnectorEvent,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
+import { emailDeliveryReceipt } from "./email-delivery-receipt.js";
 import {
   type ComposioCatalogItem,
   type ComposioProvider,
@@ -465,7 +466,14 @@ export class ComposioEmulator implements ComposioProvider {
         ? this.executeGithub(call.tool, args)
         : { ok: true, tool: call.tool, args };
     this.executions.push({ userId: context.userId, tool: call.tool, args });
-    yield { type: "result", data: result };
+    const isEmulatedEmailSend = call.tool === "GMAIL_SEND_EMAIL";
+    const output = isEmulatedEmailSend ? { ...result, emulated: true } : result;
+    const receipt = emailDeliveryReceipt(call.tool, output);
+    yield {
+      type: "result",
+      data: output,
+      ...(receipt ? { receipt } : {}),
+    };
   }
 
   async begin(

@@ -101,6 +101,11 @@ msgstr ""
 msgid "{0} will still respond to direct mentions."
 msgstr "{0} по-прежнему будет отвечать на прямые упоминания."
 
+#. placeholder {0}: routine.name
+#: src/pages/RoutineEditor.tsx
+msgid "{0}: Return to conversation"
+msgstr ""
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}'s screen"
@@ -207,6 +212,8 @@ msgstr "Токен доступа"
 msgid "Access token (optional)"
 msgstr "Токен доступа (необязательно)"
 
+#: src/components/DeckCard.tsx
+#: src/components/DraftActionCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "Аккаунт"
@@ -622,6 +629,11 @@ msgstr ""
 msgid "Back to sign in"
 msgstr "Вернуться ко входу"
 
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Bar chart"
+msgstr ""
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Base URL"
 msgstr "Базовый URL"
@@ -748,6 +760,10 @@ msgstr "Отменено"
 msgid "Card view"
 msgstr ""
 
+#: src/pages/Artifacts.tsx
+msgid "Category"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Change password"
 msgstr "Изменить пароль"
@@ -771,10 +787,6 @@ msgstr "Приложения для чата"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Chat apps, group channels, and agent connections."
 msgstr "Приложения чата, групповые каналы и подключения агентов."
-
-#: src/pages/Shell.tsx
-msgid "Chat Settings"
-msgstr "Настройки чата"
 
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
@@ -1022,6 +1034,7 @@ msgstr "Подключить модель"
 msgid "Connect API key"
 msgstr "Подключить API-ключ"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
@@ -1709,6 +1722,7 @@ msgstr "дни"
 msgid "Decline"
 msgstr "Отклонить"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Default"
@@ -1782,6 +1796,14 @@ msgstr "удалено"
 #: src/pages/shell/dialogs.tsx
 msgid "Deleting…"
 msgstr "Удаление…"
+
+#: src/components/DeckCard.tsx
+msgid "Delivered"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Delivery failed"
+msgstr ""
 
 #: src/components/AskCard.tsx
 msgid "Denied"
@@ -2161,6 +2183,10 @@ msgstr "Забыли пароль?"
 msgid "Free"
 msgstr "Бесплатно"
 
+#: src/components/DraftActionCard.tsx
+msgid "From"
+msgstr ""
+
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
 msgstr "Полноэкранный"
@@ -2447,6 +2473,11 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Light"
 msgstr "Светлая"
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Line chart"
+msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Linear issue"
@@ -3113,6 +3144,7 @@ msgstr "Удалить можно только пустые пространст
 msgid "Only you can change this setup, and every change reaches all teammates."
 msgstr ""
 
+#: src/components/DeckCard.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 msgid "Open"
@@ -3211,6 +3243,10 @@ msgstr "Ключ API организации"
 msgid "Other model…"
 msgstr "Другая модель…"
 
+#: src/components/DeckCard.tsx
+msgid "Outcome unknown"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "PagerDuty incident"
 msgstr "Инцидент PagerDuty"
@@ -3259,6 +3295,15 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Приостановлено"
+
+#: src/components/DeckCard.tsx
+msgid "Pending"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Pie chart"
+msgstr ""
 
 #: src/pages/BotContextMenu.tsx
 msgid "Pin"
@@ -3643,6 +3688,7 @@ msgstr "Восстановление вашего рабочего простр�
 msgid "Resume"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/Shell.tsx
 msgid "Retry"
 msgstr ""
@@ -3908,14 +3954,6 @@ msgstr "URL-адрес сервера"
 #: src/pages/Shell.tsx
 msgid "Settings"
 msgstr "Настройки"
-
-#: src/pages/Shell.tsx
-msgid "Settings: General"
-msgstr "Настройки: Общие"
-
-#: src/pages/Shell.tsx
-msgid "Settings: Usage"
-msgstr "Настройки: Использование"
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4396,6 +4434,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Unpublished"
+msgstr ""
+
+#: src/components/DeckCard.tsx
+msgid "Unsupported"
 msgstr ""
 
 #. placeholder {0}: pending.file.name

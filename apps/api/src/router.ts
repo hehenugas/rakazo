@@ -208,6 +208,7 @@ import {
   toComputerStatus,
 } from "./computer-status.js";
 import { submitDraftAction, updateDraftAction } from "./draft-actions.js";
+import { verifiedEmailSenders } from "./email-senders.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
 import {
   dismissMcpServerApprovals,
@@ -228,7 +229,12 @@ import {
   promptFocus,
   startOnboarding,
 } from "./onboarding.js";
-import { deliverDeck, exportDeck } from "./presentation-export.js";
+import {
+  deliverDeck,
+  exportDeck,
+  googleSlidesDeliveryConnections,
+  readDeckDeliveryStatus,
+} from "./presentation-export.js";
 import { stopProjectsOwnedByBot, stopProjectWork } from "./project-control.js";
 import { listRoutineRuns } from "./routine-runs.js";
 import { listSpaceRuns } from "./runs.js";
@@ -2363,19 +2369,26 @@ export function createRouter(deps: RouterDeps) {
         if (target.kind === "bot") {
           await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
         }
-        await submitDraftAction(deps, context.actor, target, input);
+        await submitDraftAction(
+          {
+            prisma: deps.prisma,
+            events: deps.events,
+            jobs: deps.jobs,
+            listVerifiedEmailSenders: (connectionId) =>
+              verifiedEmailSenders(deps, context.actor, connectionId, context.signal),
+          },
+          context.actor,
+          target,
+          input,
+        );
         return { ok: true as const };
       }),
       deliverDeck: authed.threads.deliverDeck.handler(async ({ context, input }) => {
-        if ((await modelSetup(deps, context.actor)).needsModel) {
-          throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
-        }
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         if (target.kind === "bot") {
           await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
         }
-        await deliverDeck(deps, context.actor, target, input);
-        return { ok: true as const };
+        return deliverDeck(deps, context.actor, target, input, context.signal);
       }),
       react: authed.threads.react.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -4605,6 +4618,19 @@ export function createRouter(deps: RouterDeps) {
           createdAt: row.createdAt.toISOString(),
         }));
       }),
+      emailSenders: authed.connections.emailSenders.handler(async ({ context, input }) => {
+        try {
+          return await verifiedEmailSenders(deps, context.actor, input.connectionId, context.signal);
+        } catch (error) {
+          if (error instanceof IsolationError) throw error;
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Could not verify sender addresses for this account.",
+          });
+        }
+      }),
+      presentationDelivery: authed.connections.presentationDelivery.handler(async ({ context }) => {
+        return googleSlidesDeliveryConnections(deps, context.actor, context.signal);
+      }),
       begin: authed.connections.begin.handler(async ({ context, input }) => {
         const connector =
           deps.integrationSettings &&
@@ -5812,6 +5838,9 @@ export function createRouter(deps: RouterDeps) {
       }),
       exportDeck: authed.artifacts.exportDeck.handler(async ({ context, input }) => {
         return exportDeck(deps, context.actor, input);
+      }),
+      deckDeliveryStatus: authed.artifacts.deckDeliveryStatus.handler(async ({ context, input }) => {
+        return readDeckDeliveryStatus(deps, context.actor, input);
       }),
       remove: authed.artifacts.remove.handler(async ({ context, input }) => {
         return deleteArtifactFamily(deps, context.actor, { familyId: input.artifactId });

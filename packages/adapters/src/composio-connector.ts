@@ -16,6 +16,12 @@ import {
   type ToolkitDirectoryEntry,
 } from "./composio-catalog-cache.js";
 import { DestinationEmulator } from "./destination-emulator.js";
+import { emailDeliveryReceipt } from "./email-delivery-receipt.js";
+import {
+  createGoogleSlidesFromMarkdown,
+  googleSlidesMarkdownTool,
+  supportsGoogleSlidesMarkdownTool,
+} from "./google-slides-delivery.js";
 import { isVitestRuntime } from "./test-runtime.js";
 
 type ComposioSession = Awaited<ReturnType<Composio["create"]>>;
@@ -75,6 +81,53 @@ export type ComposioCatalogItem = Omit<ConnectorCatalogItem, "connectorId">;
 export interface ComposioProvider extends ManagedConnectorProvider {
   warmDirectory(): Promise<void>;
   listConnectedSlugs(userId: string): Promise<string[]>;
+}
+
+function verifiedSendAsAddresses(value: unknown): string[] | null {
+  const seen = new Set<object>();
+  const findRows = (candidate: unknown, depth = 0): unknown[] | null => {
+    if (depth > 6 || !candidate || typeof candidate !== "object") return null;
+    if (seen.has(candidate)) return null;
+    seen.add(candidate);
+    if (Array.isArray(candidate)) {
+      for (const entry of candidate) {
+        const nested = findRows(entry, depth + 1);
+        if (nested) return nested;
+      }
+      return null;
+    }
+    const record = candidate as Record<string, unknown>;
+    for (const key of ["sendAs", "send_as"]) {
+      if (Array.isArray(record[key])) return record[key] as unknown[];
+    }
+    for (const nested of Object.values(record)) {
+      const rows = findRows(nested, depth + 1);
+      if (rows) return rows;
+    }
+    return null;
+  };
+  const rows = findRows(value);
+  if (!rows) return null;
+  const addresses = new Map<string, string>();
+  for (const entry of rows) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const status = String(row.verificationStatus ?? row.verification_status ?? "").toLowerCase();
+    const address = row.sendAsEmail ?? row.send_as_email ?? row.email;
+    if (
+      status !== "accepted" &&
+      status !== "verified" &&
+      row.isPrimary !== true &&
+      row.is_primary !== true
+    ) {
+      continue;
+    }
+    if (typeof address !== "string" || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address)) {
+      continue;
+    }
+    addresses.set(address.toLowerCase(), address);
+  }
+  return [...addresses.values()].sort((left, right) => left.localeCompare(right));
 }
 
 export function filterCatalog<T extends Pick<ComposioCatalogItem, "name" | "slug">>(
@@ -375,6 +428,47 @@ export class ComposioConnector implements ComposioProvider {
     return asConnectorTools(raw);
   }
 
+  async listVerifiedEmailSenders(context: AdapterContext): Promise<string[] | null> {
+    const accounts = connectedComposioConnections(context).filter((connection) =>
+      /^(gmail|googlemail)$/i.test(connection.externalId.replace(/[^a-z0-9]/gi, "")),
+    );
+    if (accounts.length !== 1) return null;
+    const tool = (await this.discoverTools(context)).find(
+      (candidate) => candidate.name.replace(/[^a-z0-9]/gi, "").toUpperCase() === "GMAILLISTSENDAS",
+    );
+    if (!tool) return null;
+    let result: unknown;
+    for await (const event of this.execute(
+      { tool: tool.name, args: {}, executionId: context.operationId },
+      context,
+    )) {
+      if (event.type === "error") throw new Error(event.message);
+      if (event.type === "result") result = event.data;
+    }
+    if (result === undefined) throw new Error("The email provider returned no sender identities.");
+    const addresses = verifiedSendAsAddresses(result);
+    if (!addresses) throw new Error("The email provider returned an unreadable sender list.");
+    return addresses;
+  }
+
+  async supportsGoogleSlidesDelivery(context: AdapterContext): Promise<boolean> {
+    const accounts = connectedComposioConnections(context).filter(
+      (connection) => connection.externalId.replace(/[^a-z0-9]/gi, "").toLowerCase() === "googleslides",
+    );
+    if (accounts.length !== 1) return false;
+    const tool = googleSlidesMarkdownTool(await this.discoverTools(context));
+    return supportsGoogleSlidesMarkdownTool(tool);
+  }
+
+  async createGoogleSlidesFromMarkdown(
+    input: { title: string; markdown: string },
+    context: AdapterContext,
+  ) {
+    const tool = googleSlidesMarkdownTool(await this.discoverTools(context));
+    if (!supportsGoogleSlidesMarkdownTool(tool)) return null;
+    return createGoogleSlidesFromMarkdown(this, context, tool, input);
+  }
+
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
     try {
       const session = await this.sessionForExecute(
@@ -382,10 +476,12 @@ export class ComposioConnector implements ComposioProvider {
         connectedComposioConnections(context),
       );
       const result = await session.execute(call.tool, call.args ?? {});
+      const receipt = emailDeliveryReceipt(call.tool, result);
       if (result.error) {
         yield {
           type: "error",
           message: sanitizeComposioError(composioResultError(result.error, result.data)),
+          ...(receipt ? { receipt } : {}),
         };
         return;
       }
@@ -396,6 +492,7 @@ export class ComposioConnector implements ComposioProvider {
           data: sanitizePayload(result.data),
           logId,
         },
+        ...(receipt ? { receipt } : {}),
       };
     } catch (error) {
       yield { type: "error", message: sanitizeComposioError(error) };

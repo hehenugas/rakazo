@@ -14,11 +14,18 @@ import {
 import { emailAccountSnapshot } from "@rakazo/core/node/email-account";
 import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { IsolationError } from "@rakazo/db";
-import { sendThreadMessage, type ThreadTarget } from "./thread-target.js";
+import type { ThreadTarget } from "./thread-target.js";
+import { sendThreadMessage } from "./thread-target.js";
 
 type DraftActionBlock = Extract<MessageBlock, { kind: "draft_action" }>;
 type Field = DraftActionBlock["fields"][number];
-type Deps = { prisma: PrismaClient; events: ThreadEvents; jobs: JobPublisher };
+type EmailSenderCapability = { supported: boolean; senders: string[] };
+type Deps = {
+  prisma: PrismaClient;
+  events: ThreadEvents;
+  jobs: JobPublisher;
+  listVerifiedEmailSenders?: (connectionId: string) => Promise<EmailSenderCapability>;
+};
 const EMAIL_DRAFT_FIELDS = new Set(["to", "cc", "bcc", "subject", "body", "from"]);
 
 /** The send nonce is the idempotency key: one draft starts at most one run, however many clicks. */
@@ -74,7 +81,16 @@ async function writeDraft(
   before: MessageBlock[],
   draftId: string,
   patch: Partial<
-    Pick<DraftActionBlock, "fields" | "status" | "connectionId" | "connectionSnapshot">
+    Pick<
+      DraftActionBlock,
+      | "fields"
+      | "status"
+      | "connectionId"
+      | "connectionSnapshot"
+      | "executionStatus"
+      | "deliveryReceipt"
+      | "executionAttempt"
+    >
   >,
 ): Promise<MessageBlock[]> {
   const next = before.map((block) =>
@@ -94,10 +110,11 @@ async function writeDraft(
  * The stored card decides which fields exist and which values they allow: edits cannot add a field
  * or widen a field's options, and a value outside the options is refused.
  */
-function lockOptions(stored: Field[], incoming: Field[]): Field[] {
+function lockOptions(stored: Field[], incoming: Field[], allowUnlistedFrom = false): Field[] {
   return incoming.map((field) => {
     const known = stored.find((candidate) => candidate.key === field.key);
     if (!known) {
+      if (allowUnlistedFrom && field.key === "from") return { ...field };
       throw new ORPCError("BAD_REQUEST", { message: `${field.label} is not part of this draft.` });
     }
     const { options: _ignored, ...rest } = field;
@@ -150,7 +167,7 @@ export async function submitDraftAction(
   deps: Deps,
   actor: Actor,
   target: ThreadTarget,
-  input: { messageId: string; draftId: string; fields: Field[] },
+  input: { messageId: string; draftId: string; fields: Field[]; connectionId?: string },
 ) {
   const { message, blocks, block } = await loadDraft(
     deps.prisma,
@@ -177,6 +194,7 @@ export async function submitDraftAction(
   const send = (
     fields: Field[],
     options?: { allowReservedDraftNonce?: boolean; requireNewRun?: boolean },
+    attempt = block.executionAttempt ?? 1,
   ) =>
     sendThreadMessage(
       deps,
@@ -184,37 +202,76 @@ export async function submitDraftAction(
       target,
       {
         text: draftExecutionText(block, fields),
-        clientNonce: draftActionNonce(block.draftId),
+        clientNonce: draftActionNonce(block.draftId, attempt),
       },
       options,
     );
   if (block.status === "submitted") {
-    // Replays the original send (same nonce) so a lost response can be retried safely.
-    await send(block.fields, {
-      allowReservedDraftNonce: true,
-      requireNewRun: true,
-    });
-    return;
-  }
-  let fields = lockOptions(block.fields, input.fields);
-  let connectionId: string | undefined;
-  let connectionSnapshot: string | undefined;
-  if (isEmailDraftAction(block.action)) {
-    const connections = await deps.prisma.connection.findMany({
-      where: { spaceId: actor.spaceId, userId: actor.userId, status: "connected" },
-      select: { id: true, provider: true, providerRef: true },
-    });
-    const matchingConnections = connections.filter((connection) =>
-      emailProviderMatches(block.provider, connection.provider),
-    );
-    if (matchingConnections.length !== 1) {
+    if (block.executionStatus === "sent" || block.executionStatus === "unknown") return;
+    if (block.executionStatus !== "failed") {
+      // Replays the same attempt nonce so a lost response is safe to retry.
+      await send(
+        block.fields,
+        { allowReservedDraftNonce: true, requireNewRun: true },
+        block.executionAttempt ?? 1,
+      );
+      return;
+    }
+    if (!isEmailDraftAction(block.action) || !block.connectionId || !block.connectionSnapshot) {
       throw new ORPCError("PRECONDITION_FAILED", {
-        message: "Connect exactly one account for this email provider before submitting the draft.",
+        message: "This draft cannot be retried safely. Create a new draft before sending again.",
       });
     }
-    const matchingConnection = matchingConnections[0]!;
-    connectionId = matchingConnection.id;
-    connectionSnapshot = emailAccountSnapshot(matchingConnection.providerRef);
+    const retryAccount = await resolveEmailAccount(
+      deps.prisma,
+      actor,
+      block.provider,
+      block.connectionId,
+    );
+    if (emailAccountSnapshot(retryAccount.providerRef) !== block.connectionSnapshot) {
+      throw new ORPCError("PRECONDITION_FAILED", {
+        message: "Reconnect the selected email account before retrying this draft.",
+      });
+    }
+    const nextAttempt = (block.executionAttempt ?? 1) + 1;
+    await sendThreadMessage(
+      deps,
+      actor,
+      target,
+      {
+        text: draftExecutionText(block, block.fields),
+        clientNonce: draftActionNonce(block.draftId, nextAttempt),
+      },
+      {
+        requireNewRun: true,
+        beforeCommit: async (tx) => {
+          const currentAccount = await resolveEmailAccount(
+            tx,
+            actor,
+            block.provider,
+            block.connectionId,
+          );
+          if (emailAccountSnapshot(currentAccount.providerRef) !== block.connectionSnapshot) {
+            throw new ORPCError("PRECONDITION_FAILED", {
+              message: "Reconnect the selected email account before retrying this draft.",
+            });
+          }
+          await writeDraft(tx, message.id, blocks, block.draftId, {
+            status: "submitted",
+            executionStatus: "queued",
+            executionAttempt: nextAttempt,
+            connectionId: currentAccount.id,
+            connectionSnapshot: emailAccountSnapshot(currentAccount.providerRef),
+          });
+        },
+      },
+    );
+    return;
+  }
+  let fields = lockOptions(block.fields, input.fields, isEmailDraftAction(block.action));
+  let selectedEmailAccount: Awaited<ReturnType<typeof resolveEmailAccount>> | null = null;
+  let selectedEmailAccountSnapshot: string | null = null;
+  if (isEmailDraftAction(block.action)) {
     const seen = new Set<string>();
     for (const field of fields) {
       if (!EMAIL_DRAFT_FIELDS.has(field.key)) {
@@ -229,12 +286,52 @@ export async function submitDraftAction(
       }
       seen.add(field.key);
     }
-    const { draft, issues } = parseEmailDraft(fields);
+    selectedEmailAccount = await resolveEmailAccount(
+      deps.prisma,
+      actor,
+      block.provider,
+      input.connectionId,
+    );
+    const requestedSender = fields.find((field) => field.key === "from")?.value.trim() ?? "";
+    let verifiedSenders: string[] = [];
+    if (requestedSender) {
+      if (!deps.listVerifiedEmailSenders) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "This account cannot verify sender addresses. Use its default sender.",
+        });
+      }
+      let capability: EmailSenderCapability;
+      try {
+        capability = await deps.listVerifiedEmailSenders(selectedEmailAccount.id);
+      } catch {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "Could not verify sender addresses for this account. Use its default sender.",
+        });
+      }
+      if (!capability.supported) {
+        throw new ORPCError("PRECONDITION_FAILED", {
+          message: "This account cannot verify sender addresses. Use its default sender.",
+        });
+      }
+      const sender = capability.senders.find(
+        (address) => address.toLowerCase() === requestedSender.toLowerCase(),
+      );
+      if (!sender) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose a verified sender address for the selected account.",
+        });
+      }
+      verifiedSenders = capability.senders;
+      fields = fields.map((field) => (field.key === "from" ? { ...field, value: sender } : field));
+    }
+    selectedEmailAccountSnapshot = emailAccountSnapshot(selectedEmailAccount.providerRef);
+    const { draft, issues } = parseEmailDraft(fields, verifiedSenders);
     if (issues.length > 0) {
       const names = [...new Set(issues.map((issue) => issue.field))].join(", ");
       throw new ORPCError("BAD_REQUEST", { message: `Email draft needs attention: ${names}.` });
     }
     const values = {
+      from: draft.from,
       to: draft.to.join(", "),
       cc: draft.cc.join(", "),
       bcc: draft.bcc.join(", "),
@@ -242,7 +339,6 @@ export async function submitDraftAction(
       body: draft.body.replace(/\r\n?/g, "\n"),
     };
     fields = fields
-      .filter((field) => field.key !== "from")
       .map((field) => ({
         ...field,
         value: values[field.key as keyof typeof values] ?? field.value,
@@ -259,13 +355,78 @@ export async function submitDraftAction(
     {
       requireNewRun: true,
       beforeCommit: async (tx) => {
+        let account = null;
+        if (selectedEmailAccount) {
+          account = await resolveEmailAccount(
+            tx,
+            actor,
+            block.provider,
+            selectedEmailAccount.id,
+          );
+          if (emailAccountSnapshot(account.providerRef) !== selectedEmailAccountSnapshot) {
+            throw new ORPCError("PRECONDITION_FAILED", {
+              message: "That email account changed. Choose it again before sending the draft.",
+            });
+          }
+        }
         await writeDraft(tx, message.id, blocks, block.draftId, {
           fields,
           status: "submitted",
-          ...(connectionId ? { connectionId } : {}),
-          ...(connectionSnapshot ? { connectionSnapshot } : {}),
+          executionStatus: "queued",
+          executionAttempt: 1,
+          ...(account
+            ? {
+                connectionId: account.id,
+                connectionSnapshot: emailAccountSnapshot(account.providerRef),
+              }
+            : {}),
         });
       },
     },
   );
+}
+
+async function resolveEmailAccount(
+  prisma: Pick<PrismaClient, "connection">,
+  actor: Actor,
+  provider: string,
+  requestedId?: string,
+) {
+  const rows = await prisma.connection.findMany({
+    where: { spaceId: actor.spaceId, userId: actor.userId, status: "connected" },
+    select: { id: true, provider: true, providerRef: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const matching = rows.filter((row) => emailProviderMatches(provider, row.provider));
+  if (matching.length === 0) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Connect an account for this email provider before sending the draft.",
+    });
+  }
+  if (requestedId) {
+    const selected = matching.find((row) => row.id === requestedId);
+    if (!selected) {
+      throw new ORPCError("PRECONDITION_FAILED", {
+        message: "That email account is no longer connected. Choose another account.",
+      });
+    }
+    if (!selected.providerRef?.trim()) {
+      throw new ORPCError("PRECONDITION_FAILED", {
+        message: "Reconnect this email account before sending the draft.",
+      });
+    }
+    return selected;
+  }
+  if (matching.length > 1) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Choose an email account before sending the draft.",
+    });
+  }
+  const selected = matching[0]!;
+  if (!selected.providerRef?.trim()) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Reconnect this email account before sending the draft.",
+    });
+  }
+  return selected;
 }

@@ -9,7 +9,8 @@ import {
   parseEmailDraft,
 } from "@rakazo/core";
 import { emailAccountSnapshot } from "@rakazo/core/node/email-account";
-import type { PrismaClient } from "@rakazo/db";
+import type { Prisma, PrismaClient } from "@rakazo/db";
+import { emailDeliveryReceipt } from "./email-delivery-receipt.js";
 
 export type ApprovedEmailDraft = {
   draft: EmailDraft;
@@ -18,6 +19,114 @@ export type ApprovedEmailDraft = {
   connectionId: string;
   connectionSnapshot: string;
 };
+
+export type EmailDraftExecutionStatus = "queued" | "executing" | "sent" | "failed" | "unknown";
+
+export function emailSendToolFromEffect(
+  effect: { kind: string; request: unknown },
+): string | undefined {
+  if (isEmailSendTool(effect.kind, "gmail")) return effect.kind;
+  const pending = [effect.request];
+  const seen = new Set<object>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    if (Array.isArray(current)) {
+      pending.push(...current);
+      continue;
+    }
+    for (const [key, value] of Object.entries(current as Record<string, unknown>)) {
+      if (
+        ["tool", "toolName", "name"].includes(key) &&
+        typeof value === "string" &&
+        isEmailSendTool(value, "gmail")
+      ) {
+        return value;
+      }
+      if (value && typeof value === "object") pending.push(value);
+    }
+  }
+  return undefined;
+}
+
+/** Persist a server-derived lifecycle state on the submitted card. */
+export async function updateEmailDraftExecutionStatus(
+  prisma: Pick<PrismaClient, "message" | "externalEffect">,
+  run: { id?: string; threadId: string; sourceMessageId: string | null },
+  status: EmailDraftExecutionStatus,
+  deliveryReceipt?: string,
+  options?: { reconcileRunEffects?: boolean },
+) {
+  if (!run.sourceMessageId) return;
+  let nextStatus = status;
+  let receiptId = deliveryReceipt;
+  if (status === "failed" && run.id && options?.reconcileRunEffects) {
+    const effects = await prisma.externalEffect.findMany({
+      where: { runId: run.id },
+      select: { kind: true, status: true, request: true, result: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const sendEffects = effects.flatMap((effect) => {
+      const toolName = emailSendToolFromEffect(effect);
+      return toolName ? [{ ...effect, toolName }] : [];
+    });
+    const receipts = sendEffects.map((effect) =>
+      emailDeliveryReceipt(effect.toolName, effect.result),
+    );
+    if (sendEffects.some((effect) => effect.status === "executing" || effect.status === "uncertain")) {
+      nextStatus = "unknown";
+      receiptId = undefined;
+    } else if (receipts.some((receipt) => receipt?.status === "sent")) {
+      nextStatus = "sent";
+      receiptId = receipts.find((receipt) => receipt?.status === "sent")?.id;
+    } else if (receipts.some((receipt) => receipt?.status === "unknown")) {
+      nextStatus = "unknown";
+      receiptId = undefined;
+    } else if (receipts.some((receipt) => receipt?.status === "failed")) {
+      nextStatus = "failed";
+      receiptId = undefined;
+    }
+  }
+  const source = await prisma.message.findFirst({
+    where: { id: run.sourceMessageId, threadId: run.threadId, role: "user" },
+    select: { clientNonce: true },
+  });
+  const nonce = source?.clientNonce;
+  if (!nonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return;
+  const draftId = nonce.slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length).split(":", 1)[0];
+  if (!draftId) return;
+  const card = await prisma.message.findFirst({
+    where: {
+      threadId: run.threadId,
+      role: "bot",
+      blocks: { array_contains: [{ kind: "draft_action", draftId }] },
+    },
+    select: { id: true, blocks: true },
+  });
+  const parsed = MessageBlockSchema.array().safeParse(card?.blocks);
+  if (!card || !parsed.success) return;
+  const current = parsed.data.find(
+    (block) => block.kind === "draft_action" && block.draftId === draftId,
+  );
+  if (current?.kind !== "draft_action" || current.status !== "submitted") return;
+  if (!isEmailDraftAction(current.action)) return;
+  if (current.executionStatus === "sent" || current.executionStatus === "failed") return;
+  if (current.executionStatus === "unknown" && nextStatus !== "sent") return;
+  const blocks = parsed.data.map((block) =>
+    block.kind === "draft_action" && block.draftId === draftId
+      ? {
+          ...block,
+          executionStatus: nextStatus,
+          ...(nextStatus === "sent" && receiptId ? { deliveryReceipt: receiptId } : {}),
+        }
+      : block,
+  );
+  await prisma.message.updateMany({
+    where: { id: card.id, blocks: { equals: parsed.data as Prisma.InputJsonValue } },
+    data: { blocks: blocks as Prisma.InputJsonValue },
+  });
+}
 
 /**
  * The email a user approved, when this run was started by submitting a draft card. Submitting
@@ -49,7 +158,7 @@ export async function loadApprovedEmailDraft(
   });
   const nonce = source?.clientNonce;
   if (!nonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return null;
-  const draftId = nonce.slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length);
+  const draftId = nonce.slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length).split(":", 1)[0];
   if (!draftId) throw new Error("Submitted draft identity is missing.");
   const card = await prisma.message.findFirst({
     where: {
@@ -92,7 +201,11 @@ export async function loadApprovedEmailDraft(
   ) {
     throw new Error("Submitted email account is no longer connected.");
   }
-  const { draft, issues } = parseEmailDraft(block.fields);
+  const approvedSender = block.fields.find((field) => field.key === "from")?.value ?? "";
+  const { draft, issues } = parseEmailDraft(
+    block.fields,
+    approvedSender ? [approvedSender] : [],
+  );
   if (issues.length > 0) throw new Error("Submitted email payload could not be verified.");
   return {
     draft,

@@ -181,7 +181,8 @@ import {
 } from "./browser-tools.js";
 import { agentConnectionTools, builtinAgentTools, sharedMemorySaveError } from "./builtin-tools.js";
 import { archiveSpawnedBot, spawnBot } from "./child-bots.js";
-import { type CloudAgentConnection, cloudAgentsEnabled } from "./cloud-agent-factory.js";
+import type { CloudAgentConnection } from "./cloud-agent-factory.js";
+import { cloudAgentsEnabled } from "./cloud-agent-factory.js";
 import { executeCloudAgentTool } from "./cloud-agent-service.js";
 import { validCloudAgentArgs } from "./cloud-agent-tools.js";
 import { selectCloudAgentTools } from "./cloud-agent-tools-select.js";
@@ -221,11 +222,18 @@ import {
   unchangedVisualStreakAfterPageBrowser,
 } from "./computer-tools.js";
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
+import { buildApprovedEmailSendAction } from "./approved-email-action.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { formatCurrentTimeInstruction } from "./current-time.js";
+import { emailDeliveryReceipt } from "./email-delivery-receipt.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
 import type { ApprovedEmailDraft } from "./draft-binding.js";
-import { approvedEmailBindingError, loadApprovedEmailDraft } from "./draft-binding.js";
+import {
+  approvedEmailBindingError,
+  emailSendToolFromEffect,
+  loadApprovedEmailDraft,
+  updateEmailDraftExecutionStatus,
+} from "./draft-binding.js";
 import { normalizeDraftFields } from "./draft-fields.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
@@ -3410,6 +3418,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           runId,
           payload: { trigger: run.trigger, routineId: run.routineId },
         });
+        await updateEmailDraftExecutionStatus(deps.prisma, run, "executing").catch((error) =>
+          getLogger().error("email draft execution status update", error),
+        );
 
         const discoveredPromise = deps.connector
           ? deps.connector.discoverTools(context)
@@ -4209,6 +4220,31 @@ export function createRunExecutor(deps: ExecutorDeps) {
             usesApprovalKey && occurrence === 0
               ? approvalEffectKey(runId, replayEffectToolName, args)
               : toolEffectIdempotencyKey(runId, replayEffectToolName, args, occurrence);
+          if (exactDraftEmailSend) {
+            const earlierEmailEffects = await deps.prisma.externalEffect.findMany({
+              where: { runId },
+              select: { idempotencyKey: true, kind: true, status: true, request: true, result: true },
+            });
+            const duplicateAttempt = earlierEmailEffects.some((effect) => {
+              const earlierTool = emailSendToolFromEffect(effect);
+              if (
+                effect.idempotencyKey === effectKey ||
+                !earlierTool ||
+                !["approved", "executing", "uncertain", "completed"].includes(effect.status)
+              ) {
+                return false;
+              }
+              if (effect.status !== "completed") return true;
+              const receipt = emailDeliveryReceipt(earlierTool, effect.result);
+              return receipt?.status !== "failed";
+            });
+            if (duplicateAttempt) {
+              return {
+                error:
+                  "This submitted draft already has an email send attempt. Check its delivery status before sending again.",
+              };
+            }
+          }
           // Connector read-only hints must not bypass approval, review, or replay decisions.
           const applied = READ_ONLY_AGENT_TOOLS.has(name)
             ? undefined
@@ -4410,6 +4446,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // stuck in "running" with no ask card — fail instead so the user can retry.
             if (!paused) {
               throw new Error("Could not pause this run for approval; try sending again.");
+            }
+            if (approvedEmail) {
+              await updateEmailDraftExecutionStatus(deps.prisma, run, "queued").catch((error) =>
+                getLogger().error("email draft approval status update", error),
+              );
             }
             await notifyRun(deps, run, {
               kind: "help",
@@ -6262,6 +6303,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (deps.connector) {
             let result: unknown = { error: `unknown tool ${name}` };
+            let emailReceiptResolved = false;
             const connectorContext = approvedEmail
               ? {
                   ...context,
@@ -6278,6 +6320,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
             )) {
               if (event.type === "result") {
                 result = event.data;
+                if (exactDraftEmailSend) {
+                  const receipt =
+                    event.receipt?.kind === "email_delivery"
+                      ? event.receipt
+                      : { kind: "email_delivery" as const, status: "unknown" as const };
+                  await updateEmailDraftExecutionStatus(
+                    deps.prisma,
+                    run,
+                    receipt.status,
+                    receipt.id,
+                  ).catch((error) =>
+                    getLogger().error("email draft provider receipt update", error),
+                  );
+                  emailReceiptResolved = true;
+                }
                 const logIds = collectLogIds(event.data);
                 for (const logId of logIds) {
                   await deps.events.append({
@@ -6290,7 +6347,29 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   });
                 }
               }
-              if (event.type === "error") result = { error: event.message };
+              if (event.type === "error") {
+                result = { error: event.message };
+                if (exactDraftEmailSend) {
+                  const receipt =
+                    event.receipt?.kind === "email_delivery"
+                      ? event.receipt
+                      : { kind: "email_delivery" as const, status: "unknown" as const };
+                  await updateEmailDraftExecutionStatus(
+                    deps.prisma,
+                    run,
+                    receipt.status,
+                    receipt.id,
+                  ).catch((error) =>
+                    getLogger().error("email draft provider receipt update", error),
+                  );
+                  emailReceiptResolved = true;
+                }
+              }
+            }
+            if (exactDraftEmailSend && !emailReceiptResolved) {
+              await updateEmailDraftExecutionStatus(deps.prisma, run, "unknown").catch((error) =>
+                getLogger().error("email draft unknown receipt update", error),
+              );
             }
             return finish(result);
           }
@@ -6437,6 +6516,121 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !leaseValid || Boolean(runAbortController?.signal.aborted),
           )
         ) {
+          return;
+        }
+
+        let approvedEmailForRun: ApprovedEmailDraft | null = null;
+        try {
+          approvedEmailForRun = await loadApprovedEmail();
+        } catch (error) {
+          getLogger().error("submitted email verification before structured execution", error);
+        }
+        const selectedEmailConnection = approvedEmailForRun
+          ? context.connectedConnections?.find(
+              (connection) => connection.id === approvedEmailForRun!.connectionId,
+            )
+          : undefined;
+        const structuredEmailAction =
+          approvedEmailForRun && selectedEmailConnection
+            ? buildApprovedEmailSendAction(
+                approvedEmailForRun,
+                exposedConnectorTools,
+              {
+                connectorId: selectedEmailConnection.connectorId,
+                provider: selectedEmailConnection.externalId,
+              },
+              )
+            : null;
+        if (structuredEmailAction) {
+          const executionId = `approved-email:${runId}:${approvedEmailForRun!.connectionId}`;
+          const startedAt = Date.now();
+          await deps.events.append({
+            spaceId: run.spaceId,
+            threadId: run.threadId,
+            botId: run.botId,
+            runId,
+            type: "agent.tool.called",
+            payload: { name: structuredEmailAction.name, executionId },
+          });
+          let result: unknown;
+          try {
+            result = await applyTool(
+              structuredEmailAction.name,
+              structuredEmailAction.args,
+              executionId,
+              structuredEmailAction.route,
+            );
+          } catch (error) {
+            result = { error: error instanceof Error ? error.message : String(error) };
+          }
+          if (isToolPauseResult(result)) return;
+          const completion = toolCompletionFromResult(
+            {
+              name: structuredEmailAction.name,
+              executionId,
+              durationMs: Date.now() - startedAt,
+            },
+            result,
+          );
+          await appendToolCompletionAudit(
+            deps,
+            {
+              spaceId: run.spaceId,
+              threadId: run.threadId,
+              botId: run.botId,
+              runId,
+            },
+            completion,
+            runSecrets,
+          );
+          const providerReceipt = emailDeliveryReceipt(structuredEmailAction.name, result);
+          const failure =
+            toolResultError(result) ??
+            (providerReceipt?.status === "failed"
+              ? "The provider did not send the approved email."
+              : undefined);
+          if (failure !== undefined) {
+            await updateEmailDraftExecutionStatus(deps.prisma, run, "failed", undefined, {
+              reconcileRunEffects: true,
+            }).catch((error) => getLogger().error("email draft structured failure status", error));
+          }
+          await workspaceCheckpoint.flush();
+          terminalCheckpointComplete = true;
+          if (!(await renewRunLease(deps, runId, workerId, fence))) return;
+          const finalized = await deps.events.finalizeRun(
+            failure === undefined
+              ? {
+                  spaceId: run.spaceId,
+                  threadId: run.threadId,
+                  botId: run.botId,
+                  runId,
+                  taskId: run.taskId,
+                  attemptId: attempt.id,
+                  leaseOwner: workerId,
+                  leaseFence: fence,
+                  outcome: "completed",
+                  blocks: [],
+                }
+              : {
+                  spaceId: run.spaceId,
+                  threadId: run.threadId,
+                  botId: run.botId,
+                  runId,
+                  taskId: run.taskId,
+                  attemptId: attempt.id,
+                  leaseOwner: workerId,
+                  leaseFence: fence,
+                  outcome: "failed",
+                  error: redactSecrets(String(failure), runSecrets).slice(0, 2_000),
+                },
+          );
+          if (!finalized) return;
+          if (finalized.continuationRunId) {
+            await deps.jobs
+              .enqueue(runContinueJob(finalized.continuationRunId))
+              .catch((error) => getLogger().error("email delivery continuation enqueue", error));
+          }
+          runAbortController?.abort();
           return;
         }
 
@@ -7008,6 +7202,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             markUnread: completionMarksUnread(run.trigger, text),
           });
           if (!completed) return;
+          await updateEmailDraftExecutionStatus(deps.prisma, run, "failed", undefined, {
+            reconcileRunEffects: true,
+          }).catch((error) =>
+            getLogger().error("email draft final status update", error),
+          );
           if (completed.continuationRunId) {
             await deps.jobs
               .enqueue(runContinueJob(completed.continuationRunId))
@@ -7085,6 +7284,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             error: message,
           });
           if (!failed) return;
+          await updateEmailDraftExecutionStatus(deps.prisma, run, "failed", undefined, {
+            reconcileRunEffects: true,
+          }).catch((statusError) =>
+            getLogger().error("email draft failed status update", statusError),
+          );
           if (failed.continuationRunId) {
             await deps.jobs
               .enqueue(runContinueJob(failed.continuationRunId))

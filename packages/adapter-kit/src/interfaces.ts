@@ -35,6 +35,7 @@ import type {
   ConnectorEvent,
   ConnectorTool,
   ControlLeaseRef,
+  GoogleSlidesDeliveryResult,
   MemoryCapabilities,
   MemoryCommitRequest,
   MemoryExportRequest,
@@ -197,6 +198,14 @@ export interface ManagedConnectorProvider
   catalog(context: AdapterContext, query?: string): Promise<ConnectorCatalogItem[]>;
   listConnectedExternalIds(context: AdapterContext): Promise<string[]>;
   connectionReady(context: AdapterContext, externalId: string): Promise<boolean>;
+  /** Verified sender identities for one explicitly scoped email account; null means unsupported. */
+  listVerifiedEmailSenders?(context: AdapterContext): Promise<string[] | null>;
+  /** Structured delivery from a stored deck; false means this account exposes no safe capability. */
+  supportsGoogleSlidesDelivery?(context: AdapterContext): Promise<boolean>;
+  createGoogleSlidesFromMarkdown?(
+    input: { title: string; markdown: string },
+    context: AdapterContext,
+  ): Promise<GoogleSlidesDeliveryResult | null>;
   warmDirectory?(): Promise<void>;
 }
 

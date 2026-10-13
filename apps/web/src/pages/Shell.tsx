@@ -66,8 +66,6 @@ import {
   resolveFeaturedCatalogItem,
   resolveMentionPickerKey,
   runThreadSubscription,
-  SLASH_ACTIONS,
-  type SlashActionId,
   searchHitThreadTarget,
   serializeComposerPrompt,
   speechFromBlocks,
@@ -4168,6 +4166,7 @@ export function ShellPage() {
             artifactTarget={transcriptArtifactTarget}
             chatAccent={chatAccent}
             messages={transcriptMessages}
+            onConnectApps={() => setPluginsOpen(true)}
             showToolActivity={showToolActivity}
             olderCursor={activeSnapshot?.olderCursor ?? null}
             loadingOlder={loadingOlder}
@@ -4270,23 +4269,6 @@ export function ShellPage() {
             mentionTargets={composerMentionTargets}
             agentSkills={agentSkills}
             onSlashOpen={refreshAgentSkills}
-            onSlashAction={(action) => {
-              if (action === "chat-settings") {
-                setPanel(inGroup ? "group-settings" : "settings");
-                return;
-              }
-              if (action === "settings-general") {
-                openSettings("general");
-                return;
-              }
-              if (action === "settings-usage") {
-                void rpc.usage
-                  .summary()
-                  .then(setUsage)
-                  .catch(() => undefined);
-                openSettings("usage");
-              }
-            }}
           />
         ) : null}
       </main>
@@ -5088,13 +5070,7 @@ export function ShellPage() {
                       key={routine.id}
                       routine={routine}
                       running={routineRunning}
-                      onOpen={() => {
-                        setRoutineDraft(draftFromRoutine(routine));
-                        setRoutineWebhookSecret(null);
-                        setEditingRoutine(routine);
-                        setRoutineError(null);
-                        setPanel("routine");
-                      }}
+                      onOpen={() => setPanel(null)}
                       onStop={() => void stopRun()}
                       onContextMenu={(event) => {
                         event.preventDefault();
@@ -6105,6 +6081,7 @@ const Transcript = memo(function Transcript({
   onScrollRequestHandled,
   artifactTarget,
   messages,
+  onConnectApps,
   showToolActivity,
   olderCursor,
   loadingOlder,
@@ -6140,6 +6117,7 @@ const Transcript = memo(function Transcript({
   onScrollRequestHandled: () => void;
   artifactTarget: ArtifactTarget;
   messages: ThreadMessage[];
+  onConnectApps: () => void;
   /** The Bot's identity color in a 1:1 chat; user bubbles take it unless Accent to Black is on. */
   chatAccent: GrokColorDef | null;
   showToolActivity: boolean;
@@ -6498,6 +6476,7 @@ const Transcript = memo(function Transcript({
                 >
                   <MessageView
                     artifactTarget={artifactTarget}
+                    onConnectApps={onConnectApps}
                     chatAccent={chatAccent}
                     message={message}
                     failedSends={failedSends}
@@ -6734,7 +6713,6 @@ const Composer = memo(function Composer({
   mentionTargets,
   agentSkills,
   onSlashOpen,
-  onSlashAction,
 }: {
   activeName?: string;
   running: boolean;
@@ -6766,7 +6744,6 @@ const Composer = memo(function Composer({
   mentionTargets?: ComposerMention[];
   agentSkills?: AgentSkillCatalogEntry[];
   onSlashOpen?: () => void;
-  onSlashAction?: (action: SlashActionId) => void;
 }) {
   const { t } = useLingui();
   const [draft, setDraft] = useState("");
@@ -6922,12 +6899,6 @@ const Composer = memo(function Composer({
     setSlashQuery(null);
   }
 
-  function runSlashAction(action: SlashActionId) {
-    setDraft("");
-    setSlashQuery(null);
-    onSlashAction?.(action);
-  }
-
   function removeLastChip() {
     if (selectedMentions.length > 0) {
       setSelectedMentions((current) => current.slice(0, -1));
@@ -6972,18 +6943,11 @@ const Composer = memo(function Composer({
       .slice(0, 8);
   }, [agentSkills, slashQuery]);
 
-  const slashActionOptions = useMemo(() => {
-    if (slashQuery === null) return [];
-    const query = slashQuery.trim().toLowerCase();
-    return SLASH_ACTIONS.filter((action) => !query || action.label.toLowerCase().includes(query));
-  }, [slashQuery]);
-
   const showSlashPicker =
     slashQuery !== null &&
     mentionQuery === null &&
-    (slashSkillOptions.length > 0 || slashActionOptions.length > 0);
-  // Skills first, then actions: the same order they are drawn in.
-  const slashItemCount = showSlashPicker ? slashSkillOptions.length + slashActionOptions.length : 0;
+    slashSkillOptions.length > 0;
+  const slashItemCount = showSlashPicker ? slashSkillOptions.length : 0;
   const activeSlashIndex = clampMentionHighlightIndex(slashHighlightIndex, slashItemCount);
   const slashItemId = (index: number) => `${slashListId}-item-${index}`;
 
@@ -7281,24 +7245,6 @@ const Composer = memo(function Composer({
               </span>
             </button>
           ))}
-          {slashActionOptions.map((action, actionIndex) => {
-            const label = slashActionLabel(action.id);
-            const index = slashSkillOptions.length + actionIndex;
-            return (
-              <button
-                key={action.id}
-                id={slashItemId(index)}
-                type="button"
-                aria-label={label}
-                data-highlighted={index === activeSlashIndex ? "" : undefined}
-                onClick={() => runSlashAction(action.id)}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-accent data-highlighted:bg-accent"
-              >
-                <Settings size={16} strokeWidth={1.7} className="shrink-0 text-muted-foreground" />
-                <span className="text-[14px] text-foreground">{label}</span>
-              </button>
-            );
-          })}
         </div>
       ) : null}
       <div
@@ -7399,10 +7345,7 @@ const Composer = memo(function Composer({
                   const skill = slashSkillOptions[slashAction.index];
                   if (skill) {
                     insertSkill(skill);
-                    return;
                   }
-                  const picked = slashActionOptions[slashAction.index - slashSkillOptions.length];
-                  if (picked) runSlashAction(picked.id);
                   return;
                 }
                 if (slashAction.type === "move") {
@@ -7549,17 +7492,6 @@ const Composer = memo(function Composer({
     </fieldset>
   );
 });
-
-function slashActionLabel(id: SlashActionId) {
-  switch (id) {
-    case "chat-settings":
-      return t`Chat Settings`;
-    case "settings-general":
-      return t`Settings: General`;
-    case "settings-usage":
-      return t`Settings: Usage`;
-  }
-}
 
 function MentionOptionIcon({ mention }: { mention: ComposerMention }) {
   if (mention.kind === "routine") {
@@ -7823,6 +7755,7 @@ function ComputerReleaseActions({
 
 const MessageView = memo(function MessageView({
   artifactTarget,
+  onConnectApps,
   canAnswer,
   message,
   onAnswer,
@@ -7854,6 +7787,7 @@ const MessageView = memo(function MessageView({
   onDeleteFailed: (send: OptimisticSend) => void;
   optimisticPending: { messageId: string; slow: boolean } | null;
   artifactTarget: ArtifactTarget;
+  onConnectApps: () => void;
   canAnswer: boolean;
   message: ThreadMessage;
   onAnswer: (message: ThreadMessage, text: string, username?: string) => Promise<void>;
@@ -8377,6 +8311,7 @@ const MessageView = memo(function MessageView({
                 messageId={message.id}
                 block={block}
                 onRefresh={onRefresh}
+                onConnectApps={onConnectApps}
               />
             </div>
           );

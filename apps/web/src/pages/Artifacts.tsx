@@ -1,8 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
-import type { Artifact, ArtifactVersion, Bot } from "@rakazo/contracts";
+import type { Artifact, ArtifactVersion, Bot, DeckChart } from "@rakazo/contracts";
 import { isAttachmentImageMimeType } from "@rakazo/contracts";
-import { DECK_MIME } from "@rakazo/core";
+import { DECK_MIME, parseDeck } from "@rakazo/core";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -949,6 +949,9 @@ function PreviewPane({
 }
 
 function ArtifactPreview({ artifact, bytes }: { artifact: Artifact; bytes: Uint8Array }) {
+  if (artifact.mimeType === DECK_MIME) {
+    return <DeckArtifactPreview bytes={bytes} />;
+  }
   if (artifact.mimeType === "text/html") {
     const html = new TextDecoder("utf-8").decode(bytes);
     return <SandboxedHtmlViewer html={html} title={artifact.name} />;
@@ -973,6 +976,226 @@ function ArtifactPreview({ artifact, bytes }: { artifact: Artifact; bytes: Uint8
     <div className="grid h-full place-items-center px-6 text-center text-sm text-muted-foreground/80">
       <Trans>Preview isn't available for this file type — download it to view it.</Trans>
     </div>
+  );
+}
+
+function DeckArtifactPreview({ bytes }: { bytes: Uint8Array }) {
+  let parsed: ReturnType<typeof parseDeck>;
+  try {
+    parsed = parseDeck(JSON.parse(new TextDecoder("utf-8").decode(bytes)));
+  } catch {
+    parsed = { error: "The deck could not be read." };
+  }
+  if ("error" in parsed) {
+    return (
+      <div role="alert" className="m-5 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive">
+        {parsed.error}
+      </div>
+    );
+  }
+  const { deck } = parsed;
+  const previewSurface =
+    deck.style === "dark"
+      ? "bg-foreground text-background"
+      : deck.style === "editorial"
+        ? "bg-muted/50 text-foreground"
+        : "bg-card text-foreground";
+  return (
+    <div className="h-full overflow-y-auto bg-muted/40 p-4 sm:p-6" data-testid="deck-artifact-preview">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <article className={`grid aspect-video place-items-center rounded-xl border border-border p-8 text-center shadow-sm ${previewSurface}`}>
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              {deck.style ?? "clean"}
+            </div>
+            <h2 className="text-2xl font-semibold sm:text-4xl">{deck.title}</h2>
+          </div>
+        </article>
+        {deck.slides.map((slide, index) => (
+          <article
+            key={`${index}:${slide.title}`}
+            className={`aspect-video overflow-hidden rounded-xl border border-border p-5 shadow-sm sm:p-8 ${previewSurface}`}
+          >
+            <h3 className="mb-4 text-lg font-semibold sm:text-2xl">{slide.title}</h3>
+            {slide.layout === "quote" ? (
+              <div className="flex h-[75%] flex-col justify-center px-3 sm:px-10">
+                <p className="text-lg italic leading-relaxed sm:text-3xl">“{slide.quote}”</p>
+                {slide.attribution ? (
+                  <p className="mt-4 text-right text-sm text-muted-foreground sm:text-base">
+                    {slide.attribution}
+                  </p>
+                ) : null}
+              </div>
+            ) : slide.layout === "two_column" ? (
+              <div className="grid grid-cols-2 gap-4 sm:gap-8">
+                {[slide.leftColumn, slide.rightColumn].map((column, columnIndex) => (
+                  <div key={columnIndex}>
+                    {column?.heading ? (
+                      <h4 className="mb-2 text-sm font-semibold sm:text-lg">{column.heading}</h4>
+                    ) : null}
+                    <ul className="list-disc space-y-1 ps-4 text-xs text-muted-foreground sm:space-y-2 sm:text-base">
+                      {column?.bullets.map((bullet, bulletIndex) => (
+                        <li key={bulletIndex}>{bullet}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : slide.layout === "chart" && slide.chart ? (
+              <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2">
+                <DeckChartGraphic chart={slide.chart} />
+                <div className="min-h-0 overflow-auto rounded-lg border border-border">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <caption className="px-3 py-1.5 text-left text-xs text-muted-foreground">
+                      {slide.chart.title ?? (
+                        slide.chart.type === "bar" ? <Trans>Bar chart</Trans> :
+                          slide.chart.type === "line" ? <Trans>Line chart</Trans> : <Trans>Pie chart</Trans>
+                      )}
+                    </caption>
+                    <thead className="bg-muted/50 text-muted-foreground">
+                      <tr>
+                        <th scope="col" className="px-3 py-1.5 font-medium"><Trans>Category</Trans></th>
+                        {slide.chart.series.map((series) => (
+                          <th key={series.name} scope="col" className="px-3 py-1.5 text-right font-medium">
+                            {series.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {slide.chart.categories.map((category, categoryIndex) => (
+                        <tr key={`${categoryIndex}:${category}`} className="border-t border-border">
+                          <th scope="row" className="px-3 py-1.5 font-medium">{category}</th>
+                          {slide.chart!.series.map((series) => (
+                            <td key={series.name} className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                              {series.values[categoryIndex]}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : slide.layout === "section" ? null : (
+              <ul className="list-disc space-y-1.5 ps-5 text-sm text-muted-foreground sm:space-y-3 sm:text-lg">
+                {slide.bullets.map((bullet, bulletIndex) => (
+                  <li key={bulletIndex}>{bullet}</li>
+                ))}
+              </ul>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const CHART_FILL_CLASSES = ["fill-primary", "fill-foreground", "fill-muted-foreground", "fill-border"];
+const CHART_BG_CLASSES = ["bg-primary", "bg-foreground", "bg-muted-foreground", "bg-border"];
+const CHART_STROKE_CLASSES = [
+  "stroke-primary",
+  "stroke-foreground",
+  "stroke-muted-foreground",
+  "stroke-border",
+];
+
+function DeckChartGraphic({ chart }: { chart: DeckChart }) {
+  const values = chart.series.flatMap((series) => series.values);
+  const minimum = Math.min(0, ...values);
+  const maximum = Math.max(1, ...values);
+  const y = (value: number) => 46 - ((value - minimum) / (maximum - minimum)) * 38;
+  const chartLabel = chart.title ?? chart.type;
+
+  return (
+    <figure className="flex min-h-0 flex-col justify-center rounded-lg border border-border bg-background p-3" aria-label={chartLabel}>
+      <svg viewBox="0 0 100 54" role="img" aria-label={chartLabel} className="min-h-0 w-full flex-1">
+        {chart.type === "bar" ? (
+          <>
+            <line x1="5" y1={y(0)} x2="95" y2={y(0)} className="stroke-border" strokeWidth="0.5" />
+            {chart.categories.flatMap((_, categoryIndex) =>
+              chart.series.map((series, seriesIndex) => {
+                const groupWidth = 88 / chart.categories.length;
+                const barWidth = Math.max(1, groupWidth / (chart.series.length + 0.5));
+                const value = series.values[categoryIndex]!;
+                const top = Math.min(y(value), y(0));
+                return (
+                  <rect
+                    key={`${categoryIndex}:${seriesIndex}`}
+                    x={6 + categoryIndex * groupWidth + seriesIndex * barWidth}
+                    y={top}
+                    width={Math.max(0.8, barWidth - 0.4)}
+                    height={Math.max(0.4, Math.abs(y(value) - y(0)))}
+                    className={CHART_FILL_CLASSES[seriesIndex % CHART_FILL_CLASSES.length]}
+                  />
+                );
+              }),
+            )}
+          </>
+        ) : chart.type === "line" ? (
+          <>
+            <line x1="5" y1="46" x2="95" y2="46" className="stroke-border" strokeWidth="0.5" />
+            {chart.series.map((series, seriesIndex) => {
+              const pointX = (index: number) =>
+                chart.categories.length === 1 ? 50 : 6 + (index * 88) / (chart.categories.length - 1);
+              const points = series.values.map((value, index) => `${pointX(index)},${y(value)}`).join(" ");
+              return (
+                <g key={series.name}>
+                  <polyline
+                    points={points}
+                    fill="none"
+                    className={CHART_STROKE_CLASSES[seriesIndex % CHART_STROKE_CLASSES.length]}
+                    strokeWidth="1.5"
+                  />
+                  {series.values.map((value, index) => (
+                    <circle
+                      key={index}
+                      cx={pointX(index)}
+                      cy={y(value)}
+                      r="1.5"
+                      className={CHART_FILL_CLASSES[seriesIndex % CHART_FILL_CLASSES.length]}
+                    />
+                  ))}
+                </g>
+              );
+            })}
+          </>
+        ) : (
+          (() => {
+            const series = chart.series[0]!;
+            const total = series.values.reduce((sum, value) => sum + value, 0);
+            if (series.values.length === 1) {
+              return <circle cx="50" cy="27" r="21" className={CHART_FILL_CLASSES[0]} />;
+            }
+            let angle = -Math.PI / 2;
+            return series.values.map((value, index) => {
+              const nextAngle = angle + (value / total) * Math.PI * 2;
+              const startX = 50 + 21 * Math.cos(angle);
+              const startY = 27 + 21 * Math.sin(angle);
+              const endX = 50 + 21 * Math.cos(nextAngle);
+              const endY = 27 + 21 * Math.sin(nextAngle);
+              const largeArc = nextAngle - angle > Math.PI ? 1 : 0;
+              const path = `M 50 27 L ${startX} ${startY} A 21 21 0 ${largeArc} 1 ${endX} ${endY} Z`;
+              angle = nextAngle;
+              return <path key={index} d={path} className={CHART_FILL_CLASSES[index % CHART_FILL_CLASSES.length]} />;
+            });
+          })()
+        )}
+      </svg>
+      <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        {(chart.type === "pie" ? chart.categories : chart.series.map((series) => series.name))
+          .slice(0, 8)
+          .map((label, index) => {
+            const bgClass = CHART_BG_CLASSES[index % CHART_BG_CLASSES.length] ?? "bg-primary";
+            return (
+              <span key={`${index}:${label}`} className="flex max-w-full items-center gap-1 truncate">
+                <span className={`size-2 shrink-0 rounded-full ${bgClass}`} />
+                <span className="truncate">{label}</span>
+              </span>
+            );
+          })}
+      </figcaption>
+    </figure>
   );
 }
 

@@ -244,10 +244,22 @@ export interface ConnectorCall {
   route?: ConnectorRoute;
 }
 
+export type ConnectorReceipt = {
+  kind: "email_delivery";
+  status: "sent" | "failed" | "unknown";
+  id?: string;
+};
+
+export type GoogleSlidesDeliveryReceipt = { fileId: string; url: string };
+export type GoogleSlidesDeliveryResult =
+  | { status: "delivered"; receipt: GoogleSlidesDeliveryReceipt }
+  | { status: "failed"; message: string }
+  | { status: "unknown"; message: string };
+
 export type ConnectorEvent =
   | { type: "log"; message: string }
-  | { type: "result"; data: unknown }
-  | { type: "error"; message: string };
+  | { type: "result"; data: unknown; receipt?: ConnectorReceipt }
+  | { type: "error"; message: string; receipt?: ConnectorReceipt };
 
 export interface ConnectorCapabilities {
   discover: boolean;

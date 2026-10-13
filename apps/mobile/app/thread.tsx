@@ -3,6 +3,7 @@ import type {
   AgentSkillCatalogEntry,
   Connection,
   ConnectionCatalogItem,
+  ConnectionEmailSenders,
   MessageBlock,
   Routine,
 } from "@rakazo/contracts";
@@ -20,8 +21,10 @@ import {
   type ComposerMention,
   cloudAgentHttpsUrl,
   decodeAttachmentBase64,
+  emailProviderMatches,
   groupVoiceChats,
   isApprovalAskBlock,
+  isEmailDraftAction,
   isRunTerminalEvent,
   isSecretAskBlock,
   latestAnswerableAskMessageId,
@@ -29,8 +32,6 @@ import {
   plainTextFromMarkdown,
   projectMessageReactions,
   resolveComposerSendPlan,
-  SLASH_ACTIONS,
-  type SlashActionId,
   seekableSegments,
   selectedAskActionLabel,
   serializeComposerPrompt,
@@ -77,6 +78,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppConnectCard } from "../components/AppConnectCard";
 import { AskActions } from "../components/AskActions";
 import { BotAvatar } from "../components/bot-avatar";
+import { DeckCard } from "../components/deck-card";
 import { McpApprovalCard } from "../components/McpApprovalCard";
 import {
   MarkdownArtifactPreview,
@@ -93,6 +95,7 @@ import {
   loadSessionToken,
   type MobileBot,
   type MobileGroup,
+  type MobileMe,
   type MobileMessage,
   type MobileMessagePage,
   type MobileSnapshot,
@@ -106,7 +109,8 @@ import {
   subscribeThread,
 } from "../lib/api";
 import { mobileTokens } from "../lib/appearance";
-import { type MobileArtifactTarget, openMobileArtifact } from "../lib/artifact-open";
+import type { MobileArtifactTarget } from "../lib/artifact-open";
+import { openMobileArtifact } from "../lib/artifact-open";
 import { nextAutoSpeakAction } from "../lib/auto-speak";
 import { confirmDeleteBot } from "../lib/bot-lifecycle";
 import { setCallProviderTranscribe, startCall, useCallSession } from "../lib/call-session";
@@ -149,9 +153,12 @@ import {
 import { playMpeg, speakText } from "../lib/voice";
 import { probeProviderTranscribe, resolveVoiceCallPlan } from "../lib/voice-call-entry";
 import {
+  discardPendingVoiceMemo,
+  loadPendingVoiceMemos,
   type MemoRecording,
   type MemoSubmission,
   type MemoTarget,
+  type PendingVoiceMemo,
   memoTranscriptionAvailable,
   productionMemoDeps,
   type RecordedMemo,
@@ -161,12 +168,7 @@ import {
 
 type PendingAttachment = PickedAttachment & { threadKey: string };
 type AskAction = NonNullable<Extract<MessageBlock, { kind: "ask" }>["actions"]>[number];
-type PendingMemoSubmission = {
-  target: MemoTarget;
-  memo: RecordedMemo;
-  options: { transcribe: boolean; reply?: { messageId: string; quote?: string } };
-  submission: MemoSubmission;
-};
+type PendingMemoSubmission = PendingVoiceMemo;
 
 function memoTargetKey(target: MemoTarget): string {
   return "botId" in target ? `bot:${target.botId}` : `group:${target.groupId}`;
@@ -392,10 +394,40 @@ function Thread() {
   const [memoState, setMemoState] = useState<"idle" | "recording" | "sending">("idle");
   const memoRecording = useRef<MemoRecording | null>(null);
   const pendingMemoSubmissions = useRef(new Map<string, PendingMemoSubmission>());
+  const pendingMemoOwnerUserId = useRef<string | null>(null);
+  const pendingMemoRecoveryGeneration = useRef(0);
+  const [pendingMemoRevision, setPendingMemoRevision] = useState(0);
   const pendingMemoKey = groupId ? `group:${groupId}` : botId ? `bot:${botId}` : null;
-  const hasPendingMemo = pendingMemoKey
-    ? pendingMemoSubmissions.current.has(pendingMemoKey)
-    : false;
+  const hasPendingMemo = useMemo(
+    () => (pendingMemoKey ? pendingMemoSubmissions.current.has(pendingMemoKey) : false),
+    [pendingMemoKey, pendingMemoRevision],
+  );
+
+  useEffect(() => {
+    const generation = ++pendingMemoRecoveryGeneration.current;
+    let cancelled = false;
+    void rpc<MobileMe>("me")
+      .then(async (me) => {
+        if (cancelled || generation !== pendingMemoRecoveryGeneration.current) return;
+        if (pendingMemoOwnerUserId.current !== me.userId) {
+          pendingMemoOwnerUserId.current = me.userId;
+          pendingMemoSubmissions.current.clear();
+        }
+        const recovered = await loadPendingVoiceMemos(me.userId);
+        if (cancelled || generation !== pendingMemoRecoveryGeneration.current) return;
+        for (const pending of recovered) {
+          const key = memoTargetKey(pending.target);
+          if (!pendingMemoSubmissions.current.has(key)) {
+            pendingMemoSubmissions.current.set(key, pending);
+          }
+        }
+        setPendingMemoRevision((revision) => revision + 1);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [threadKey]);
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownArtifactPreviewTarget | null>(
@@ -458,17 +490,6 @@ function Thread() {
             );
           })
           .slice(0, 8)
-      : [];
-  const slashActionOptions =
-    slashQuery !== null && mentionQuery === null
-      ? SLASH_ACTIONS.filter((action) => {
-          if (!slashQueryNormalized) return true;
-          const label = t(action.label);
-          return (
-            action.label.toLowerCase().includes(slashQueryNormalized) ||
-            label.toLowerCase().includes(slashQueryNormalized)
-          );
-        })
       : [];
   const currentBot = botId ? mentionBots.find((bot) => bot.id === botId) : undefined;
   const displayName = currentBot?.name ?? name;
@@ -1180,23 +1201,6 @@ function Thread() {
     return serializeComposerPrompt(draft, selectedSkill, selectedMentions);
   }
 
-  function runSlashAction(action: SlashActionId) {
-    setDraft("");
-    setSlashQuery(null);
-    if (action === "chat-settings") {
-      if (inGroup && groupId) {
-        router.push({ pathname: "/group-settings", params: { groupId } });
-      } else if (botId) {
-        router.push({ pathname: "/bot-settings", params: { botId } });
-      }
-      return;
-    }
-    router.push({
-      pathname: "/account",
-      params: action === "settings-usage" ? { focus: "usage" } : undefined,
-    });
-  }
-
   const canSend =
     Boolean(draft.trim()) ||
     selectedSkill !== null ||
@@ -1370,15 +1374,143 @@ function Thread() {
     const targetBotId = botId;
     const targetGroupId = groupId;
     if ((!targetBotId && !targetGroupId) || sending) return;
+    if (block.status === "submitted" && block.executionStatus === "failed") {
+      await sendDraftAction(draftMessage, block, block.connectionId, undefined, true);
+      return;
+    }
+    let connectionId: string | undefined;
+    if (isEmailDraftAction(block.action)) {
+      try {
+        const rows = await rpc<Connection[]>("connections/list");
+        const accounts = rows.filter(
+          (row) => row.status === "connected" && emailProviderMatches(block.provider, row.provider),
+        );
+        if (accounts.length === 0) {
+          Alert.alert(t("Connect apps"), undefined, [
+            { text: t("Cancel"), style: "cancel" },
+            { text: t("Connect apps"), onPress: () => router.push("/integrations") },
+          ]);
+          return;
+        }
+        if (accounts.length > 1) {
+          presentMessageActionSheet({
+            title: t("Account"),
+            actions: accounts.map((account) => ({
+              text: account.displayName,
+              onPress: () => void selectDraftSender(draftMessage, block, account.id),
+            })),
+            colorScheme,
+            cancel: t("Cancel"),
+            more: t("More"),
+          });
+          return;
+        }
+        connectionId = accounts[0]!.id;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("Could not load connections"));
+        return;
+      }
+    }
+    if (connectionId) {
+      await selectDraftSender(draftMessage, block, connectionId);
+    } else {
+      await sendDraftAction(draftMessage, block);
+    }
+  }
+
+  async function selectDraftSender(
+    draftMessage: MobileMessage,
+    block: Extract<MessageBlock, { kind: "draft_action" }>,
+    connectionId: string,
+  ) {
+    if (!isEmailDraftAction(block.action)) {
+      await sendDraftAction(draftMessage, block, connectionId);
+      return;
+    }
+    const proposedSender = block.fields.find((field) => field.key === "from")?.value.trim() ?? "";
+    let capability: ConnectionEmailSenders | null = null;
+    try {
+      capability = await rpc<ConnectionEmailSenders>("connections/emailSenders", { connectionId });
+    } catch {
+      capability = null;
+    }
+    if (capability?.supported) {
+      const verifiedSender = capability.senders.find(
+        (address) => address.toLowerCase() === proposedSender.toLowerCase(),
+      );
+      if (capability.senders.length > 1 || proposedSender) {
+        presentMessageActionSheet({
+          title: t("From"),
+          actions: [
+            { text: t("Default"), onPress: () => void sendDraftAction(draftMessage, block, connectionId) },
+            ...capability.senders.map((address) => ({
+              text: address,
+              onPress: () => void sendDraftAction(draftMessage, block, connectionId, address),
+            })),
+          ],
+          colorScheme,
+          cancel: t("Cancel"),
+          more: t("More"),
+        });
+        return;
+      }
+      if (verifiedSender) {
+        await sendDraftAction(draftMessage, block, connectionId, verifiedSender);
+        return;
+      }
+      await sendDraftAction(draftMessage, block, connectionId);
+      return;
+    }
+    if (proposedSender) {
+      Alert.alert(
+        t("Sender unavailable"),
+        t("This account cannot verify sender addresses. The account's default sender will be used."),
+        [
+          { text: t("Cancel"), style: "cancel" },
+          {
+            text: t("Default"),
+            onPress: () => void sendDraftAction(draftMessage, block, connectionId),
+          },
+        ],
+      );
+      return;
+    }
+    await sendDraftAction(draftMessage, block, connectionId);
+  }
+
+  async function sendDraftAction(
+    draftMessage: MobileMessage,
+    block: Extract<MessageBlock, { kind: "draft_action" }>,
+    connectionId?: string,
+    sender?: string,
+    frozenFields = false,
+  ) {
+    if (sending) return;
     setSending(true);
     setError(null);
     try {
       // The server freezes these fields and sends exactly them, once.
       await rpc("threads/submitDraftAction", {
-        ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
+        ...(groupId ? { groupId } : { botId: botId! }),
         messageId: draftMessage.id,
         draftId: block.draftId,
-        fields: block.fields,
+        fields: frozenFields
+          ? block.fields
+          : isEmailDraftAction(block.action)
+          ? [
+              ...block.fields.filter((field) => field.key !== "from"),
+              ...(sender
+                ? [
+                    {
+                      key: "from",
+                      label: block.fields.find((field) => field.key === "from")?.label ?? t("From"),
+                      value: sender,
+                    },
+                  ]
+                : []),
+            ]
+          : block.fields,
+        ...(connectionId ? { connectionId } : {}),
       });
       await refresh();
     } catch (err) {
@@ -1457,6 +1589,7 @@ function Thread() {
         pending.submission,
       );
       pendingMemoSubmissions.current.delete(memoTargetKey(pending.target));
+      setPendingMemoRevision((revision) => revision + 1);
       setReplyTarget(null);
       setReplyQuote(null);
       if (
@@ -1482,19 +1615,19 @@ function Thread() {
     try {
       const memo = await recording.stop();
       if (!memo) return;
-      const transcribe = await memoTranscriptionAvailable();
       const pending: PendingMemoSubmission = {
+        ownerUserId: recording.ownerUserId,
         target,
         memo,
-        options: {
-          transcribe,
-          reply: replyTarget
-            ? { messageId: replyTarget.id, quote: replyQuote ?? undefined }
-            : undefined,
+        options: recording.options,
+        submission: {
+          clientNonce: recording.clientNonce,
+          ownerUserId: recording.ownerUserId,
+          fileName: memo.fileName,
         },
-        submission: { clientNonce: productionMemoDeps.newNonce() },
       };
       pendingMemoSubmissions.current.set(memoTargetKey(target), pending);
+      setPendingMemoRevision((revision) => revision + 1);
       await deliverPendingVoiceMemo(pending);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Could not send the voice memo"));
@@ -1503,12 +1636,46 @@ function Thread() {
     }
   }
 
+  async function discardVoiceMemo(pending: PendingMemoSubmission) {
+    try {
+      await discardPendingVoiceMemo(pending.submission);
+      pendingMemoSubmissions.current.delete(memoTargetKey(pending.target));
+      setPendingMemoRevision((revision) => revision + 1);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Could not discard the voice memo"));
+    }
+  }
+
   async function toggleVoiceMemo() {
     const target: MemoTarget | null = groupId ? { groupId } : botId ? { botId } : null;
     if (!target || sending || memoState === "sending") return;
     const pending = pendingMemoSubmissions.current.get(memoTargetKey(target));
     if (pending) {
-      await deliverPendingVoiceMemo(pending);
+      presentMessageActionSheet({
+        title: t("Voice memo"),
+        actions: [
+          {
+            text: t("Retry voice memo"),
+            onPress: () => void deliverPendingVoiceMemo(pending),
+          },
+          {
+            text: t("Discard"),
+            onPress: () =>
+              Alert.alert(t("Discard"), undefined, [
+                { text: t("Cancel"), style: "cancel" },
+                {
+                  text: t("Discard"),
+                  style: "destructive",
+                  onPress: () => void discardVoiceMemo(pending),
+                },
+              ]),
+          },
+        ],
+        colorScheme,
+        cancel: t("Cancel"),
+        more: t("More"),
+      });
       return;
     }
     if (memoState === "recording") {
@@ -1517,7 +1684,26 @@ function Thread() {
     }
     setError(null);
     try {
-      memoRecording.current = await startMemoRecording(() => void finishVoiceMemo(target));
+      const [me, transcribe] = await Promise.all([
+        rpc<MobileMe>("me"),
+        memoTranscriptionAvailable(),
+      ]);
+      const options = {
+        transcribe,
+        reply: replyTarget
+          ? { messageId: replyTarget.id, quote: replyQuote ?? undefined }
+          : undefined,
+      };
+      memoRecording.current = await startMemoRecording(
+        () => void finishVoiceMemo(target),
+        {
+          target,
+          ownerUserId: me.userId,
+          clientNonce: productionMemoDeps.newNonce(),
+          options,
+        },
+      );
+      pendingMemoOwnerUserId.current = me.userId;
       setMemoState("recording");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Could not record a voice memo"));
@@ -2172,7 +2358,7 @@ function Thread() {
             ))}
           </View>
         ) : null}
-        {slashSkillOptions.length || slashActionOptions.length ? (
+        {slashSkillOptions.length ? (
           <View
             testID="slash-picker"
             style={{
@@ -2212,28 +2398,6 @@ function Thread() {
                     {truncateSlashDescription(skill.description)}
                   </Text>
                 </View>
-              </Pressable>
-            ))}
-            {slashActionOptions.map((action) => (
-              <Pressable
-                key={action.id}
-                accessibilityLabel={t(action.label)}
-                onPress={() => runSlashAction(action.id)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                }}
-              >
-                <NativeSymbol
-                  ios="gearshape"
-                  android="settings-outline"
-                  size={16}
-                  color={tokens.mutedForeground}
-                />
-                <Text style={{ color: tokens.foreground, fontSize: 14 }}>{t(action.label)}</Text>
               </Pressable>
             ))}
           </View>
@@ -3335,12 +3499,16 @@ const MessageBubble = memo(function MessageBubble({
           <Text
             style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
           >
-            {block.status}
+            {block.executionStatus ?? block.status}
           </Text>
-          {block.status === "draft" && onDraftSubmit ? (
+          {(block.status === "draft" ||
+            (block.status === "submitted" && block.executionStatus === "failed")) &&
+          onDraftSubmit ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("Send draft")}
+              accessibilityLabel={
+                block.status === "draft" ? t("Send draft") : t("Retry")
+              }
               onPress={() => void onDraftSubmit(message, block)}
               style={{
                 alignSelf: "flex-start",
@@ -3353,7 +3521,7 @@ const MessageBubble = memo(function MessageBubble({
               }}
             >
               <Text style={{ color: tokens.foreground, fontSize: 13.5, fontWeight: "600" }}>
-                {t("Send")}
+                {block.status === "draft" ? t("Send") : t("Retry")}
               </Text>
             </Pressable>
           ) : null}
@@ -3405,40 +3573,7 @@ const MessageBubble = memo(function MessageBubble({
         </Pressable>
       ))}
       {deckBlocks.map((block) => (
-        <View
-          key={block.artifactId}
-          accessibilityRole="summary"
-          accessibilityLabel={`${block.title}, ${t("{count} slides", { count: block.slideCount })}`}
-          style={{
-            width: "100%",
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: tokens.border,
-            backgroundColor: tokens.muted,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            gap: 6,
-          }}
-        >
-          <Text
-            style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}
-            numberOfLines={1}
-          >
-            {block.title}
-          </Text>
-          <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
-            {t("{count} slides", { count: block.slideCount })}
-          </Text>
-          {block.slides.slice(0, 5).map((slide, index) => (
-            <Text
-              key={index}
-              style={{ color: tokens.foreground, fontSize: 13.5 }}
-              numberOfLines={1}
-            >
-              {index + 1}. {slide.title}
-            </Text>
-          ))}
-        </View>
+        <DeckCard key={block.artifactId} block={block} target={artifactTarget} />
       ))}
       {voiceMemoBlocks.map((block) => (
         <VoiceMemoRow

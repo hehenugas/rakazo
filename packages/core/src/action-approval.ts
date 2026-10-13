@@ -53,7 +53,7 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "web_search",
 ]);
 
-const READ_ONLY_CONNECTOR_PATTERN = /(^|_)(get|list|search|find|read)(_|$)/i;
+const READ_ONLY_CONNECTOR_PATTERN = /(^|_)(fetch|get|list|search|find|read)(_|$)/i;
 const MUTATING_CONNECTOR_PATTERN =
   /(^|_)(accept|add|approve|archive|assign|buy|cancel|charge|checkout|close|commit|copy|create|delete|deploy|disable|enable|execute|forward|grant|invite|link|mark|merge|modify|move|patch|pay|post|publish|purchase|put|register|reject|remove|rename|replace|reply|reset|revoke|run|schedule|send|set|share|start|stop|submit|subscribe|trigger|unassign|unlink|unsubscribe|update|upload|upsert|write)(_|$)/i;
 const COMPOUND_CONNECTOR_ACTION_PATTERN = /_(and|or|then)_/i;

@@ -887,6 +887,7 @@ model Connection {
   secretId    String?
   providerRef String?
   metadata    Json     @default("{}")
+  artifactDeliveries ArtifactDelivery[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1066,6 +1067,7 @@ model Artifact {
   rootArtifactId String?
   rootArtifact   Artifact?  @relation("ArtifactVersions", fields: [rootArtifactId], references: [id], onDelete: Cascade)
   versions       Artifact[] @relation("ArtifactVersions")
+  deliveries     ArtifactDelivery[]
   version        Int        @default(1)
 
   @@index([spaceId, botId])
@@ -1073,6 +1075,29 @@ model Artifact {
   @@index([rootArtifactId])
   // artifacts_family_version_key is raw SQL: Prisma cannot express COALESCE indexes.
   @@map("artifacts")
+}
+
+model ArtifactDelivery {
+  id                 String   @id @default(cuid())
+  spaceId            String
+  userId             String
+  artifactId         String
+  artifact           Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  version            Int
+  connectionId       String
+  connection         Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  provider           String
+  connectionSnapshot String   @db.Char(64)
+  idempotencyKey     String   @unique
+  status             String
+  externalFileId     String?
+  externalUrl        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([spaceId, userId, artifactId, version, connectionId, connectionSnapshot], map: "artifact_deliveries_scope_key")
+  @@index([spaceId, userId, artifactId], map: "artifact_deliveries_space_user_artifact_idx")
+  @@map("artifact_deliveries")
 }
 
 model UsageRecord {

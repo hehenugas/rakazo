@@ -25,8 +25,10 @@ export interface EmailDraft {
 
 export const EMAIL_DRAFT_ACTION_NONCE_PREFIX = "draft-action:";
 
-export function emailDraftActionNonce(draftId: string): string {
-  return `${EMAIL_DRAFT_ACTION_NONCE_PREFIX}${draftId}`;
+export function emailDraftActionNonce(draftId: string, attempt = 1): string {
+  return attempt <= 1
+    ? `${EMAIL_DRAFT_ACTION_NONCE_PREFIX}${draftId}`
+    : `${EMAIL_DRAFT_ACTION_NONCE_PREFIX}${draftId}:retry:${attempt}`;
 }
 
 /** Provider names in draft cards and connection rows may use their display spelling. */
@@ -82,15 +84,23 @@ export function parseAddressList(value: string): { addresses: string[]; invalid:
 }
 
 /** The default sender is safe; UI/model-provided options are not proof of provider capability. */
-function fromAddress(fields: DraftField[], issues: EmailDraftIssue[]): string {
+function fromAddress(
+  fields: DraftField[],
+  issues: EmailDraftIssue[],
+  verifiedSenders: readonly string[],
+): string {
   const field = fields.find((candidate) => candidate.key === "from");
   const value = field?.value.trim() ?? "";
   if (!value) return "";
-  issues.push({ field: "from", code: "not_allowed", value });
-  return "";
+  const verified = verifiedSenders.find((address) => address.toLowerCase() === value.toLowerCase());
+  if (!verified) {
+    issues.push({ field: "from", code: "not_allowed", value });
+    return "";
+  }
+  return verified;
 }
 
-export function parseEmailDraft(fields: DraftField[]): {
+export function parseEmailDraft(fields: DraftField[], verifiedSenders: readonly string[] = []): {
   draft: EmailDraft;
   issues: EmailDraftIssue[];
 } {
@@ -103,7 +113,7 @@ export function parseEmailDraft(fields: DraftField[]): {
     }
     return addresses;
   };
-  const from = fromAddress(fields, issues);
+  const from = fromAddress(fields, issues, verifiedSenders);
   const to = recipients("to");
   const cc = recipients("cc");
   const bcc = recipients("bcc");
@@ -278,9 +288,12 @@ const ALLOWED_EMAIL_ARGS = new Set([
   "subject",
   "body",
   "is_html",
+  "from_email",
+  "from",
 ]);
 const TO_KEYS = ["to", "recipient_email"];
 const BODY_KEYS = ["body"];
+const FROM_KEYS = ["from_email", "from"];
 
 const isEmptyArg = (value: unknown) =>
   value === null ||
@@ -312,7 +325,7 @@ export function emailArgsMismatch(
   else if (to === "invalid" || !sameList(to, lower(approved.to))) wrong.push("to");
   if (cc === "invalid" || !sameList(cc ?? [], lower(approved.cc))) wrong.push("cc");
   if (bcc === "invalid" || !sameList(bcc ?? [], lower(approved.bcc))) wrong.push("bcc");
-  // Account, sender, attachment, reply/thread metadata and provider-specific fields are not in
+  // Account, attachment, reply/thread metadata and other provider-specific fields are not in
   // this card's approved contract, so any non-empty value is rejected below.
   for (const key of Object.keys(args)) {
     if (!ALLOWED_EMAIL_ARGS.has(key)) wrong.push(`unapproved field ${key}`);
@@ -332,6 +345,19 @@ export function emailArgsMismatch(
     if (delivered !== normalizeBody(expected)) wrong.push("body");
     if (formatted && args.is_html !== true) wrong.push("format (not verifiable)");
     if (!formatted && args.is_html === true) wrong.push("format");
+  }
+  const suppliedFromKeys = FROM_KEYS.filter((key) => key in args);
+  if (suppliedFromKeys.length > 1) wrong.push("from (ambiguous fields)");
+  const suppliedFromKey = suppliedFromKeys[0];
+  if (approved.from) {
+    const suppliedFrom = suppliedFromKey ? args[suppliedFromKey] : undefined;
+    if (typeof suppliedFrom !== "string") wrong.push("from (not verifiable)");
+    else if (suppliedFrom.trim().toLowerCase() !== approved.from.toLowerCase()) wrong.push("from");
+  } else if (
+    suppliedFromKey &&
+    !isEmptyArg(args[suppliedFromKey])
+  ) {
+    wrong.push("from");
   }
   if ("is_html" in args && typeof args.is_html !== "boolean") wrong.push("format");
   return wrong.length === 0 ? null : wrong.join(", ");

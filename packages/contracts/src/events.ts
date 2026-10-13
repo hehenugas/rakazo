@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { botSecretDestinationSchema } from "./bot-secrets.js";
 import { Id } from "./ids.js";
+import { DeckSlidePreviewSchema, DeckStyleSchema } from "./presentation.js";
 import { McpTransportSchema } from "./mcp.js";
 
 /** Voice memo transcript. `segments` (seconds) exist only when the provider returned timing. */
@@ -214,6 +215,12 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     connectionId: Id.optional(),
     /** Opaque provider-account snapshot; prevents a reconnect from changing the approved account. */
     connectionSnapshot: z.string().length(64).optional(),
+    /** Server-derived execution state; sent is reserved for an explicit provider receipt. */
+    executionStatus: z.enum(["queued", "executing", "sent", "failed", "unknown"]).optional(),
+    /** Opaque provider receipt id, stored only on the owning conversation. */
+    deliveryReceipt: z.string().max(512).optional(),
+    /** Number of server-created execution attempts for safe failed-send retries. */
+    executionAttempt: z.number().int().positive().optional(),
     provider: z.string(),
     action: z.string(),
     title: z.string(),
@@ -235,7 +242,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     artifactId: Id,
     title: z.string(),
     slideCount: z.number().int().nonnegative(),
-    slides: z.array(z.object({ title: z.string(), bullets: z.array(z.string()) })).max(12),
+    style: DeckStyleSchema.optional(),
+    slides: z.array(DeckSlidePreviewSchema).max(12),
   }),
   z.object({
     /** Durable multi-step work surfaced in Conversation Details > Tasks. */

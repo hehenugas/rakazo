@@ -666,6 +666,12 @@ export const ConnectionSchema = z.object({
 });
 export type Connection = z.infer<typeof ConnectionSchema>;
 
+export const ConnectionEmailSendersSchema = z.object({
+  supported: z.boolean(),
+  senders: z.array(z.string()),
+});
+export type ConnectionEmailSenders = z.infer<typeof ConnectionEmailSendersSchema>;
+
 export const ConnectionCatalogItemSchema = z.object({
   connectorId: z.string(),
   slug: z.string(),

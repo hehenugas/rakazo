@@ -132,6 +132,18 @@ class ConfiguredIntegrationProvider implements ManagedConnectorProvider {
   async connectionReady(context: AdapterContext, externalId: string) {
     return (await this.required()).connectionReady(context, externalId);
   }
+  async listVerifiedEmailSenders(context: AdapterContext) {
+    return (await this.settings.resolve(this.id))?.listVerifiedEmailSenders?.(context) ?? null;
+  }
+  async supportsGoogleSlidesDelivery(context: AdapterContext) {
+    return (await this.settings.resolve(this.id))?.supportsGoogleSlidesDelivery?.(context) ?? false;
+  }
+  async createGoogleSlidesFromMarkdown(
+    input: Parameters<NonNullable<ManagedConnectorProvider["createGoogleSlidesFromMarkdown"]>>[0],
+    context: AdapterContext,
+  ) {
+    return (await this.settings.resolve(this.id))?.createGoogleSlidesFromMarkdown?.(input, context) ?? null;
+  }
   async begin(request: Parameters<ManagedConnectorProvider["begin"]>[0], context: AdapterContext) {
     return (await this.required()).begin(request, context);
   }

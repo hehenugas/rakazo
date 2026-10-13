@@ -2,6 +2,8 @@ import type { ConnectorTool } from "@rakazo/adapter-kit";
 import {
   BotSecretName,
   botSecretDestinationSchema,
+  DECK_LAYOUTS,
+  DECK_STYLES,
   SecretAskPurpose,
   SecretHttpRequest,
 } from "@rakazo/contracts";
@@ -295,25 +297,69 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "presentation_save",
     description:
-      "Create or update a slide deck for the user. Give a title and the slides (each a title and a few short bullets, optional speaker notes). The deck appears in the chat as a card the user can preview and download as PowerPoint. To revise a deck you already made, call this again with the same title: it becomes a new version of that deck. Keep slides concise; a deck has at most 60 slides and 12 bullets per slide.",
+      "Create or update a slide deck for the user. Before the first version, offer the Clean, Editorial, and Dark styles and ask the user to choose if they have not chosen a style. Save that style as deck metadata. Slides support title_bullets, section, quote, two_column, and chart layouts with optional speaker notes. A chart slide has 1–12 categories and 1–4 named data series with one finite numeric value per category; pie charts use one non-negative series. The deck appears in chat and the Artifact Library, and can be downloaded as PowerPoint. To revise a deck, call this again with the same title. Keep slides concise; a deck has at most 60 slides and 12 bullets per slide.",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", description: "Deck title; the same title updates the same deck." },
+        style: {
+          type: "string",
+          enum: [...DECK_STYLES],
+          description: "Style selected by the user before the first version.",
+        },
         slides: {
           type: "array",
           items: {
             type: "object",
             properties: {
               title: { type: "string" },
+              layout: { type: "string", enum: [...DECK_LAYOUTS] },
               bullets: { type: "array", items: { type: "string" } },
               notes: { type: "string", description: "Optional speaker notes." },
+              quote: { type: "string", description: "Quote text for the quote layout." },
+              attribution: { type: "string", description: "Optional quote attribution." },
+              leftColumn: {
+                type: "object",
+                properties: {
+                  heading: { type: "string" },
+                  bullets: { type: "array", items: { type: "string" }, maxItems: 6 },
+                },
+              },
+              rightColumn: {
+                type: "object",
+                properties: {
+                  heading: { type: "string" },
+                  bullets: { type: "array", items: { type: "string" }, maxItems: 6 },
+                },
+              },
+              chart: {
+                type: "object",
+                properties: {
+                  type: { type: "string", enum: ["bar", "line", "pie"] },
+                  title: { type: "string" },
+                  categories: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 12 },
+                  series: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 4,
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        values: { type: "array", items: { type: "number" }, minItems: 1, maxItems: 12 },
+                      },
+                      required: ["name", "values"],
+                    },
+                  },
+                },
+                required: ["type", "categories", "series"],
+              },
             },
             required: ["title"],
           },
         },
       },
-      required: ["title", "slides"],
+      required: ["title", "style", "slides"],
     },
   },
   {

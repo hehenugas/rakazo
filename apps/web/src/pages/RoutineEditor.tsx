@@ -159,6 +159,7 @@ export function RoutineListRow({
     <div className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 hover:bg-accent">
       <button
         type="button"
+        aria-label={t`${routine.name}: Return to conversation`}
         onClick={onOpen}
         onContextMenu={onContextMenu}
         aria-haspopup={onContextMenu ? "menu" : undefined}

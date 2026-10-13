@@ -1,9 +1,17 @@
+import { createHash, randomUUID } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import type { ArtifactStore } from "@rakazo/adapter-kit";
-import { PPTX_MIME, renderDeckPptx } from "@rakazo/adapters";
+import type {
+  AdapterContext,
+  ArtifactStore,
+  GoogleSlidesDeliveryResult,
+} from "@rakazo/adapter-kit";
+import { deckToGoogleSlidesMarkdown, PPTX_MIME, renderDeckPptx } from "@rakazo/adapters";
 import type { Actor } from "@rakazo/contracts";
-import { DECK_MIME, type Deck, parseDeck } from "@rakazo/core";
+import type { Deck } from "@rakazo/core";
+import { DECK_MIME, parseDeck } from "@rakazo/core";
+import type { ConnectorRegistry } from "@rakazo/adapters";
 import type { PrismaClient } from "@rakazo/db";
+import { IsolationError } from "@rakazo/db";
 import { getSpaceArtifactById } from "./artifacts.js";
 import type { ThreadTarget } from "./thread-target.js";
 
@@ -44,7 +52,7 @@ export async function exportDeck(
   };
 }
 
-/** @deprecated Connection presence does not prove structured Slides delivery capability. */
+/** Canonical provider slug used for connected-account capability checks. */
 export const GOOGLE_SLIDES_PROVIDER = "googleslides";
 
 /** @deprecated Kept for compatibility; never used to expose an export action. */
@@ -61,7 +69,7 @@ export async function hasGoogleSlides(prisma: Pick<PrismaClient, "connection">, 
   return Boolean(row);
 }
 
-/** @deprecated Legacy nonce helper; direct structured delivery is not currently available. */
+/** Legacy nonce format retained for callers that recorded it before structured delivery shipped. */
 export const deckDeliveryNonce = (artifactId: string, version: number) =>
   `deck-delivery:google_slides:${artifactId}:${version}`;
 
@@ -79,18 +87,241 @@ export function deckDeliveryText(deck: Deck): string {
   ].join("\n\n");
 }
 
-/** No connector currently provides a structured Slides create/upload receipt. */
+/** Deliver a stored deck through the selected provider account and persist its receipt. */
 export async function deliverDeck(
   deps: {
     prisma: PrismaClient;
     artifacts: ArtifactStore;
+    connectors?: ConnectorRegistry;
   },
   actor: Actor,
   _target: ThreadTarget,
-  input: { artifactId: string; destination: "google_slides" },
+  input: { artifactId: string; destination: "google_slides"; connectionId?: string },
+  signal?: AbortSignal,
+) {
+  const { artifact, deck } = await loadDeck(deps, actor, input.artifactId);
+  if (!input.connectionId) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Choose a connected Google Slides account before delivery.",
+    });
+  }
+  const connection = await deps.prisma.connection.findFirst({
+    where: {
+      id: input.connectionId,
+      spaceId: actor.spaceId,
+      userId: actor.userId,
+      status: "connected",
+    },
+  });
+  if (!connection || normalizeProvider(connection.provider) !== "googleslides") {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "The selected Google Slides account is no longer connected.",
+    });
+  }
+  const connector = deps.connectors?.managed(connection.connectorId);
+  if (!connector?.supportsGoogleSlidesDelivery || !connector.createGoogleSlidesFromMarkdown) {
+    return { status: "unsupported" as const, url: null };
+  }
+  const operationId = `deck-delivery:${randomUUID()}`;
+  const context: AdapterContext = {
+    operationId,
+    traceId: operationId,
+    spaceId: actor.spaceId,
+    userId: actor.userId,
+    signal: signal ?? new AbortController().signal,
+    connectedConnections: [
+      {
+        id: connection.id,
+        connectorId: connection.connectorId,
+        externalId: connection.provider,
+        displayName: connection.displayName,
+        providerRef: connection.providerRef ?? undefined,
+      },
+    ],
+  };
+  if (!connection.providerRef?.trim() || !(await connector.supportsGoogleSlidesDelivery(context))) {
+    return { status: "unsupported" as const, url: null };
+  }
+  const connectionSnapshot = createHash("sha256").update(connection.providerRef).digest("hex");
+  const idempotencyKey = createHash("sha256")
+    .update(
+      `${actor.spaceId}:${actor.userId}:${artifact.id}:${artifact.version}:${connection.id}:${connectionSnapshot}`,
+    )
+    .digest("hex");
+  let attempt = await deps.prisma.artifactDelivery.findFirst({ where: { idempotencyKey } });
+  let shouldDeliver = false;
+  if (!attempt) {
+    try {
+      attempt = await deps.prisma.artifactDelivery.create({
+        data: {
+          spaceId: actor.spaceId,
+          userId: actor.userId,
+          artifactId: artifact.id,
+          version: artifact.version,
+          connectionId: connection.id,
+          provider: connection.provider,
+          connectionSnapshot,
+          idempotencyKey,
+          status: "pending",
+        },
+      });
+      shouldDeliver = true;
+    } catch (error) {
+      attempt = await deps.prisma.artifactDelivery.findFirst({ where: { idempotencyKey } });
+      if (!attempt) throw error;
+    }
+  } else if (attempt.status === "failed") {
+    const claimed = await deps.prisma.artifactDelivery.updateMany({
+      where: { id: attempt.id, status: "failed", connectionSnapshot },
+      data: { status: "pending", externalFileId: null, externalUrl: null },
+    });
+    attempt = await deps.prisma.artifactDelivery.findUnique({ where: { id: attempt.id } });
+    shouldDeliver = claimed.count === 1;
+  }
+  if (!attempt) throw new IsolationError();
+  if (attempt.connectionSnapshot !== connectionSnapshot) {
+    return { status: "unknown" as const, url: null };
+  }
+  if (!shouldDeliver) return deliveryStatus(attempt);
+  const currentConnection = await deps.prisma.connection.findFirst({
+    where: {
+      id: connection.id,
+      spaceId: actor.spaceId,
+      userId: actor.userId,
+      status: "connected",
+    },
+    select: { providerRef: true },
+  });
+  if (
+    !currentConnection ||
+    createHash("sha256").update(currentConnection.providerRef ?? "").digest("hex") !==
+      connectionSnapshot
+  ) {
+    const failed = await deps.prisma.artifactDelivery.update({
+      where: { id: attempt.id },
+      data: { status: "failed" },
+    });
+    return deliveryStatus(failed);
+  }
+  let result: GoogleSlidesDeliveryResult | null;
+  try {
+    result = await connector.createGoogleSlidesFromMarkdown(
+      {
+        title: deck.title,
+        markdown: deckToGoogleSlidesMarkdown(deck),
+      },
+      context,
+    );
+  } catch {
+    const unknown = await deps.prisma.artifactDelivery.update({
+      where: { id: attempt.id },
+      data: { status: "unknown" },
+    });
+    return deliveryStatus(unknown);
+  }
+  if (!result) {
+    const unsupported = await deps.prisma.artifactDelivery.update({
+      where: { id: attempt.id },
+      data: { status: "unsupported" },
+    });
+    return deliveryStatus(unsupported);
+  }
+  const delivered = await deps.prisma.artifactDelivery.update({
+    where: { id: attempt.id },
+    data: {
+      status: result.status,
+      ...(result.status === "delivered"
+        ? { externalFileId: result.receipt.fileId, externalUrl: result.receipt.url }
+        : {}),
+    },
+  });
+  return deliveryStatus(delivered);
+}
+
+export async function googleSlidesDeliveryConnections(
+  deps: { prisma: PrismaClient; connectors: ConnectorRegistry },
+  actor: Actor,
+  signal?: AbortSignal,
+) {
+  const rows = await deps.prisma.connection.findMany({
+    where: { spaceId: actor.spaceId, userId: actor.userId, status: "connected" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const eligible = await Promise.all(
+    rows
+      .filter(
+        (row) => normalizeProvider(row.provider) === "googleslides" && Boolean(row.providerRef),
+      )
+      .map(async (row) => {
+        const connector = deps.connectors.managed(row.connectorId);
+        if (!connector?.supportsGoogleSlidesDelivery) return null;
+        const operationId = `deck-delivery-capability:${randomUUID()}`;
+        const context: AdapterContext = {
+          operationId,
+          traceId: operationId,
+          spaceId: actor.spaceId,
+          userId: actor.userId,
+          signal: signal ?? new AbortController().signal,
+          connectedConnections: [
+            {
+              id: row.id,
+              connectorId: row.connectorId,
+              externalId: row.provider,
+              displayName: row.displayName,
+              providerRef: row.providerRef ?? undefined,
+            },
+          ],
+        };
+        try {
+          return (await connector.supportsGoogleSlidesDelivery(context))
+            ? { connectionId: row.id, displayName: row.displayName }
+            : null;
+        } catch {
+          return null;
+        }
+      }),
+  );
+  return eligible.filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+export async function readDeckDeliveryStatus(
+  deps: { prisma: PrismaClient; artifacts: ArtifactStore },
+  actor: Actor,
+  input: { artifactId: string; connectionId: string },
 ) {
   await loadDeck(deps, actor, input.artifactId);
-  throw new ORPCError("PRECONDITION_FAILED", {
-    message: "Google Slides delivery is unavailable for this connection.",
+  const connection = await deps.prisma.connection.findFirst({
+    where: { id: input.connectionId, spaceId: actor.spaceId, userId: actor.userId },
+    select: { providerRef: true },
   });
+  if (!connection?.providerRef) return null;
+  const connectionSnapshot = createHash("sha256").update(connection.providerRef).digest("hex");
+  let row = await deps.prisma.artifactDelivery.findFirst({
+    where: {
+      artifactId: input.artifactId,
+      connectionId: input.connectionId,
+      connectionSnapshot,
+      spaceId: actor.spaceId,
+      userId: actor.userId,
+    },
+  });
+  if (row?.status === "pending" && Date.now() - row.updatedAt.getTime() > 120_000) {
+    await deps.prisma.artifactDelivery.updateMany({
+      where: { id: row.id, status: "pending", updatedAt: row.updatedAt },
+      data: { status: "unknown" },
+    });
+    row = await deps.prisma.artifactDelivery.findUnique({ where: { id: row.id } });
+  }
+  return row ? deliveryStatus(row) : null;
+}
+
+function normalizeProvider(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function deliveryStatus(row: { status: string; externalUrl: string | null }) {
+  const status = ["pending", "delivered", "failed", "unknown", "unsupported"].includes(row.status)
+    ? (row.status as "pending" | "delivered" | "failed" | "unknown" | "unsupported")
+    : "unknown";
+  return { status, url: status === "delivered" ? row.externalUrl : null };
 }

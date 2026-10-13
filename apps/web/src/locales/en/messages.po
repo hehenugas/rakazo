@@ -101,6 +101,11 @@ msgstr "{0} slides"
 msgid "{0} will still respond to direct mentions."
 msgstr "{0} will still respond to direct mentions."
 
+#. placeholder {0}: routine.name
+#: src/pages/RoutineEditor.tsx
+msgid "{0}: Return to conversation"
+msgstr "{0}: Return to conversation"
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}'s screen"
@@ -207,6 +212,8 @@ msgstr "Access token"
 msgid "Access token (optional)"
 msgstr "Access token (optional)"
 
+#: src/components/DeckCard.tsx
+#: src/components/DraftActionCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Account"
 msgstr "Account"
@@ -622,6 +629,11 @@ msgstr "Back to conversation details"
 msgid "Back to sign in"
 msgstr "Back to sign in"
 
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Bar chart"
+msgstr "Bar chart"
+
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
 msgid "Base URL"
 msgstr "Base URL"
@@ -748,6 +760,10 @@ msgstr "Cancelled"
 msgid "Card view"
 msgstr "Card view"
 
+#: src/pages/Artifacts.tsx
+msgid "Category"
+msgstr "Category"
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Change password"
 msgstr "Change password"
@@ -771,10 +787,6 @@ msgstr "Chat apps"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Chat apps, group channels, and agent connections."
 msgstr "Chat apps, group channels, and agent connections."
-
-#: src/pages/Shell.tsx
-msgid "Chat Settings"
-msgstr "Chat Settings"
 
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Check failed"
@@ -1022,6 +1034,7 @@ msgstr "Connect a model"
 msgid "Connect API key"
 msgstr "Connect API key"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/command-palette.tsx
@@ -1709,6 +1722,7 @@ msgstr "days"
 msgid "Decline"
 msgstr "Decline"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Default"
@@ -1782,6 +1796,14 @@ msgstr "deleted"
 #: src/pages/shell/dialogs.tsx
 msgid "Deleting…"
 msgstr "Deleting…"
+
+#: src/components/DeckCard.tsx
+msgid "Delivered"
+msgstr "Delivered"
+
+#: src/components/DeckCard.tsx
+msgid "Delivery failed"
+msgstr "Delivery failed"
 
 #: src/components/AskCard.tsx
 msgid "Denied"
@@ -2161,6 +2183,10 @@ msgstr "Forgot password?"
 msgid "Free"
 msgstr "Free"
 
+#: src/components/DraftActionCard.tsx
+msgid "From"
+msgstr "From"
+
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
 msgstr "Fullscreen"
@@ -2447,6 +2473,11 @@ msgstr "Library is empty"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Light"
 msgstr "Light"
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Line chart"
+msgstr "Line chart"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Linear issue"
@@ -3113,6 +3144,7 @@ msgstr "Only empty spaces can be deleted. Delete its bots and groups first."
 msgid "Only you can change this setup, and every change reaches all teammates."
 msgstr "Only you can change this setup, and every change reaches all teammates."
 
+#: src/components/DeckCard.tsx
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
 msgid "Open"
@@ -3211,6 +3243,10 @@ msgstr "Organization API key"
 msgid "Other model…"
 msgstr "Other model…"
 
+#: src/components/DeckCard.tsx
+msgid "Outcome unknown"
+msgstr "Outcome unknown"
+
 #: src/pages/RoutineEditor.tsx
 msgid "PagerDuty incident"
 msgstr "PagerDuty incident"
@@ -3259,6 +3295,15 @@ msgstr "Pause"
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
+
+#: src/components/DeckCard.tsx
+msgid "Pending"
+msgstr "Pending"
+
+#: src/components/DeckCard.tsx
+#: src/pages/Artifacts.tsx
+msgid "Pie chart"
+msgstr "Pie chart"
 
 #: src/pages/BotContextMenu.tsx
 msgid "Pin"
@@ -3643,6 +3688,7 @@ msgstr "Restoring your workspace"
 msgid "Resume"
 msgstr "Resume"
 
+#: src/components/DraftActionCard.tsx
 #: src/pages/Shell.tsx
 msgid "Retry"
 msgstr "Retry"
@@ -3908,14 +3954,6 @@ msgstr "Server URL"
 #: src/pages/Shell.tsx
 msgid "Settings"
 msgstr "Settings"
-
-#: src/pages/Shell.tsx
-msgid "Settings: General"
-msgstr "Settings: General"
-
-#: src/pages/Shell.tsx
-msgid "Settings: Usage"
-msgstr "Settings: Usage"
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/ModelSettingsOverlay.tsx
@@ -4397,6 +4435,10 @@ msgstr "Unpublish"
 #: src/pages/Shell.tsx
 msgid "Unpublished"
 msgstr "Unpublished"
+
+#: src/components/DeckCard.tsx
+msgid "Unsupported"
+msgstr "Unsupported"
 
 #. placeholder {0}: pending.file.name
 #: src/pages/Shell.tsx

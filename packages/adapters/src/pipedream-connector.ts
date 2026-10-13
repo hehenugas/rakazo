@@ -31,6 +31,12 @@ import {
 } from "./remote-mcp.js";
 import { isVitestRuntime } from "./test-runtime.js";
 import { readBodyCapped, withAbort } from "./web-ssrf.js";
+import { emailDeliveryReceipt } from "./email-delivery-receipt.js";
+import {
+  createGoogleSlidesFromMarkdown,
+  googleSlidesMarkdownTool,
+  supportsGoogleSlidesMarkdownTool,
+} from "./google-slides-delivery.js";
 
 const API_BASE = "https://api.pipedream.com";
 const MCP_ENDPOINT = "https://remote.mcp.pipedream.net/v3";
@@ -211,6 +217,25 @@ export class PipedreamConnector implements ManagedConnectorProvider {
     );
   }
 
+  async supportsGoogleSlidesDelivery(context: AdapterContext): Promise<boolean> {
+    const accounts = context.connectedConnections?.filter(
+      (connection) =>
+        connection.connectorId === "pipedream" &&
+        connection.externalId.replace(/[^a-z0-9]/gi, "").toLowerCase() === "googleslides",
+    );
+    if (accounts?.length !== 1) return false;
+    return supportsGoogleSlidesMarkdownTool(googleSlidesMarkdownTool(await this.discoverTools(context)));
+  }
+
+  async createGoogleSlidesFromMarkdown(
+    input: { title: string; markdown: string },
+    context: AdapterContext,
+  ) {
+    const tool = googleSlidesMarkdownTool(await this.discoverTools(context));
+    if (!supportsGoogleSlidesMarkdownTool(tool)) return null;
+    return createGoogleSlidesFromMarkdown(this, context, tool, input);
+  }
+
   async resolveCall(
     call: ConnectorCall,
     context: AdapterContext,
@@ -252,9 +277,11 @@ export class PipedreamConnector implements ManagedConnectorProvider {
         call.route?.toolName ?? call.tool,
         call.args,
       );
+      const receipt = emailDeliveryReceipt(call.route?.toolName ?? call.tool, result);
       yield {
         type: "result",
         data: redactConnectorPayload(result, [token, this.config.clientSecret]),
+        ...(receipt ? { receipt } : {}),
       };
     } catch (error) {
       yield {
