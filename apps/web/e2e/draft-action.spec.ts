@@ -23,7 +23,7 @@ test("email draft: edit, save, submit, and sent state", async ({ page }, testInf
   await expect(toField).not.toBeEditable();
 
   const submitted = page.waitForResponse((response) =>
-    response.url().includes("/rpc/threads/updateDraftAction"),
+    response.url().includes("/rpc/threads/submitDraftAction"),
   );
   await card.getByRole("button", { name: "Send" }).click();
   await submitted;
@@ -57,4 +57,51 @@ test("slack draft: discard keeps the message from sending", async ({ page }, tes
     timeout: 15_000,
   });
   await captureScreenshot(page, testInfo, "11-draft-action-discarded");
+});
+
+test("formatted email draft: preview, validation, and one approved send", async ({
+  page,
+}, testInfo) => {
+  await signup(page, `draft-format-${Date.now()}@rakazo.test`, "password12", "Drafts");
+  await completeOnboarding(page);
+
+  const composer = page.getByPlaceholder(/Message/);
+  await composer.fill("please draft a formatted email to the team");
+  await page.keyboard.press("Enter");
+
+  const card = page.getByTestId("draft-action-card");
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  const preview = card.getByTestId("draft-email-preview");
+  await expect(preview.getByRole("heading", { name: "Status" })).toBeVisible();
+  await expect(preview.locator("strong")).toHaveText("on track");
+  await expect(preview.getByRole("listitem")).toHaveCount(2);
+  await captureScreenshot(page, testInfo, "draft-email-formatted-preview");
+
+  // An invalid recipient blocks Send and says why.
+  await card.getByRole("button", { name: "Edit" }).click();
+  const to = card.getByRole("textbox", { name: "To" });
+  await to.fill("not-an-address");
+  await expect(card.getByText("Invalid address")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Send" })).toBeDisabled();
+  await to.fill("team@example.test, lead@example.test");
+  await expect(card.getByRole("button", { name: "Send" })).toBeEnabled();
+
+  // Send goes through the server once; the card then freezes.
+  let submits = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/rpc/threads/submitDraftAction")) submits += 1;
+  });
+  const submitted = page.waitForResponse((response) =>
+    response.url().includes("/rpc/threads/submitDraftAction"),
+  );
+  await card.getByRole("button", { name: "Send" }).click();
+  expect((await submitted).ok()).toBe(true);
+  await expect(card.getByText("submitted", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByRole("button", { name: "Send" })).toHaveCount(0);
+  await expect(
+    page
+      .getByTestId("transcript")
+      .getByText("done. the submitted action went out through the connected provider."),
+  ).toBeVisible({ timeout: 30_000 });
+  expect(submits).toBe(1);
 });

@@ -176,7 +176,9 @@ describe("teamBots membership scoping", () => {
     }));
     prisma.bot = { ...prisma.bot, updateMany: vi.fn().mockResolvedValue({ count: 2 }) };
     prisma.$transaction = vi.fn(
-      async (run: (tx: { teamBot: { update: unknown }; bot: { updateMany: unknown } }) => unknown) =>
+      async (
+        run: (tx: { teamBot: { update: unknown }; bot: { updateMany: unknown } }) => unknown,
+      ) =>
         run({
           teamBot: { update: prisma.teamBot.update },
           bot: { updateMany: prisma.bot.updateMany },

@@ -58,6 +58,7 @@ import {
   ModelConnectInputSchema,
   ModelCredentialSchema,
   ModelOAuthBeginSchema,
+  ProjectIdInput,
   ProjectSchema,
   REPLY_QUOTE_MAX_LENGTH,
   ReorderBotsInput,
@@ -89,7 +90,7 @@ import {
   VoiceInfoSchema,
   VoiceStatusSchema,
 } from "./domain.js";
-import { ComputerCommandSchema, ProductEventSchema } from "./events.js";
+import { ComputerCommandSchema, ProductEventSchema, VoiceTranscriptSchema } from "./events.js";
 import { Id, IsoDate } from "./ids.js";
 import {
   IntegrationProviderConfigSchema,
@@ -101,6 +102,17 @@ import { SearchQueryOutputSchema } from "./search.js";
 
 const botId = z.object({ botId: Id });
 const groupId = z.object({ groupId: Id });
+
+const DraftActionFieldsInput = z
+  .array(
+    z.object({
+      key: z.string().min(1).max(120),
+      label: z.string().min(1).max(160),
+      value: z.string().max(20_000),
+      multiline: z.boolean().optional(),
+    }),
+  )
+  .max(30);
 
 const threadTarget = z
   .object({
@@ -318,6 +330,10 @@ export const appContract = {
     get: oc.input(z.object({ projectId: Id })).output(ProjectSchema),
     create: oc.input(CreateProjectInput).output(ProjectSchema),
     update: oc.input(UpdateProjectInput).output(ProjectSchema),
+    /** Stops the project's owned work only; unrelated runs on the same bots keep going. */
+    stop: oc.input(ProjectIdInput).output(ProjectSchema),
+    /** Restarts failed or cancelled child work and reopens the project. */
+    retry: oc.input(ProjectIdInput).output(ProjectSchema),
   },
   groups: {
     create: oc.input(CreateGroupInput).output(GroupSchema),
@@ -378,19 +394,24 @@ export const appContract = {
         threadTarget.safeExtend({
           messageId: Id,
           draftId: Id,
-          fields: z
-            .array(
-              z.object({
-                key: z.string().min(1).max(120),
-                label: z.string().min(1).max(160),
-                value: z.string().max(20_000),
-                multiline: z.boolean().optional(),
-              }),
-            )
-            .max(30),
+          fields: DraftActionFieldsInput,
           status: z.enum(["draft", "submitted", "discarded"]),
         }),
       )
+      .output(z.object({ ok: z.literal(true) })),
+    /** Approve a draft: freeze its fields and start the run that carries them out. */
+    submitDraftAction: oc
+      .input(
+        threadTarget.safeExtend({
+          messageId: Id,
+          draftId: Id,
+          fields: DraftActionFieldsInput,
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** Reserved endpoint; returns unsupported until structured provider delivery is available. */
+    deliverDeck: oc
+      .input(threadTarget.safeExtend({ artifactId: Id, destination: z.enum(["google_slides"]) }))
       .output(z.object({ ok: z.literal(true) })),
     react: oc
       .input(
@@ -861,12 +882,17 @@ export const appContract = {
             description: z.string().max(ARTIFACT_DESCRIPTION_MAX_LENGTH).optional(),
             mimeType: z.string().min(1),
             contentBase64: z.string().min(1).max(ATTACHMENT_MAX_BASE64_LENGTH),
+            transcript: VoiceTranscriptSchema.optional(),
           }),
         ),
       )
       .output(ArtifactSchema),
     get: oc.input(threadTarget.and(z.object({ artifactId: Id }))).output(ArtifactWithContentSchema),
     getById: oc.input(z.object({ artifactId: Id })).output(ArtifactWithContentSchema),
+    /** Render a deck artifact into a downloadable file. */
+    exportDeck: oc
+      .input(z.object({ artifactId: Id, format: z.enum(["pptx"]) }))
+      .output(z.object({ name: z.string(), mimeType: z.string(), contentBase64: z.string() })),
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   usage: {

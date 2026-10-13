@@ -14,8 +14,10 @@ import {
 import {
   ACTIVE_RUN_STATUSES,
   callIdFromClientNonce,
+  EMAIL_DRAFT_ACTION_NONCE_PREFIX,
   isActive,
   isConversationalRun,
+  PROJECT_TASK_RUN_TRIGGER,
   projectMessages,
   resolveGroupTargetBotIds,
   runFailureError,
@@ -61,6 +63,12 @@ export type ThreadTarget =
       members: GroupMember[];
       memberBotIds: string[];
     };
+
+/** What stopping needs from a thread; delegated-work stops carry no full bot record. */
+export type StoppableThread = { threadId: string } & (
+  | { kind: "bot"; botId: string }
+  | { kind: "group"; memberBotIds: string[] }
+);
 
 const THREAD_MESSAGE_PAGE_SIZE = 100;
 const RUNS_NEEDING_CONTINUE = new Set(["queued", "waiting_takeover"]);
@@ -614,9 +622,29 @@ export async function sendThreadMessage(
     replyQuote?: string;
     clientNonce?: string;
   },
+  options: {
+    /** Persist a related domain transition with the message, task, run, and event. */
+    beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>;
+    /** Draft submissions must start a run whose source message is the submitted draft. */
+    requireNewRun?: boolean;
+    /** Only the draft-action handler may replay an already submitted draft nonce. */
+    allowReservedDraftNonce?: boolean;
+  } = {},
 ) {
+  if (
+    input.clientNonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX) &&
+    !options.beforeCommit &&
+    !options.allowReservedDraftNonce
+  ) {
+    throw new ORPCError("BAD_REQUEST", { message: "This message nonce is reserved." });
+  }
   const existing = await replayExistingSend(deps, target.threadId, input.clientNonce);
-  if (existing) return existing;
+  if (existing) {
+    if (options.beforeCommit) {
+      throw new ORPCError("CONFLICT", { message: "This draft already has a send receipt." });
+    }
+    return existing;
+  }
   // Live events carry the call id so a spoken turn joins the call card on first
   // paint; without it the bubble shows loose until a refetch reads the nonce.
   const callId = callIdFromClientNonce(input.clientNonce);
@@ -627,6 +655,7 @@ export async function sendThreadMessage(
 
   const commit = () =>
     deps.prisma.$transaction(async (tx) => {
+      await options.beforeCommit?.(tx);
       let replyToMessageId: string | undefined;
       let replyQuote: string | undefined;
       if (input.replyToMessageId) {
@@ -681,14 +710,25 @@ export async function sendThreadMessage(
           replyQuote,
           clientNonce: input.clientNonce,
         });
-        const activeRuns = await tx.run.findMany({
-          where: {
-            threadId: target.threadId,
-            botId: target.botId,
-            status: { in: [...ACTIVE_RUN_STATUSES] },
-          },
-          select: { id: true, taskId: true, status: true, trigger: true },
-        });
+        // Delegated project work runs in the background: a user message never queues behind it,
+        // but a child that is waiting for an answer can still take the user's reply.
+        const activeRuns = (
+          await tx.run.findMany({
+            where: {
+              threadId: target.threadId,
+              botId: target.botId,
+              status: { in: [...ACTIVE_RUN_STATUSES] },
+            },
+            select: { id: true, taskId: true, status: true, trigger: true },
+          })
+        ).filter(
+          (run) => run.trigger !== PROJECT_TASK_RUN_TRIGGER || run.status === "waiting_input",
+        );
+        if (options.requireNewRun && activeRuns.length > 0) {
+          throw new ORPCError("CONFLICT", {
+            message: "Wait for the current Bot response before submitting this draft.",
+          });
+        }
         const waitingRuns = activeRuns.filter((run) => run.status === "waiting_input");
         if (waitingRuns.length && !activeRuns.some(steersUserMessage)) {
           const answerText = input.text?.trim();
@@ -855,6 +895,11 @@ export async function sendThreadMessage(
         },
         select: { id: true, taskId: true, botId: true, status: true, trigger: true },
       });
+      if (options.requireNewRun && activeRuns.length > 0) {
+        throw new ORPCError("CONFLICT", {
+          message: "Wait for the current Bot response before submitting this draft.",
+        });
+      }
       const activeByBotId = new Map<string, (typeof activeRuns)[number]>();
       const answeredByBotId = new Map<string, Array<(typeof activeRuns)[number]>>();
       const conversationalBotIds = new Set(
@@ -1049,25 +1094,31 @@ export async function stopThreadRuns(
     events: ThreadEvents;
   },
   actor: Actor,
-  target: ThreadTarget,
+  target: StoppableThread,
+  /** Stop only these runs (delegated work) and leave the thread's other runs and queue alone. */
+  options?: { onlyRunIds?: string[] },
 ) {
+  const onlyRunIds = options?.onlyRunIds;
   const { runIds, computers, leases, eventSeq } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
         threadId: target.threadId,
         status: { in: [...ACTIVE_RUN_STATUSES] },
+        ...(onlyRunIds ? { id: { in: onlyRunIds } } : {}),
       },
       data: { status: "cancelled", completedAt: new Date() },
       select: { id: true, botId: true },
     });
     const ids = cancelled.map((run) => run.id);
-    await tx.steeringMessage.deleteMany({
-      where: {
-        botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },
-        message: { threadId: target.threadId },
-      },
-    });
+    if (!onlyRunIds) {
+      await tx.steeringMessage.deleteMany({
+        where: {
+          botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },
+          message: { threadId: target.threadId },
+        },
+      });
+    }
     // Snapshot teardown coordinates before commit. Once cancellation becomes
     // visible, a worker can release its lease / execution columns immediately; a
     // later lookup would then miss the sandbox work this request must stop.

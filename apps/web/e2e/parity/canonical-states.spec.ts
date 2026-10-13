@@ -146,9 +146,9 @@ test("connect apps catalog and plugin search", async ({ page }) => {
   await page.setViewportSize(PARITY_VIEWPORT);
   await expect(page.getByTestId("composer-bar")).toBeVisible();
   await page.locator("aside").first().getByRole("button", { name: "Connect apps" }).click();
-  await expect(page.getByPlaceholder("Search apps")).toBeVisible();
+  await expect(page.getByPlaceholder("Search plugins")).toBeVisible();
   await expectParityScreenshot(page, "09-connect-apps-catalog");
-  await page.getByPlaceholder("Search apps").fill("git");
+  await page.getByPlaceholder("Search plugins").fill("git");
   await expect(page.getByText("GitHub", { exact: true })).toBeVisible();
   await expectParityScreenshot(page, "10-connect-apps-search");
 });

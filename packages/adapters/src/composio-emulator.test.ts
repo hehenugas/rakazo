@@ -160,6 +160,8 @@ describe("ComposioEmulator", () => {
       "GMAIL_SEND_EMAIL",
       "GMAIL_CREATE_EMAIL_DRAFT",
       "GMAIL_LIST_LABELS",
+      "GMAIL_LIST_SEND_AS",
+      "GMAIL_ADD_LABEL_TO_EMAIL",
       "SLACK_EMULATED_ACTION",
     ]);
     expect(tools.find((tool) => tool.name === "GMAIL_SEND_EMAIL")?.inputSchema).toMatchObject({
@@ -292,5 +294,73 @@ describe("ComposioEmulator", () => {
       }),
     );
     expect(emulator.listGithubReleases()[0]?.tag).toBe("v0.4.2");
+  });
+
+  it("lists send-as addresses and sends only from a verified one", async () => {
+    const emulator = new ComposioEmulator();
+    await emulator.begin({ provider: "GMAIL", redirectUrl: "http://example.test" }, context);
+
+    const [listed] = await collectResults(emulator, "GMAIL_LIST_SEND_AS", {});
+    const sendAs = (
+      listed as {
+        data: { data: { sendAs: { sendAsEmail: string; verificationStatus: string }[] } };
+      }
+    ).data.data.sendAs;
+    expect(sendAs.map((alias) => alias.sendAsEmail)).toContain("team@example.test");
+
+    const send = (from_email: string) =>
+      collectResults(emulator, "GMAIL_SEND_EMAIL", {
+        recipient_email: "client@example.test",
+        subject: "Hello",
+        body: "Hi",
+        from_email,
+      });
+    const [sent] = await send("TEAM@example.test");
+    expect((sent as { data: { successful: boolean } }).data.successful).toBe(true);
+    expect(
+      emulator.mailboxFor(context.userId)?.messages.find((m) => m.subject === "Hello")?.sender,
+    ).toBe("team@example.test");
+    const [pending] = await send("pending@example.test");
+    expect((pending as { data: { successful: boolean } }).data.successful).toBe(false);
+    const [stranger] = await send("stranger@example.test");
+    expect((stranger as { data: { successful: boolean } }).data.successful).toBe(false);
+  });
+
+  it("finds spam only when asked and restores a message by changing its labels", async () => {
+    const emulator = new ComposioEmulator();
+    await emulator.begin({ provider: "GMAIL", redirectUrl: "http://example.test" }, context);
+    type Fetched = { data: { data: { messages: { messageId: string; labelIds: string[] }[] } } };
+
+    const [normal] = await collectResults(emulator, "GMAIL_FETCH_EMAILS", { max_results: 50 });
+    expect((normal as Fetched).data.data.messages.some((m) => m.labelIds.includes("SPAM"))).toBe(
+      false,
+    );
+
+    const [spam] = await collectResults(emulator, "GMAIL_FETCH_EMAILS", {
+      label_ids: ["SPAM"],
+      include_spam_trash: true,
+    });
+    const found = (spam as Fetched).data.data.messages;
+    expect(found).toHaveLength(1);
+
+    const [moved] = await collectResults(emulator, "GMAIL_ADD_LABEL_TO_EMAIL", {
+      message_id: found[0]!.messageId,
+      add_label_ids: ["INBOX"],
+      remove_label_ids: ["SPAM"],
+    });
+    expect((moved as { data: { data: { labelIds: string[] } } }).data.data.labelIds).toEqual([
+      "INBOX",
+    ]);
+    const [after] = await collectResults(emulator, "GMAIL_FETCH_EMAILS", {
+      label_ids: ["SPAM"],
+      include_spam_trash: true,
+    });
+    expect((after as Fetched).data.data.messages).toHaveLength(0);
+
+    const [bad] = await collectResults(emulator, "GMAIL_ADD_LABEL_TO_EMAIL", {
+      message_id: found[0]!.messageId,
+      add_label_ids: ["NOT_A_LABEL"],
+    });
+    expect((bad as { data: { successful: boolean } }).data.successful).toBe(false);
   });
 });

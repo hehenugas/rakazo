@@ -576,8 +576,8 @@ export default function Integrations() {
               setQuery(value);
               setVisibleCount(CONNECTION_CATALOG_PAGE_SIZE);
             }}
-            accessibilityLabel={t("Search apps")}
-            placeholder={t("Search apps")}
+            accessibilityLabel={t("Search plugins")}
+            placeholder={t("Search plugins")}
             placeholderTextColor={native.tertiaryLabel}
             autoCapitalize="none"
             autoCorrect={false}

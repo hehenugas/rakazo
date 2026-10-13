@@ -177,3 +177,33 @@ function darkenHex(hex: string, percent: number): string {
   const b = Math.max(0, Math.floor((num & 255) * factor));
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
+
+function relativeLuminance(hex: string): number {
+  const c = expandHex(hex);
+  const channel = (offset: number) => {
+    const value = (Number.parseInt(c.substring(offset, offset + 2), 16) || 0) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+export function contrastRatio(a: string, b: string): number {
+  const [light, dark] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+}
+
+/**
+ * The bubble surface for a Bot-colored user message in 1:1 chats. The text color is whichever of
+ * black or white contrasts more, which is always at least WCAG AA (4.5:1) for body text.
+ */
+export function botBubbleColors(
+  color: Pick<GrokColorDef, "light" | "dark">,
+  appearance: "light" | "dark",
+): { background: string; foreground: string } {
+  const background = appearance === "dark" ? color.dark : color.light;
+  const foreground =
+    contrastRatio(background, "#000000") >= contrastRatio(background, "#FFFFFF")
+      ? "#000000"
+      : "#FFFFFF";
+  return { background, foreground };
+}

@@ -67,3 +67,48 @@ test("composer / picker lists skills above actions", async ({ page }, testInfo) 
   await composer.fill("@");
   await expect(page.getByTestId("slash-picker")).toHaveCount(0);
 });
+
+test("composer / picker is operable from the keyboard", async ({ page }) => {
+  const stamp = Date.now();
+  await signup(page, `slash-keys-${stamp}@rakazo.test`, "password12", "Slash Keys");
+  await completeOnboarding(page);
+  await page.goto("/app");
+  await page.waitForURL(/\/app\/[^/]+$/);
+
+  await rpc(page, "agentSkills/create", {
+    name: "Daily standup",
+    description: "Prepare a concise standup update.",
+    body: "1. Summarize wins.",
+  });
+
+  const composer = page.getByRole("combobox", { name: /^Message/ });
+  await composer.fill("/standup");
+  const picker = page.getByTestId("slash-picker");
+  await expect(picker).toBeVisible();
+  const skillButton = picker.getByRole("button", { name: "Skill Daily standup" });
+  await expect(skillButton).toHaveAttribute("data-highlighted", "");
+
+  // Escape closes without sending anything.
+  await composer.press("Escape");
+  await expect(picker).toHaveCount(0);
+  await expect(composer).toHaveValue("/standup");
+
+  // Arrows move the highlight and Enter picks instead of sending the "/" text.
+  await composer.fill("/");
+  await expect(picker).toBeVisible();
+  const items = picker.getByRole("button");
+  const first = items.nth(0);
+  const second = items.nth(1);
+  await expect(first).toHaveAttribute("data-highlighted", "");
+  await composer.press("ArrowDown");
+  await expect(second).toHaveAttribute("data-highlighted", "");
+  await expect(first).not.toHaveAttribute("data-highlighted", "");
+  await composer.press("ArrowUp");
+  await expect(first).toHaveAttribute("data-highlighted", "");
+
+  await composer.fill("/standup");
+  await composer.press("Enter");
+  await expect(page.getByTestId("skill-chip")).toContainText("Daily standup");
+  await expect(picker).toHaveCount(0);
+  await expect(composer).toHaveValue("");
+});

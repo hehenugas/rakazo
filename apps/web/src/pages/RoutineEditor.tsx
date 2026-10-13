@@ -144,11 +144,14 @@ export function RoutineListRow({
   running,
   onOpen,
   onStop,
+  onContextMenu,
 }: {
   routine: Routine;
   running: boolean;
   onOpen: () => void;
   onStop: () => void;
+  /** Right-click, or the keyboard menu key / Shift+F10 on the focused row. */
+  onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const nextRun =
     routine.active && routine.nextRunAt ? formatInstant(routine.nextRunAt, routine.timezone) : "";
@@ -157,6 +160,8 @@ export function RoutineListRow({
       <button
         type="button"
         onClick={onOpen}
+        onContextMenu={onContextMenu}
+        aria-haspopup={onContextMenu ? "menu" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-start"
       >
         <span className="grid h-5 w-5 place-items-center">

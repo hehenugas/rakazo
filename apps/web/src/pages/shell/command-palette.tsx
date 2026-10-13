@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot, ConnectionCatalogItem } from "@rakazo/contracts";
 import {
   Badge,
   BotAvatar,
@@ -15,6 +15,7 @@ import {
   Kbd,
 } from "@rakazo/ui-web";
 import { useEffect, useMemo, useState } from "react";
+import { pluginMatches } from "./command-palette-plugins";
 
 function isApplePlatform() {
   if (typeof navigator === "undefined") return false;
@@ -43,13 +44,19 @@ export function CommandPalette({
   onOpenChange,
   bots,
   onSelectBot,
+  loadPlugins,
+  onSelectPlugin,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bots: Bot[];
   onSelectBot: (botId: string) => void;
+  /** Resolves the Connect apps catalog; fetched once, the first time the palette opens. */
+  loadPlugins?: () => Promise<ConnectionCatalogItem[]>;
+  onSelectPlugin?: (item: ConnectionCatalogItem) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [plugins, setPlugins] = useState<ConnectionCatalogItem[] | null>(null);
   const [modKey, setModKey] = useState("⌘");
 
   useEffect(() => {
@@ -59,6 +66,26 @@ export function CommandPalette({
   useEffect(() => {
     if (!open) setSearch("");
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !loadPlugins || plugins) return;
+    let cancelled = false;
+    loadPlugins()
+      .then((items) => {
+        if (!cancelled) setPlugins(items);
+      })
+      .catch(() => {
+        if (!cancelled) setPlugins([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, loadPlugins, plugins]);
+
+  const filteredPlugins = useMemo(
+    () => (onSelectPlugin ? pluginMatches(plugins ?? [], search) : []),
+    [onSelectPlugin, plugins, search],
+  );
 
   const filteredBots = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -152,6 +179,26 @@ export function CommandPalette({
               );
             })}
           </CommandGroup>
+          {filteredPlugins.length > 0 ? (
+            <CommandGroup heading={t`Connect apps`}>
+              {filteredPlugins.map((item) => (
+                <CommandItem
+                  key={`${item.connectorId}:${item.slug}`}
+                  value={`plugin:${item.connectorId}:${item.slug}`}
+                  data-testid={`command-palette-plugin-${item.slug}`}
+                  onSelect={() => {
+                    onSelectPlugin?.(item);
+                    onOpenChange(false);
+                  }}
+                  className="items-center gap-3 rounded-xl! px-2.5 py-2.5"
+                >
+                  <span className="truncate font-medium text-foreground" dir="auto">
+                    {item.name}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
         </CommandList>
       </Command>
     </CommandDialog>

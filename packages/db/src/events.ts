@@ -14,6 +14,7 @@ import {
   isConversationalRun,
   isSecretAskBlock,
   messagingChannelId,
+  PROJECT_TASK_RUN_TRIGGER,
   resolveAskChoice,
   sanitizeJsonValue,
 } from "@rakazo/core";
@@ -398,6 +399,8 @@ export async function sendUserMessage(
                 status: {
                   in: ["running", "queued", "leased", "waiting_input", "waiting_takeover"],
                 },
+                // Delegated project work runs in the background; a user message never queues behind it.
+                trigger: { not: PROJECT_TASK_RUN_TRIGGER },
               },
               select: { id: true, taskId: true, trigger: true },
             })

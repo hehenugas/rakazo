@@ -442,7 +442,10 @@ export function mountVoiceHttpRoutes(
         mimeType: String((body as { mimeType?: unknown }).mimeType ?? "audio/webm"),
         signal: c.req.raw.signal,
       });
-      return c.json({ text: result.text });
+      return c.json({
+        text: result.text,
+        ...(result.segments ? { segments: result.segments } : {}),
+      });
     } catch (error) {
       return voiceHttpError(c, error);
     }

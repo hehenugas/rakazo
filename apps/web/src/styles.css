@@ -51,3 +51,14 @@ body,
     opacity: 0.3;
   }
 }
+
+/* Bot-colored user bubble (1:1 chats). The Bot's identity color arrives as inline custom
+   properties; the active theme picks which variant to paint. */
+.bot-bubble {
+  background-color: var(--bot-bubble-dark);
+  color: var(--bot-bubble-dark-foreground);
+}
+:root[data-theme="light"] .bot-bubble {
+  background-color: var(--bot-bubble-light);
+  color: var(--bot-bubble-light-foreground);
+}

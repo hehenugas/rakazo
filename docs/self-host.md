@@ -295,6 +295,8 @@ Do not commit `.env`. Never put `COMPOSIO_API_KEY`, OpenRouter keys, or provider
 
 Optional messaging platforms (iMessage, Slack, WhatsApp, Telegram, Feishu/Lark) mount when their env credentials are set — see `.env.example`. Point a Feishu/Lark bot event subscription at `/api/v1/messaging/webhook/lark` (webhook/HTTP inbound only; do not enable long connection). Groups stay iMessage-only.
 
+Slack mentions: a Team Bot can notify a Slack user group by writing `<!subteam^GROUPID>` with the group's id. It goes out only if Slack lists that group, which needs the `usergroups:read` scope on the bot token; without the scope, or when Slack cannot be reached, the mention is sent as plain text and notifies nobody. `@here`, `@channel` and `@everyone` never notify anyone from a Bot, whatever the Bot writes.
+
 ## Choosing a computer provider
 
 The Electron desktop app is a client of the same API. Docker and E2B still apply. On first launch, Electron asks the deployment owner whether bots should keep using Docker or run on this Mac as you. `SANDBOX_PROVIDER=desktop` is a separate, explicit provider that always runs commands on the service host.

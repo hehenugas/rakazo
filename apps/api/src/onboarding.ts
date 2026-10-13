@@ -1,3 +1,5 @@
+import type { JobPublisher } from "@rakazo/adapter-kit";
+import { runContinueJob } from "@rakazo/adapter-kit";
 import type { ConnectorRegistry } from "@rakazo/adapters";
 import type { Actor, MessageBlock } from "@rakazo/contracts";
 import { featuredConnectorProvidersMatch } from "@rakazo/core";
@@ -19,6 +21,8 @@ type OnboardingDeps = {
   prisma: PrismaClient;
   events: ThreadEvents;
   connectors: ConnectorRegistry;
+  /** Resumes a run that was waiting for this app to connect. */
+  jobs?: JobPublisher;
 };
 
 type FocusOption = {
@@ -313,7 +317,7 @@ export async function markAppConnected(
   const target = { spaceId: actor.spaceId, botId: bot.id, threadId: thread.id };
   const messages = await deps.prisma.message.findMany({
     where: { threadId: thread.id },
-    select: { id: true, blocks: true },
+    select: { id: true, blocks: true, runId: true },
     orderBy: { createdAt: "asc" },
     take: 100,
   });
@@ -337,7 +341,39 @@ export async function markAppConnected(
         : block,
     );
     await updateBlocks(deps, target, message.id, next);
+    await resumeRunWaitingOnApp(deps, actor, target.threadId, message.id, message.runId, blocks);
   }
+}
+
+/**
+ * A run that paused with request_app_connection continues as soon as the app connects, so the
+ * user never has to come back and tell the bot. The ask stays answerable if this misses.
+ */
+async function resumeRunWaitingOnApp(
+  deps: OnboardingDeps,
+  actor: Actor,
+  threadId: string,
+  messageId: string,
+  runId: string | null,
+  blocks: MessageBlock[],
+): Promise<void> {
+  if (!runId) return;
+  const waiting = blocks.some(
+    (block) =>
+      block.kind === "ask" &&
+      block.status !== "answered" &&
+      block.actions?.some((action) => action.id === "connected"),
+  );
+  if (!waiting) return;
+  const answered = await deps.events.answerRunInput({
+    spaceId: actor.spaceId,
+    threadId,
+    runId,
+    messageId,
+    answeredByUserId: actor.userId,
+    answer: "connected",
+  });
+  if (answered) await deps.jobs?.enqueue(runContinueJob(runId)).catch(() => undefined);
 }
 
 function capitalize(value: string): string {

@@ -7,8 +7,10 @@ import type {
   VoiceProvider,
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
+  VoiceTranscribeResult,
   VoiceVerifyResult,
 } from "@rakazo/adapter-kit";
+import { segmentsFromWords } from "./transcript-segments.js";
 import {
   readVoiceAudio,
   readVoiceJson,
@@ -85,7 +87,7 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
   async transcribe(
     request: VoiceTranscribeRequest,
     context: AdapterContext,
-  ): Promise<{ text: string }> {
+  ): Promise<VoiceTranscribeResult> {
     const form = new FormData();
     form.set("model_id", TRANSCRIBE_MODEL);
     form.set(
@@ -101,8 +103,10 @@ export class ElevenLabsVoiceProvider implements VoiceProvider {
     });
     const body = await readVoiceJson(res, { requireValid: res.ok });
     if (!res.ok) throw new Error(voiceHttpError(res.status, "ElevenLabs", "transcribing", body));
-    const text = String((body as { text?: unknown } | null)?.text ?? "").trim();
-    return { text };
+    const parsed = body as { text?: unknown; words?: unknown } | null;
+    const text = String(parsed?.text ?? "").trim();
+    const segments = segmentsFromWords(parsed?.words);
+    return segments.length > 0 ? { text, segments } : { text };
   }
 }
 

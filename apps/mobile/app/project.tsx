@@ -1,7 +1,7 @@
 import type { Project } from "@rakazo/contracts";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { rpc } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useMobileTokens } from "../lib/native";
@@ -44,6 +44,34 @@ export default function ProjectDetailScreen() {
     };
   }, [projectId]);
 
+  // Delegated child runs live on other threads, so an open project is re-read while shown.
+  const open = project ? ["planned", "running", "waiting"].includes(project.status) : false;
+  useEffect(() => {
+    if (!projectId || !open) return;
+    const timer = setInterval(() => {
+      void rpc<Project>("projects/get", { projectId })
+        .then(setProject)
+        .catch(() => undefined);
+    }, 5_000);
+    return () => clearInterval(timer);
+  }, [projectId, open]);
+
+  async function change(action: "stop" | "retry") {
+    if (!projectId) return;
+    try {
+      setProject(await rpc<Project>(`projects/${action}`, { projectId }));
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : t("Could not update project"));
+    }
+  }
+
+  function confirmStop() {
+    Alert.alert(t("Stop this project?"), undefined, [
+      { text: t("Cancel"), style: "cancel" },
+      { text: t("Stop"), style: "destructive", onPress: () => void change("stop") },
+    ]);
+  }
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: tokens.background }}
@@ -70,6 +98,30 @@ export default function ProjectDetailScreen() {
             <Text style={{ color: projectStatusColor(project.status, tokens), fontSize: 14 }}>
               {projectStatusLabel(project.status, t)}
             </Text>
+            {open ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Stop project")}
+                onPress={confirmStop}
+                style={{ alignSelf: "flex-start", paddingVertical: 4 }}
+              >
+                <Text style={{ color: tokens.destructive, fontSize: 14, fontWeight: "600" }}>
+                  {t("Stop")}
+                </Text>
+              </Pressable>
+            ) : null}
+            {project.status === "failed" || project.status === "cancelled" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("Retry project")}
+                onPress={() => void change("retry")}
+                style={{ alignSelf: "flex-start", paddingVertical: 4 }}
+              >
+                <Text style={{ color: tokens.foreground, fontSize: 14, fontWeight: "600" }}>
+                  {t("Retry")}
+                </Text>
+              </Pressable>
+            ) : null}
             {project.objective ? (
               <Text selectable style={{ color: tokens.foreground, fontSize: 15, lineHeight: 22 }}>
                 {project.objective}
@@ -137,6 +189,11 @@ export default function ProjectDetailScreen() {
                   <Text selectable style={{ color: tokens.foreground, fontSize: 15 }}>
                     {task.prompt}
                   </Text>
+                  {task.botId && task.botId !== project.botId ? (
+                    <Text style={{ color: tokens.mutedForeground, fontSize: 13 }}>
+                      {task.botName}
+                    </Text>
+                  ) : null}
                 </View>
               ))
             ) : (

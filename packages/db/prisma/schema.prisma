@@ -602,12 +602,16 @@ model Project {
   objective   String
   plan        Json     @default("[]")
   status      String   @default("planned")
+  /// The run that started this Project. Child status is derived from task runs, never copied here.
+  orchestratorRunId String?
+  orchestratorRun   Run?     @relation("ProjectOrchestratorRun", fields: [orchestratorRunId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   completedAt DateTime?
   tasks       Task[]
 
   @@index([spaceId, botId, userId, status, updatedAt])
+  @@index([status, updatedAt])
   @@map("projects")
 }
 
@@ -670,6 +674,7 @@ model Run {
   usageRecords         UsageRecord[]
   steeringMessages     SteeringMessage[]
   externalMessage      ExternalMessage?
+  orchestratedProjects Project[]        @relation("ProjectOrchestratorRun")
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])
@@ -1053,6 +1058,8 @@ model Artifact {
   size       Int
   hash       String
   storageKey String
+  /// Voice memo transcript: { text, segments?: [{ start, end, text }] } (seconds).
+  transcript Json?
   createdAt  DateTime   @default(now())
 
   // Null on the first version; that row's id is the family's stable id.

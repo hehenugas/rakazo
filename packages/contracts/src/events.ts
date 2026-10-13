@@ -3,6 +3,22 @@ import { botSecretDestinationSchema } from "./bot-secrets.js";
 import { Id } from "./ids.js";
 import { McpTransportSchema } from "./mcp.js";
 
+/** Voice memo transcript. `segments` (seconds) exist only when the provider returned timing. */
+export const VoiceTranscriptSchema = z.object({
+  text: z.string().max(20_000),
+  segments: z
+    .array(
+      z.object({
+        start: z.number().nonnegative(),
+        end: z.number().nonnegative(),
+        text: z.string().max(2_000),
+      }),
+    )
+    .max(2_000)
+    .optional(),
+});
+export type VoiceTranscript = z.infer<typeof VoiceTranscriptSchema>;
+
 export const ProductEventType = z.enum([
   "thread.message.created",
   "thread.cleared",
@@ -194,6 +210,10 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** Editable outbound action. Execution is intentionally separate from drafting. */
     kind: z.literal("draft_action"),
     draftId: Id,
+    /** Server-pinned account for submitted email drafts; never user-editable. */
+    connectionId: Id.optional(),
+    /** Opaque provider-account snapshot; prevents a reconnect from changing the approved account. */
+    connectionSnapshot: z.string().length(64).optional(),
     provider: z.string(),
     action: z.string(),
     title: z.string(),
@@ -203,9 +223,19 @@ export const MessageBlock = z.discriminatedUnion("kind", [
         label: z.string(),
         value: z.string(),
         multiline: z.boolean().optional(),
+        /** A closed set of allowed values (for example authorized send-as addresses). */
+        options: z.array(z.string()).max(25).optional(),
       }),
     ),
     status: z.enum(["draft", "submitted", "discarded"]),
+  }),
+  z.object({
+    /** A slide deck stored as a versioned artifact; `slides` is a short preview, not the deck. */
+    kind: z.literal("deck"),
+    artifactId: Id,
+    title: z.string(),
+    slideCount: z.number().int().nonnegative(),
+    slides: z.array(z.object({ title: z.string(), bullets: z.array(z.string()) })).max(12),
   }),
   z.object({
     /** Durable multi-step work surfaced in Conversation Details > Tasks. */
@@ -214,6 +244,10 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     title: z.string(),
     status: z.enum(["planned", "running", "waiting", "completed", "failed", "cancelled"]),
     objective: z.string().optional(),
+    /** Child task progress, kept in sync by the project reconciler. */
+    progress: z
+      .object({ done: z.number().int().nonnegative(), total: z.number().int().nonnegative() })
+      .optional(),
   }),
   z.object({
     /** Compact card for a remote cloud coding agent (not the bot computer). */
@@ -274,6 +308,7 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     mimeType: z.string(),
     name: z.string(),
     size: z.number().int().nonnegative(),
+    transcript: VoiceTranscriptSchema.optional(),
   }),
   z.object({
     kind: z.literal("handoff"),

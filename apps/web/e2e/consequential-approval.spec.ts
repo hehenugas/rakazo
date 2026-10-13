@@ -77,6 +77,16 @@ test("actions run by default while optional confirmations live in advanced user 
   expect(Math.abs(allowBox!.width - listBox!.width)).toBeLessThan(2);
   await captureScreenshot(page, testInfo, "53-action-confirmation-pending");
 
+  // Summary first: the full request opens only on demand.
+  const detailToggle = page.getByTestId("ask-detail-toggle").last();
+  await expect(detailToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(detailToggle).toHaveText("View the full request");
+  await expect(page.getByText(/collection: /)).toHaveCount(0);
+  await detailToggle.click();
+  await expect(detailToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(detailToggle).toHaveText("Hide the full request");
+  await expect(page.getByText(/collection: /).last()).toBeVisible();
+
   await page.getByRole("button", { name: "Deny", exact: true }).click();
   await expect(page.getByText("Denied", { exact: true })).toBeVisible();
   await waitForRunIdle(page);

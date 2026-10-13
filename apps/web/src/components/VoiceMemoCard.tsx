@@ -1,19 +1,26 @@
 import { Trans } from "@lingui/react/macro";
+import type { VoiceTranscript } from "@rakazo/contracts";
+import { activeTranscriptSegment, seekableSegments } from "@rakazo/core";
 import { LoaderCircle, Mic } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { rpc } from "../lib/rpc";
 
 export function VoiceMemoCard({
   artifactId,
   mimeType,
   name,
+  transcript,
 }: {
   artifactId: string;
   mimeType: string;
   name: string;
+  transcript?: VoiceTranscript;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const segments = seekableSegments(transcript);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +40,13 @@ export function VoiceMemoCard({
     };
   }, [artifactId]);
 
+  function seek(start: number) {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = start;
+    void audio.play().catch(() => undefined);
+  }
+
   return (
     <div
       data-testid="voice-memo-card"
@@ -45,7 +59,19 @@ export function VoiceMemoCard({
         </span>
       </div>
       {src ? (
-        <audio controls preload="metadata" className="h-9 w-full" src={src}>
+        <audio
+          ref={audioRef}
+          controls
+          preload="metadata"
+          className="h-9 w-full"
+          src={src}
+          onTimeUpdate={(event) =>
+            segments.length > 0
+              ? setActiveIndex(activeTranscriptSegment(segments, event.currentTarget.currentTime))
+              : undefined
+          }
+          onEnded={() => setActiveIndex(-1)}
+        >
           <track kind="captions" />
         </audio>
       ) : failed ? (
@@ -58,6 +84,32 @@ export function VoiceMemoCard({
           <Trans>Loading voice memo…</Trans>
         </div>
       )}
+      {transcript?.text ? (
+        <p
+          data-testid="voice-memo-transcript"
+          dir="auto"
+          className="mt-2.5 text-[14px] leading-6 text-foreground"
+        >
+          {segments.length > 0 && src
+            ? segments.map((segment, index) => (
+                <span key={`${segment.start}-${index}`}>
+                  {index > 0 ? " " : null}
+                  <button
+                    type="button"
+                    data-testid="voice-memo-segment"
+                    aria-current={index === activeIndex ? "true" : undefined}
+                    onClick={() => seek(segment.start)}
+                    className={`rounded px-0.5 text-start transition-colors hover:bg-accent ${
+                      index === activeIndex ? "bg-accent font-medium" : ""
+                    }`}
+                  >
+                    {segment.text}
+                  </button>
+                </span>
+              ))
+            : transcript.text}
+        </p>
+      ) : null}
       <span className="sr-only">{mimeType}</span>
     </div>
   );

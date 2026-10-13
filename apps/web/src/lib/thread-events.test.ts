@@ -86,6 +86,62 @@ describe("thread event reduction", () => {
     expect(next?.cursor).toBe(4);
   });
 
+  it("converges on the latest card state when a reconnect replays updates, even twice", () => {
+    const card = (status: string, done: number) => ({
+      kind: "project" as const,
+      projectId: "project-1",
+      title: "Launch",
+      status: status as "running",
+      progress: { done, total: 3 },
+    });
+    const draft = (status: "draft" | "submitted") => ({
+      kind: "draft_action" as const,
+      draftId: "draft-1",
+      provider: "gmail",
+      action: "send_email",
+      title: "Hello",
+      fields: [{ key: "to", label: "To", value: "a@x.test" }],
+      status,
+    });
+    const initial = snapshot([
+      message("card-1", [card("running", 0)], 1),
+      message("draft-1", [draft("draft")], 2),
+    ]);
+    const replay = [
+      event({
+        type: "thread.message.updated",
+        seq: 4,
+        payload: { messageId: "card-1", role: "bot", blocks: [card("running", 1)] },
+      }),
+      event({
+        type: "thread.message.updated",
+        seq: 5,
+        payload: { messageId: "draft-1", role: "bot", blocks: [draft("submitted")] },
+      }),
+      event({
+        type: "thread.message.updated",
+        seq: 6,
+        payload: { messageId: "card-1", role: "bot", blocks: [card("completed", 3)] },
+      }),
+    ];
+    const apply = (start: ThreadSnapshot, events: ProductEvent[]) =>
+      events.reduce<ThreadSnapshot>(
+        (view, item) => reduceThreadSnapshot(view, item) ?? view,
+        start,
+      );
+
+    const once = apply(initial, replay);
+    // A second connection delivering the same events again leaves the same transcript.
+    const twice = apply(once, replay.slice(-1));
+    expect(once.cursor).toBe(6);
+    expect(once.messages.map((m) => m.blocks)).toEqual([
+      [card("completed", 3)],
+      [draft("submitted")],
+    ]);
+    expect(twice.messages).toEqual(once.messages);
+    expect(once.messages).toHaveLength(2);
+  });
+
   it("appends a quoted reply carrying its excerpt", () => {
     const initial = snapshot([message("message-1", [{ kind: "text", text: "Done" }], 1)]);
 

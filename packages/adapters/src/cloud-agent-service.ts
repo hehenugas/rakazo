@@ -57,6 +57,31 @@ export async function executeCloudAgentTool(
         }
         return { agent: existing };
       }
+      const sourceRun = await tx.run.findFirst({
+        where: {
+          id: run.id,
+          spaceId: context.spaceId,
+          userId: context.userId,
+          botId: context.botId,
+          status: "running",
+        },
+        select: { task: { select: { projectId: true } } },
+      });
+      if (!sourceRun) {
+        return { error: "This run stopped before the cloud agent could start." };
+      }
+      if (sourceRun.task.projectId) {
+        const projects = await tx.$queryRaw<Array<{ status: string }>>`
+          SELECT status FROM projects
+          WHERE id = ${sourceRun.task.projectId} AND "spaceId" = ${context.spaceId}
+            AND "userId" = ${context.userId}
+          FOR UPDATE
+        `;
+        const project = projects[0];
+        if (!project || project.status === "cancelled" || project.status === "completed") {
+          return { error: "This Project stopped before the cloud agent could start." };
+        }
+      }
       const created = await tx.cloudAgent.create({
         data: {
           operationKey: context.operationId,
@@ -91,6 +116,7 @@ export async function executeCloudAgentTool(
       });
       return { agent: saved, seq: event.seq };
     });
+    if ("error" in result) return result;
     agent = result.agent;
     if (result.seq !== undefined)
       await deps.events.notify(run.threadId, result.seq).catch(() => undefined);

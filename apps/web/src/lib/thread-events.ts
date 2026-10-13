@@ -200,10 +200,7 @@ export function dropReconciledOptimisticMessages(
 }
 
 /** True when a durable (non-local) user message with this exact text exists. */
-export function hasDurableUserText(
-  snapshot: ThreadSnapshot | null,
-  text: string,
-): boolean {
+export function hasDurableUserText(snapshot: ThreadSnapshot | null, text: string): boolean {
   if (!snapshot) return false;
   return snapshot.messages.some(
     (message) =>

@@ -398,7 +398,11 @@ export const UpdateBotInput = z
 export const ProjectTaskSchema = z.object({
   id: Id,
   prompt: z.string(),
+  /** Derived from the task's latest run; the stored task status only covers unstarted work. */
   status: z.string(),
+  /** Bot doing the work; differs from the project's bot when the task was delegated. */
+  botId: Id.optional(),
+  botName: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -425,6 +429,8 @@ export const CreateProjectInput = z.object({
   plan: z.array(z.string().trim().min(1).max(1000)).max(100).default([]),
 });
 export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
+
+export const ProjectIdInput = z.object({ projectId: Id });
 
 export const UpdateProjectInput = z.object({
   projectId: Id,
@@ -937,6 +943,7 @@ export const RunSchema = z.object({
     "messaging",
     "cloud_agent",
     "created",
+    "project_task",
   ]),
   routineId: Id.nullable(),
   modelProvider: z.string().nullable(),

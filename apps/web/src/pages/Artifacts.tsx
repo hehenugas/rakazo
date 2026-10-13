@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { Artifact, ArtifactVersion, Bot } from "@rakazo/contracts";
 import { isAttachmentImageMimeType } from "@rakazo/contracts";
+import { DECK_MIME } from "@rakazo/core";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -794,6 +795,7 @@ function mimeLabel(mimeType: string): string {
   if (mimeType === "text/html") return "HTML";
   if (mimeType === "text/markdown") return "MD";
   if (mimeType === "application/pdf") return "PDF";
+  if (mimeType === DECK_MIME) return "DECK";
   const slash = mimeType.indexOf("/");
   return (slash === -1 ? mimeType : mimeType.slice(slash + 1)).toUpperCase().slice(0, 6);
 }

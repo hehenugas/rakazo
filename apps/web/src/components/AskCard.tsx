@@ -4,6 +4,7 @@ import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
 import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@rakazo/core";
 import { Button, Input } from "@rakazo/ui-web";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 export type AskBlock = Extract<ThreadMessage["blocks"][number], { kind: "ask" }>;
@@ -45,6 +46,14 @@ function secretFieldLabel(purpose: AskBlock["purpose"]): string {
   return t`Code`;
 }
 
+function AskDetail({ detail }: { detail: string }) {
+  return (
+    <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted px-3.5 py-3 font-mono text-[12.5px] leading-[1.7] text-muted-foreground">
+      {detail}
+    </pre>
+  );
+}
+
 export function AskCard({
   block,
   canAnswer,
@@ -56,6 +65,7 @@ export function AskCard({
 }) {
   const { t } = useLingui();
   const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [answer, setAnswer] = useState("");
   const [username, setUsername] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -104,9 +114,30 @@ export function AskCard({
         </div>
       ) : null}
       {block.detail && !secretInput ? (
-        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted px-3.5 py-3 font-mono text-[12.5px] leading-[1.7] text-muted-foreground">
-          {block.detail}
-        </pre>
+        approvalActions ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              data-testid="ask-detail-toggle"
+              aria-expanded={detailOpen}
+              onClick={() => setDetailOpen((open) => !open)}
+              className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                className={`transition-transform ${detailOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+              {detailOpen ? t`Hide the full request` : t`View the full request`}
+            </button>
+            {detailOpen ? <AskDetail detail={block.detail} /> : null}
+          </div>
+        ) : (
+          <div className="mt-3">
+            <AskDetail detail={block.detail} />
+          </div>
+        )
       ) : null}
       {block.status === "answered" ? (
         <div className="mt-3.5 text-[13.5px] font-medium text-success">

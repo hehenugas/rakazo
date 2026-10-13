@@ -1,24 +1,55 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { MessageBlock } from "@rakazo/contracts";
-import { Button, Input, Textarea } from "@rakazo/ui-web";
+import {
+  type EmailDraftIssue,
+  type EmailInline,
+  emailBodyHasFormatting,
+  isEmailDraftAction,
+  parseEmailBody,
+  parseEmailDraft,
+} from "@rakazo/core";
+import { Button, Input, NativeSelect, NativeSelectOption, Textarea } from "@rakazo/ui-web";
 import { Check, Pencil, Send, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { rpc } from "../lib/rpc";
 
 type DraftActionBlock = Extract<MessageBlock, { kind: "draft_action" }>;
 
-function executionPrompt(block: DraftActionBlock, fields: DraftActionBlock["fields"]): string {
-  const body = fields.map((field) => `- ${field.label} (${field.key}): ${field.value}`).join("\n");
-  return [
-    "Execute this submitted draft action now.",
-    `Provider: ${block.provider}`,
-    `Action: ${block.action}`,
-    "Fields:",
-    body,
-    "",
-    "Use the connected provider/tool for the action. This submission is an explicit user request to proceed, but continue to follow the configured approval and Auto Review policy for consequential external actions.",
-  ].join("\n");
+function inlineNodes(inline: EmailInline[]) {
+  return inline.map((part, index) => {
+    if ("br" in part) return <br key={index} />;
+    return part.bold ? <strong key={index}>{part.text}</strong> : part.text;
+  });
+}
+
+/** What the recipient will see, drawn as elements (never as raw HTML). */
+function EmailBodyPreview({ body }: { body: string }) {
+  return (
+    <div data-testid="draft-email-preview" className="space-y-2 text-[13.5px] text-foreground">
+      {parseEmailBody(body).map((block, index) => {
+        if (block.type === "heading") {
+          const Heading = block.level === 1 ? "h3" : block.level === 2 ? "h4" : "h5";
+          return (
+            <Heading key={index} className="font-semibold">
+              {inlineNodes(block.inline)}
+            </Heading>
+          );
+        }
+        if (block.type === "list") {
+          const List = block.ordered ? "ol" : "ul";
+          return (
+            <List key={index} className={block.ordered ? "list-decimal ps-5" : "list-disc ps-5"}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{inlineNodes(item)}</li>
+              ))}
+            </List>
+          );
+        }
+        return <p key={index}>{inlineNodes(block.inline)}</p>;
+      })}
+    </div>
+  );
 }
 
 export function DraftActionCard({
@@ -41,6 +72,22 @@ export function DraftActionCard({
   useEffect(() => {
     setFields(block.fields);
   }, [block.fields]);
+
+  const isEmail = isEmailDraftAction(block.action);
+  const issues = useMemo<EmailDraftIssue[]>(
+    () => (isEmail ? parseEmailDraft(fields).issues : []),
+    [isEmail, fields],
+  );
+  const issueFor = (key: string) => issues.find((issue) => issue.field === key);
+  const issueText = (issue: EmailDraftIssue) =>
+    issue.code === "required"
+      ? t`Required`
+      : issue.code === "line_break"
+        ? t`No line breaks`
+        : issue.code === "not_allowed"
+          ? t`Not an allowed address`
+          : t`Invalid address`;
+  const body = fields.find((field) => field.key === "body")?.value ?? "";
 
   async function persist(status: DraftActionBlock["status"]) {
     await rpc.threads.updateDraftAction({
@@ -81,21 +128,16 @@ export function DraftActionCard({
   }
 
   async function submit() {
-    if (busy || block.status !== "draft") return;
+    if (busy || block.status !== "draft" || issues.length > 0) return;
     setBusy(true);
     setError(null);
     try {
-      await rpc.threads.updateDraftAction({
+      // The server freezes these fields and sends exactly them, once.
+      await rpc.threads.submitDraftAction({
         ...target,
         messageId,
         draftId: block.draftId,
         fields,
-        status: "submitted",
-      });
-      await rpc.threads.send({
-        ...target,
-        clientNonce: `draft-action:${block.draftId}:${Date.now()}`,
-        text: executionPrompt(block, fields),
       });
       setEditing(false);
       await onRefresh();
@@ -128,6 +170,7 @@ export function DraftActionCard({
       <div className="mt-4 space-y-3">
         {fields.map((field, index) => {
           const fieldId = `draft-action-field-${block.draftId}-${field.key}`;
+          const issue = issueFor(field.key);
           return (
             <div key={field.key}>
               <label
@@ -136,9 +179,30 @@ export function DraftActionCard({
               >
                 {field.label}
               </label>
-              {field.multiline ? (
+              {field.options && field.options.length > 0 ? (
+                <NativeSelect
+                  id={fieldId}
+                  aria-invalid={issue ? true : undefined}
+                  value={field.value}
+                  disabled={!editing || block.status !== "draft"}
+                  onChange={(event) =>
+                    setFields((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, value: event.target.value } : item,
+                      ),
+                    )
+                  }
+                >
+                  {field.options.map((option) => (
+                    <NativeSelectOption key={option} value={option}>
+                      {option}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              ) : field.multiline ? (
                 <Textarea
                   id={fieldId}
+                  aria-invalid={issue ? true : undefined}
                   value={field.value}
                   readOnly={!editing || block.status !== "draft"}
                   rows={4}
@@ -153,6 +217,7 @@ export function DraftActionCard({
               ) : (
                 <Input
                   id={fieldId}
+                  aria-invalid={issue ? true : undefined}
                   value={field.value}
                   readOnly={!editing || block.status !== "draft"}
                   onChange={(event) =>
@@ -164,9 +229,22 @@ export function DraftActionCard({
                   }
                 />
               )}
+              {issue && block.status === "draft" ? (
+                <div role="alert" className="mt-1 text-[11.5px] text-destructive">
+                  {issueText(issue)}
+                </div>
+              ) : null}
             </div>
           );
         })}
+        {isEmail && emailBodyHasFormatting(body) ? (
+          <div>
+            <div className="mb-1 text-[11.5px] font-medium text-muted-foreground">
+              <Trans>Preview</Trans>
+            </div>
+            <EmailBodyPreview body={body} />
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -188,7 +266,7 @@ export function DraftActionCard({
               <Trans>Edit</Trans>
             </Button>
           )}
-          <Button size="sm" disabled={busy} onClick={() => void submit()}>
+          <Button size="sm" disabled={busy || issues.length > 0} onClick={() => void submit()}>
             <Send size={14} aria-hidden="true" />
             <Trans>Send</Trans>
           </Button>

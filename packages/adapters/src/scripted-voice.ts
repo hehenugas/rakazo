@@ -7,11 +7,17 @@ import type {
   VoiceProvider,
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
+  VoiceTranscribeResult,
   VoiceVerifyResult,
 } from "@rakazo/adapter-kit";
 
 export const SCRIPTED_VOICE_ID = "alloy-test";
 export const SCRIPTED_TRANSCRIPT = "hello from the test microphone";
+/** Deterministic timing so playback sync and seek can be tested offline. */
+export const SCRIPTED_TRANSCRIPT_SEGMENTS = [
+  { start: 0, end: 0.4, text: "hello from" },
+  { start: 0.4, end: 1, text: "the test microphone" },
+];
 
 /** A tiny MPEG frame so `/api/voice/speak` can return `audio/mpeg` without a live vendor. */
 export const SCRIPTED_MPEG = Uint8Array.from([
@@ -56,7 +62,7 @@ export class ScriptedVoiceProvider implements VoiceProvider {
   async transcribe(
     _request: VoiceTranscribeRequest,
     _context: AdapterContext,
-  ): Promise<{ text: string }> {
-    return { text: SCRIPTED_TRANSCRIPT };
+  ): Promise<VoiceTranscribeResult> {
+    return { text: SCRIPTED_TRANSCRIPT, segments: SCRIPTED_TRANSCRIPT_SEGMENTS };
   }
 }

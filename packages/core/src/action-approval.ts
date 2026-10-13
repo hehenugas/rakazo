@@ -119,6 +119,19 @@ export function unattendedTriggerToolRequiresApproval(
     : !UNATTENDED_SAFE_BUILTIN_TOOLS.has(toolName);
 }
 
+/** A connector tool that sends, replies to, or forwards email. */
+export function isEmailSendTool(toolName: string, connectorKind: string): boolean {
+  if (!EMAIL_CONNECTOR_SLUGS.has(connectorKind.toLowerCase())) {
+    return /send.*mail|gmail_send|outlook_send/i.test(toolName);
+  }
+  return (
+    /(^|_)(send|reply|forward)(_|$)/i.test(toolName) &&
+    !/draft/i.test(toolName) &&
+    // A lookup such as listing send-as addresses sends nothing.
+    !/(^|_)(list|get|fetch|search|find|read)(_|$)/i.test(toolName)
+  );
+}
+
 function categoryMatches(
   category: string,
   toolName: string,

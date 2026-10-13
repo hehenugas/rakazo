@@ -74,6 +74,12 @@ msgstr "{0} KB"
 msgid "{0} MB"
 msgstr "{0} MB"
 
+#. placeholder {0}: block.progress.done
+#. placeholder {1}: block.progress.total
+#: src/pages/Shell.tsx
+msgid "{0} of {1} done"
+msgstr ""
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -84,6 +90,11 @@ msgstr ""
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "{0} runs · {1} tokens"
 msgstr "{0} çalıştırma · {1} token"
+
+#. placeholder {0}: block.slideCount
+#: src/components/DeckCard.tsx
+msgid "{0} slides"
+msgstr ""
 
 #. placeholder {0}: bot.name
 #: src/pages/ExternalConversationSettings.tsx
@@ -184,6 +195,10 @@ msgstr ""
 msgid "About spaces"
 msgstr ""
 
+#: src/pages/AccountSettingsOverlay.tsx
+msgid "Accent to Black"
+msgstr ""
+
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Access token"
 msgstr ""
@@ -214,9 +229,10 @@ msgstr "İşlem onayları"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: group.spaceName
-#. placeholder {0}: sectionMenu.section.name
+#. placeholder {0}: routine.name
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Actions for {0}"
 msgstr "{0} için işlemler"
 
@@ -314,6 +330,10 @@ msgstr "Sunucu ekle"
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Add server URL"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Add to prompt"
 msgstr ""
 
 #: src/components/teach/SkillDraftCard.tsx
@@ -833,6 +853,7 @@ msgstr ""
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
+#: src/pages/shell/team-bot-panel.tsx
 #: src/pages/WindowChrome.tsx
 msgid "Close"
 msgstr "Kapat"
@@ -1003,6 +1024,7 @@ msgstr "API anahtarıyla bağlan"
 
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/command-palette.tsx
 msgid "Connect apps"
 msgstr ""
 
@@ -1101,6 +1123,10 @@ msgstr ""
 #: src/pages/Shell.tsx
 msgid "Copy"
 msgstr "Kopyala"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Copy Bot"
+msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not add"
@@ -1363,6 +1389,10 @@ msgstr "Terminal açılamadı"
 msgid "Could not play a test clip"
 msgstr "Deneme sesi çalınamadı"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Could not publish to team"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "Could not reach the server"
@@ -1409,6 +1439,10 @@ msgstr "Grafik çizilemedi"
 msgid "Could not reset password"
 msgstr "Parola sıfırlanamadı"
 
+#: src/pages/Shell.tsx
+msgid "Could not retry the project"
+msgstr ""
+
 #: src/pages/PluginsOverlay.tsx
 msgid "Could not revoke connection"
 msgstr "Bağlantı iptal edilemedi"
@@ -1447,6 +1481,10 @@ msgstr "Rutin kaydedilemedi"
 msgid "Could not save rule"
 msgstr "Kural kaydedilemedi"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Could not save shared setup"
+msgstr ""
+
 #: src/pages/KnowledgeSection.tsx
 msgid "Could not save skill"
 msgstr "Beceri kaydedilemedi"
@@ -1483,12 +1521,20 @@ msgstr "Sıfırlama e-postası gönderilemedi"
 msgid "Could not send that"
 msgstr "Gönderilemedi"
 
+#: src/components/DeckCard.tsx
+msgid "Could not send to Google Slides"
+msgstr ""
+
 #: src/pages/McpServersOverlay.tsx
 msgid "Could not start OAuth"
 msgstr "OAuth başlatılamadı"
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not start teaching"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Could not stop the project"
 msgstr ""
 
 #: src/components/DraftActionCard.tsx
@@ -1517,6 +1563,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Could not update reaction"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Could not update routine"
 msgstr ""
 
 #: src/pages/MemorySettingsOverlay.tsx
@@ -1688,6 +1738,7 @@ msgstr "Varsayılan kapsam"
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Delete"
 msgstr "Sil"
 
@@ -1753,6 +1804,7 @@ msgid "Describe what this bot does"
 msgstr "Bu botun ne yaptığını açıkla"
 
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Description"
 msgstr "Açıklama"
 
@@ -1853,8 +1905,20 @@ msgstr "Markdown olarak indir"
 msgid "Download Executor"
 msgstr ""
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Download template"
+msgstr ""
+
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
+msgstr ""
+
+#: src/pages/shell/bot-picker.tsx
+msgid "Draft"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Draft — only you"
 msgstr ""
 
 #: src/components/teach/SkillDraftCard.tsx
@@ -1878,6 +1942,7 @@ msgid "Earlier message"
 msgstr ""
 
 #: src/components/DraftActionCard.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Edit"
 msgstr ""
 
@@ -1888,6 +1953,10 @@ msgstr "Önce düzenle"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Profili Düzenle"
+
+#: src/pages/Shell.tsx
+msgid "Edit shared setup"
+msgstr ""
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -1971,6 +2040,10 @@ msgstr ""
 msgid "Export"
 msgstr "Dışa aktar"
 
+#: src/components/DeckCard.tsx
+msgid "Export failed"
+msgstr ""
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Export this week's list from the CRM and drop it in the shared folder"
 msgstr "Bu haftanın listesini CRM'den dışa aktar ve ortak klasöre bırak"
@@ -1997,6 +2070,10 @@ msgstr "başarısız"
 #: src/pages/ActivityList.tsx
 msgid "Failed"
 msgstr "Başarısız"
+
+#: src/pages/Shell.tsx
+msgid "Failed to send"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Failed to send message"
@@ -2112,6 +2189,10 @@ msgstr ""
 msgid "Goal"
 msgstr ""
 
+#: src/components/DeckCard.tsx
+msgid "Google Slides"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/Shell.tsx
 msgid "Group"
@@ -2179,6 +2260,10 @@ msgstr ""
 msgid "Hide password"
 msgstr ""
 
+#: src/components/AskCard.tsx
+msgid "Hide the full request"
+msgstr ""
+
 #: src/components/call/VoiceChatCard.tsx
 msgid "Hide transcript"
 msgstr "Dökümü gizle"
@@ -2213,6 +2298,10 @@ msgstr "Nasıl kontrol edilir"
 #: src/pages/Shell.tsx
 msgid "I’m done"
 msgstr "Bitirdim"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Identity and routines as a shareable file. No history or credentials."
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "If you heard that, voice is ready."
@@ -2250,6 +2339,10 @@ msgstr "Instance API anahtarı"
 msgid "Instruction"
 msgstr "Talimat"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Instructions"
+msgstr ""
+
 #: src/pages/PluginsOverlay.tsx
 msgid "Integration domain"
 msgstr ""
@@ -2270,6 +2363,10 @@ msgstr "Aralık miktarı"
 #: src/pages/RoutineSchedule.tsx
 msgid "Interval unit"
 msgstr "Aralık birimi"
+
+#: src/components/DraftActionCard.tsx
+msgid "Invalid address"
+msgstr ""
 
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -2716,6 +2813,7 @@ msgstr "Sesi kapat"
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/bot-panel.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Name"
 msgstr "Ad"
 
@@ -2833,6 +2931,10 @@ msgstr ""
 msgid "No group chats yet."
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
+msgid "No line breaks"
+msgstr ""
+
 #: src/components/AskCard.tsx
 msgid "No longer active"
 msgstr "Artık etkin değil"
@@ -2913,6 +3015,10 @@ msgstr ""
 #: src/pages/ScratchpadSection.tsx
 msgid "None yet"
 msgstr "Henüz yok"
+
+#: src/components/DraftActionCard.tsx
+msgid "Not an allowed address"
+msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Not in the plugin catalog"
@@ -3001,6 +3107,10 @@ msgstr "Bir kez"
 
 #: src/pages/Shell.tsx
 msgid "Only empty spaces can be deleted. Delete its bots and groups first."
+msgstr ""
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Only you can change this setup, and every change reaches all teammates."
 msgstr ""
 
 #: src/pages/ScratchpadSection.tsx
@@ -3142,6 +3252,10 @@ msgstr "Sunucundaki OpenAI uyumlu adresi yapıştır. Gerekirse Rakazo /v1 ekler
 msgid "Paste your API key"
 msgstr "API anahtarını yapıştır"
 
+#: src/pages/shell/routine-context-menu.tsx
+msgid "Pause"
+msgstr ""
+
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr ""
@@ -3162,8 +3276,16 @@ msgstr "Çalınıyor…"
 msgid "POST to"
 msgstr ""
 
+#: src/components/DeckCard.tsx
+msgid "PowerPoint"
+msgstr ""
+
 #: src/components/VoiceMemoButton.tsx
 msgid "Preparing voice memo"
+msgstr ""
+
+#: src/components/DraftActionCard.tsx
+msgid "Preview"
 msgstr ""
 
 #. placeholder {0}: props.name
@@ -3220,6 +3342,18 @@ msgstr "Sağlayıcı"
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Providers"
 msgstr "Sağlayıcılar"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Publish <0>{botName}</0> as a Team Bot. Shared: identity and setup. Private: chats, memory, and credentials."
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Publish to team"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Published to team"
+msgstr ""
 
 #: src/components/CloudAgentCard.tsx
 msgid "Pull request"
@@ -3448,8 +3582,16 @@ msgstr "{replyName} yanıtlanıyor"
 msgid "Replying to {replyName}: “{replyQuote}”"
 msgstr ""
 
+#: src/components/DraftActionCard.tsx
+msgid "Required"
+msgstr ""
+
 #: src/pages/shell/message-cards.tsx
 msgid "Research & writing"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Resend"
 msgstr ""
 
 #: src/components/ComputerMaintenanceActions.tsx
@@ -3497,10 +3639,22 @@ msgstr ""
 msgid "Restoring your workspace"
 msgstr ""
 
+#: src/pages/shell/routine-context-menu.tsx
+msgid "Resume"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Retry"
+msgstr ""
+
 #: src/App.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "Retry now"
 msgstr "Şimdi tekrar dene"
+
+#: src/pages/Shell.tsx
+msgid "Retry project"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Retry screen"
@@ -3584,6 +3738,7 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-panel.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Save"
 msgstr "Kaydet"
 
@@ -3632,6 +3787,7 @@ msgstr ""
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Saving…"
 msgstr "Kaydediliyor…"
 
@@ -3648,7 +3804,6 @@ msgid "Search"
 msgstr "Ara"
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Search apps"
 msgstr "Uygulama ara"
 
@@ -3674,6 +3829,10 @@ msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search models"
+msgstr ""
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Search plugins"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -3709,6 +3868,10 @@ msgstr "Gönder"
 #: src/pages/Auth.tsx
 msgid "Send reset link"
 msgstr "Sıfırlama bağlantısı gönder"
+
+#: src/pages/Shell.tsx
+msgid "Sending"
+msgstr ""
 
 #: src/components/AskCard.tsx
 msgid "Sending…"
@@ -3764,6 +3927,7 @@ msgid "Shape"
 msgstr "Şekil"
 
 #: src/pages/Shell.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Share"
 msgstr ""
 
@@ -3782,6 +3946,10 @@ msgstr "Paylaşılan belgeler"
 
 #: src/pages/shell/bot-panel.tsx
 msgid "Shared identity and setup, with a private conversation and private computer for each teammate."
+msgstr ""
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Shared setup"
 msgstr ""
 
 #: src/components/computer/TerminalApp.tsx
@@ -3899,6 +4067,10 @@ msgstr "Bu yanıtı seslendir"
 msgid "Speech model"
 msgstr "Konuşma modeli"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Start fresh"
+msgstr ""
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Start recording"
 msgstr "Kaydı başlat"
@@ -3921,6 +4093,10 @@ msgstr "Adımlar"
 #: src/pages/Shell.tsx
 msgid "Stop"
 msgstr "Durdur"
+
+#: src/pages/Shell.tsx
+msgid "Stop project"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Stop speaking"
@@ -4032,6 +4208,7 @@ msgid "Test"
 msgstr "Dene"
 
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Test run"
 msgstr ""
 
@@ -4136,6 +4313,7 @@ msgid "Timezone"
 msgstr "Saat dilimi"
 
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Title"
 msgstr "Başlık"
 
@@ -4211,6 +4389,14 @@ msgstr "Sesi aç"
 #: src/pages/BotContextMenu.tsx
 msgid "Unpin"
 msgstr "Sabitlemeyi kaldır"
+
+#: src/pages/Shell.tsx
+msgid "Unpublish"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "Unpublished"
+msgstr ""
 
 #. placeholder {0}: pending.file.name
 #: src/pages/Shell.tsx
@@ -4333,6 +4519,10 @@ msgstr ""
 #: src/pages/RoutineRunHistory.tsx
 msgid "View chat"
 msgstr "Sohbeti görüntüle"
+
+#: src/components/AskCard.tsx
+msgid "View the full request"
+msgstr ""
 
 #: src/pages/SettingsOverlay.tsx
 #: src/pages/Shell.tsx

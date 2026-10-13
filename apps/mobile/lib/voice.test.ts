@@ -106,6 +106,29 @@ describe("mobile speech", () => {
     await expect(playMpeg(new Uint8Array([1, 2, 3]))).resolves.toBeUndefined();
   });
 
+  it("reports playback position so a timed transcript can follow along", async () => {
+    class TickingAudio {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      ontimeupdate: (() => void) | null = null;
+      currentTime = 0;
+
+      async play() {
+        for (const time of [0.4, 1.2]) {
+          this.currentTime = time;
+          this.ontimeupdate?.();
+        }
+        this.onended?.();
+      }
+    }
+    vi.stubGlobal("Audio", TickingAudio);
+    const seen: number[] = [];
+
+    await playMpeg(new Uint8Array([1, 2, 3]), { onProgress: (seconds) => seen.push(seconds) });
+
+    expect(seen).toEqual([0.4, 1.2]);
+  });
+
   it("rejects oversized audio without waiting for response cancellation", async () => {
     const cancel = vi.fn(() => new Promise<void>(() => undefined));
     vi.stubGlobal(

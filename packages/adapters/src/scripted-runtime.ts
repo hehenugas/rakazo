@@ -99,6 +99,7 @@ export class ScriptedAgentRuntime implements AgentRuntime {
             text: turn.ask.text,
             detail: turn.ask.detail,
             actions: turn.ask.actions,
+            appConnect: turn.ask.appConnect,
           };
           return;
         }
@@ -162,6 +163,46 @@ export function inferScript(
       },
     ];
   }
+  const projectCreate = /create project titled\s+(.+?)\s+with objective\s+([\s\S]+)$/i.exec(prompt);
+  if (projectCreate) {
+    return [
+      {
+        assistant: "setting up that project.",
+        toolCalls: [
+          {
+            name: "project_create",
+            args: {
+              title: projectCreate[1]?.trim(),
+              objective: projectCreate[2]?.trim(),
+              plan: ["Plan the work", "Run the tasks", "Report the result"],
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  // Orchestrator turn: "start project task project:<id> assignee:<bot> do: <work>".
+  const projectTask =
+    /start project task\s+project:(\S+)(?:\s+assignee:(.+?))?\s+do:\s*([\s\S]+)$/i.exec(prompt);
+  if (projectTask) {
+    return [
+      {
+        assistant: "starting that task now.",
+        toolCalls: [
+          {
+            name: "project_task_add",
+            args: {
+              project_id: projectTask[1],
+              prompt: projectTask[3]?.trim(),
+              ...(projectTask[2] ? { assignee: projectTask[2].trim() } : {}),
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
   if (lower.includes("message the bot named") || lower.includes("message bot named")) {
     const name = namedBot(prompt) ?? "Peer";
     const message =
@@ -200,6 +241,61 @@ export function inferScript(
               prompt: "Add a README with setup instructions",
               repository: "https://github.com/example/demo",
               openPr: true,
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.includes("build a slide deck")) {
+    return [
+      {
+        assistant: "your deck is ready.",
+        toolCalls: [
+          {
+            name: "presentation_save",
+            args: {
+              title: "Launch plan",
+              slides: [
+                {
+                  title: "Why now",
+                  bullets: ["Market is ready", "Team is ready"],
+                  notes: "Open here",
+                },
+                { title: "The plan", bullets: ["Ship Friday", "Review Monday"] },
+                { title: "Asks", bullets: ["Budget", "Two engineers"] },
+              ],
+            },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.includes("draft a formatted email")) {
+    return [
+      {
+        assistant: "here is a formatted draft you can edit before sending.",
+        toolCalls: [
+          {
+            name: "draft_action_create",
+            args: {
+              provider: "gmail",
+              action: "send_email",
+              title: "Launch update",
+              fields: [
+                { key: "to", label: "To", value: "team@example.test" },
+                { key: "cc", label: "Cc", value: "lead@example.test" },
+                { key: "subject", label: "Subject", value: "Launch update" },
+                {
+                  key: "body",
+                  label: "Body",
+                  value:
+                    "# Status\n\nWe are **on track** for Friday.\n\n- Docs done\n- Tests green",
+                  multiline: true,
+                },
+              ],
             },
           },
         ],
@@ -368,6 +464,22 @@ code-b
             { id: "choice-3", label: "Toronto" },
             { id: "choice-4", label: "Lisbon" },
           ],
+        },
+      },
+    ];
+  }
+  const connectApp = /\bsign in to (\w[\w .-]{0,40}?)(?: to continue|\.|$)/i.exec(prompt)?.[1];
+  if (connectApp && lower.includes("needs sign-in")) {
+    return [
+      {
+        assistant: `i need ${connectApp} before i can continue.`,
+        ask: {
+          text: `Connect ${connectApp} to continue`,
+          actions: [
+            { id: "connected", label: "I connected it" },
+            { id: "skip", label: "Skip" },
+          ],
+          appConnect: { app: connectApp },
         },
       },
     ];
@@ -647,11 +759,17 @@ code-b
   ];
 }
 
+/** A delegating turn carries the child's prompt as payload; it must not trigger on that text. */
+function isProjectDelegation(prompt: string): boolean {
+  return /start project task\s+project:/i.test(prompt);
+}
+
 function shouldFail(prompt: string): boolean {
-  return prompt.toLowerCase().includes("fail this run");
+  return !isProjectDelegation(prompt) && prompt.toLowerCase().includes("fail this run");
 }
 
 function shouldHang(prompt: string): boolean {
+  if (isProjectDelegation(prompt)) return false;
   const lower = prompt.toLowerCase();
   return (
     lower.includes("keep working") ||

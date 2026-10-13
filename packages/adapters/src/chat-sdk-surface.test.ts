@@ -313,6 +313,17 @@ describe("ChatSdkMessagingSurface outbound", () => {
     expect((adapter.postMessage as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe("mock:C1:9");
   });
 
+  it("sends the platform's rewritten text, so provider rules apply to every outbound post", async () => {
+    const sanitizeOutbound = vi.fn(async (body: string) => body.replace("<!channel>", "@channel"));
+    const { surface, adapter } = createSurface({ sanitizeOutbound });
+    await surface.sendToThread({ threadId: "mock:C1:9", body: "ship it <!channel>" }, context);
+
+    expect(sanitizeOutbound).toHaveBeenCalledWith("ship it <!channel>");
+    const posted = (adapter.postMessage as ReturnType<typeof vi.fn>).mock.calls[0]![1];
+    expect(JSON.stringify(posted)).toContain("ship it @channel");
+    expect(JSON.stringify(posted)).not.toContain("<!channel>");
+  });
+
   it("prefers the platform's deterministic direct thread id", async () => {
     const { surface, adapter } = createSurface({
       directThreadId: (address) => `mock:D${address}:pinned`,

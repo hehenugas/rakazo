@@ -678,6 +678,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "write_file") return `Writing ${detail(record.path)}`;
   if (toolName === "list_files") return `Listing ${detail(record.path ?? ".")}`;
   if (toolName === "attach_file") return `Attaching ${detail(record.path)}`;
+  if (toolName === "presentation_save") return `Building slides: ${detail(record.title)}`;
   if (toolName === "open_path") return `Opening ${detail(record.path)}`;
   if (toolName === "render_plot") return "Rendering a chart";
   if (toolName === "add_mcp_server") return `Connecting MCP server: ${detail(record.name)}`;
@@ -872,6 +873,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
           options,
         };
       }
+      if (tool.name === "request_app_connection") {
+        return { app: String(raw.app ?? "").trim(), reason: String(raw.reason ?? "").trim() };
+      }
       if (tool.name === "request_secret") {
         return prepareRequestSecretArguments(raw);
       }
@@ -1000,6 +1004,26 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
             });
             return {
               content: [{ type: "text", text: "Waiting for the user's choice." }],
+              details: args,
+              terminate: true,
+            };
+          }
+          if (tool.name === "request_app_connection") {
+            const app = String(args.app ?? "").trim();
+            if (!app) throw new Error("request_app_connection requires an app name");
+            host.pausePending = true;
+            host.queue.push({
+              type: "ask",
+              text: `Connect ${app} to continue`,
+              detail: String(args.reason ?? "").trim() || undefined,
+              actions: [
+                { id: "connected", label: "I connected it" },
+                { id: "skip", label: "Skip" },
+              ],
+              appConnect: { app },
+            });
+            return {
+              content: [{ type: "text", text: "Waiting for the user to connect the app." }],
               details: args,
               terminate: true,
             };
@@ -1372,6 +1396,12 @@ function builtinParameters(tool: ConnectorTool) {
         maxItems: 4,
         uniqueItems: true,
       }),
+    });
+  }
+  if (tool.name === "request_app_connection") {
+    return Type.Object({
+      app: Type.String({ minLength: 1, maxLength: 80 }),
+      reason: Type.Optional(Type.String({ maxLength: 240 })),
     });
   }
   if (tool.name === "remember") {

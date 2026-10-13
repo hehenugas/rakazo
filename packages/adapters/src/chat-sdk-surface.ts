@@ -51,6 +51,8 @@ export interface MessagingPlatform {
     raw: unknown,
     base: MessagingInboundMessage,
   ) => Partial<MessagingInboundMessage>;
+  /** Platform-specific rewrite of outbound text (for example Slack mention rules). */
+  sanitizeOutbound?: (body: string) => Promise<string> | string;
 }
 
 /**
@@ -135,7 +137,11 @@ export class ChatSdkMessagingSurface implements MessagingSurface {
     _context: AdapterContext,
   ): Promise<MessagingSendResult> {
     await this.ensureInitialized();
-    const sent = await this.chat.thread(request.threadId).post(request.body);
+    const platform = this.byProvider.get(providerOfThreadId(request.threadId));
+    const body = platform?.sanitizeOutbound
+      ? await platform.sanitizeOutbound(request.body)
+      : request.body;
+    const sent = await this.chat.thread(request.threadId).post(body);
     const handle = "id" in sent && typeof sent.id === "string" ? sent.id : "";
     return { handle };
   }

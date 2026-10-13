@@ -6,6 +6,12 @@ import type { Adapter } from "chat";
 import { createLarkAdapter, Domain } from "chat-adapter-lark";
 import { createSendblueAdapter } from "chat-adapter-sendblue";
 import type { MessagingPlatform } from "./chat-sdk-surface.js";
+import {
+  createSlackUserGroupLookup,
+  hasSlackUserGroupMention,
+  neutralizeSlackBroadcasts,
+  sanitizeSlackOutbound,
+} from "./slack-mentions.js";
 import { isVitestRuntime } from "./test-runtime.js";
 
 /**
@@ -30,6 +36,20 @@ export interface MessagingEnvironmentValues {
   larkVerificationToken?: string | undefined;
   larkEncryptKey?: string | undefined;
   larkDomain?: string | undefined;
+}
+
+/**
+ * Slack outbound text: broadcasts never ping, and a user-group mention goes out only when Slack
+ * lists that group. The group list is fetched lazily, so sends without a group mention cost nothing.
+ */
+export function slackOutboundSanitizer(botToken: string): (body: string) => Promise<string> {
+  const userGroups = createSlackUserGroupLookup({ botToken });
+  return async (body) => {
+    const text = neutralizeSlackBroadcasts(body);
+    // Ask Slack only when a group mention is present (a nested one is caught by the loop below).
+    const allowed = hasSlackUserGroupMention(text) ? await userGroups() : new Set<string>();
+    return sanitizeSlackOutbound(text, allowed);
+  };
 }
 
 export function messagingEnvFromProcess(
@@ -127,6 +147,7 @@ export function messagingPlatformsFromEnv(
         signingSecret: env.slackSigningSecret,
       }),
       enrichTeamRoom: enrichSlackTeamRoom,
+      sanitizeOutbound: slackOutboundSanitizer(env.slackBotToken),
     });
   }
 

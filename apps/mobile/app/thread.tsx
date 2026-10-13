@@ -14,6 +14,7 @@ import {
 import type { ThreadItem } from "@rakazo/core";
 import {
   abortableDelay,
+  activeTranscriptSegment,
   attachmentsForThread,
   buildComposerMentionOptions,
   type ComposerMention,
@@ -30,6 +31,7 @@ import {
   resolveComposerSendPlan,
   SLASH_ACTIONS,
   type SlashActionId,
+  seekableSegments,
   selectedAskActionLabel,
   serializeComposerPrompt,
   truncateSlashDescription,
@@ -133,6 +135,7 @@ import {
   pickFromLibrary,
   takePhoto,
 } from "../lib/pick-attachments";
+import { projectStatusColor, projectStatusLabel } from "../lib/project-status";
 import { threadRefreshDelayMs } from "../lib/refresh";
 import {
   getCachedResponseStreamingEnabled,
@@ -145,9 +148,29 @@ import {
 } from "../lib/thread-scroll";
 import { playMpeg, speakText } from "../lib/voice";
 import { probeProviderTranscribe, resolveVoiceCallPlan } from "../lib/voice-call-entry";
+import {
+  type MemoRecording,
+  type MemoSubmission,
+  type MemoTarget,
+  memoTranscriptionAvailable,
+  productionMemoDeps,
+  type RecordedMemo,
+  sendVoiceMemo,
+  startMemoRecording,
+} from "../lib/voice-memo";
 
 type PendingAttachment = PickedAttachment & { threadKey: string };
 type AskAction = NonNullable<Extract<MessageBlock, { kind: "ask" }>["actions"]>[number];
+type PendingMemoSubmission = {
+  target: MemoTarget;
+  memo: RecordedMemo;
+  options: { transcribe: boolean; reply?: { messageId: string; quote?: string } };
+  submission: MemoSubmission;
+};
+
+function memoTargetKey(target: MemoTarget): string {
+  return "botId" in target ? `bot:${target.botId}` : `group:${target.groupId}`;
+}
 
 function newClientNonce(): string {
   const webCrypto = globalThis.crypto;
@@ -366,6 +389,13 @@ function Thread() {
   const [quoteTarget, setQuoteTarget] = useState<MobileMessage | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [memoState, setMemoState] = useState<"idle" | "recording" | "sending">("idle");
+  const memoRecording = useRef<MemoRecording | null>(null);
+  const pendingMemoSubmissions = useRef(new Map<string, PendingMemoSubmission>());
+  const pendingMemoKey = groupId ? `group:${groupId}` : botId ? `bot:${botId}` : null;
+  const hasPendingMemo = pendingMemoKey
+    ? pendingMemoSubmissions.current.has(pendingMemoKey)
+    : false;
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownArtifactPreviewTarget | null>(
@@ -1343,17 +1373,12 @@ function Thread() {
     setSending(true);
     setError(null);
     try {
-      await rpc("threads/updateDraftAction", {
+      // The server freezes these fields and sends exactly them, once.
+      await rpc("threads/submitDraftAction", {
         ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
         messageId: draftMessage.id,
         draftId: block.draftId,
         fields: block.fields,
-        status: "submitted",
-      });
-      await rpc("threads/send", {
-        ...(targetGroupId ? { groupId: targetGroupId } : { botId: targetBotId! }),
-        clientNonce: newClientNonce(),
-        text: draftExecutionPrompt(block),
       });
       await refresh();
     } catch (err) {
@@ -1394,6 +1419,110 @@ function Thread() {
       ),
     [botId, snap?.members],
   );
+
+  // Leaving the thread drops a recording in progress rather than sending it.
+  useEffect(
+    () => () => {
+      const recording = memoRecording.current;
+      memoRecording.current = null;
+      if (recording) {
+        void recording.cancel().catch(() => undefined);
+        setMemoState("idle");
+      }
+    },
+    [botId, groupId],
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") return;
+      const recording = memoRecording.current;
+      if (!recording) return;
+      memoRecording.current = null;
+      setMemoState("idle");
+      void recording.cancel().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  async function deliverPendingVoiceMemo(pending: PendingMemoSubmission) {
+    setMemoState("sending");
+    setError(null);
+    try {
+      await sendVoiceMemo(
+        productionMemoDeps,
+        pending.target,
+        pending.memo,
+        pending.options,
+        pending.submission,
+      );
+      pendingMemoSubmissions.current.delete(memoTargetKey(pending.target));
+      setReplyTarget(null);
+      setReplyQuote(null);
+      if (
+        isCurrentTarget(
+          "botId" in pending.target ? pending.target.botId : undefined,
+          "groupId" in pending.target ? pending.target.groupId : undefined,
+        )
+      ) {
+        await refresh().catch(() => undefined);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Could not send the voice memo"));
+    } finally {
+      setMemoState("idle");
+    }
+  }
+
+  async function finishVoiceMemo(target: MemoTarget) {
+    const recording = memoRecording.current;
+    if (!recording) return;
+    memoRecording.current = null;
+    setMemoState("sending");
+    try {
+      const memo = await recording.stop();
+      if (!memo) return;
+      const transcribe = await memoTranscriptionAvailable();
+      const pending: PendingMemoSubmission = {
+        target,
+        memo,
+        options: {
+          transcribe,
+          reply: replyTarget
+            ? { messageId: replyTarget.id, quote: replyQuote ?? undefined }
+            : undefined,
+        },
+        submission: { clientNonce: productionMemoDeps.newNonce() },
+      };
+      pendingMemoSubmissions.current.set(memoTargetKey(target), pending);
+      await deliverPendingVoiceMemo(pending);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Could not send the voice memo"));
+    } finally {
+      setMemoState("idle");
+    }
+  }
+
+  async function toggleVoiceMemo() {
+    const target: MemoTarget | null = groupId ? { groupId } : botId ? { botId } : null;
+    if (!target || sending || memoState === "sending") return;
+    const pending = pendingMemoSubmissions.current.get(memoTargetKey(target));
+    if (pending) {
+      await deliverPendingVoiceMemo(pending);
+      return;
+    }
+    if (memoState === "recording") {
+      await finishVoiceMemo(target);
+      return;
+    }
+    setError(null);
+    try {
+      memoRecording.current = await startMemoRecording(() => void finishVoiceMemo(target));
+      setMemoState("recording");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Could not record a voice memo"));
+    }
+  }
 
   async function startVoiceCall() {
     const targetBotId = botId;
@@ -2266,7 +2395,46 @@ function Thread() {
               }}
             />
           </View>
-          {botId && !onCall && draft.trim().length === 0 ? (
+          {(botId || groupId) && !onCall && (draft.trim().length === 0 || hasPendingMemo) ? (
+            <Pressable
+              accessibilityLabel={
+                memoState === "recording"
+                  ? t("Stop voice memo")
+                  : hasPendingMemo
+                    ? t("Retry voice memo")
+                    : t("Record voice memo")
+              }
+              accessibilityState={{ busy: memoState === "sending" }}
+              disabled={sending || memoState === "sending"}
+              onPress={() => void toggleVoiceMemo()}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: memoState === "recording" ? tokens.destructive : tokens.border,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: memoState === "sending" ? 0.5 : 1,
+              }}
+            >
+              <NativeSymbol
+                ios={
+                  memoState === "recording"
+                    ? "stop.fill"
+                    : hasPendingMemo
+                      ? "arrow.clockwise"
+                      : "mic"
+                }
+                android={
+                  memoState === "recording" ? "stop" : hasPendingMemo ? "refresh" : "mic-outline"
+                }
+                size={memoState === "recording" ? 15 : 18}
+                color={memoState === "recording" ? tokens.destructive : tokens.mutedForeground}
+              />
+            </Pressable>
+          ) : null}
+          {botId && memoState === "idle" && !onCall && draft.trim().length === 0 ? (
             <Pressable
               accessibilityLabel={t("Call")}
               onPress={() => void startVoiceCall()}
@@ -2630,21 +2798,6 @@ function previewMessageText(message: MobileMessage): string {
   return t("Message");
 }
 
-function draftExecutionPrompt(block: Extract<MessageBlock, { kind: "draft_action" }>): string {
-  const body = block.fields
-    .map((field) => `- ${field.label} (${field.key}): ${field.value}`)
-    .join("\n");
-  return [
-    "Execute this submitted draft action now.",
-    `Provider: ${block.provider}`,
-    `Action: ${block.action}`,
-    "Fields:",
-    body,
-    "",
-    "Use the connected provider/tool for the action. This submission is an explicit user request to proceed, but continue to follow the configured approval and Auto Review policy for consequential external actions.",
-  ].join("\n");
-}
-
 const VoiceMemoRow = memo(function VoiceMemoRow({
   target,
   block,
@@ -2657,6 +2810,11 @@ const VoiceMemoRow = memo(function VoiceMemoRow({
   const tokens = mobileTokens();
   const { t } = useI18n();
   const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [position, setPosition] = useState<number | null>(null);
+  const [seekable, setSeekable] = useState(false);
+  const seekPlayback = useRef<((seconds: number) => void) | null>(null);
+  const segments = seekableSegments(block.transcript);
+  const activeSegment = position === null ? -1 : activeTranscriptSegment(segments, position);
 
   async function play() {
     if (state === "loading") return;
@@ -2667,10 +2825,21 @@ const VoiceMemoRow = memo(function VoiceMemoRow({
         artifactId: block.artifactId,
       });
       const bytes = decodeAttachmentBase64(artifact.contentBase64);
-      await playMpeg(bytes);
+      setState("playing");
+      await playMpeg(bytes, {
+        onProgress: setPosition,
+        onSeekReady: (seek) => {
+          seekPlayback.current = seek;
+          setSeekable(true);
+        },
+      });
       setState("idle");
     } catch {
       setState("error");
+    } finally {
+      seekPlayback.current = null;
+      setSeekable(false);
+      setPosition(null);
     }
   }
 
@@ -2711,6 +2880,30 @@ const VoiceMemoRow = memo(function VoiceMemoRow({
       </Pressable>
       {state === "error" ? (
         <Text style={{ color: tokens.destructive, fontSize: 12 }}>{t("Could not play memo.")}</Text>
+      ) : null}
+      {segments.length > 0 ? (
+        <Text style={{ color: tokens.mutedForeground, fontSize: 13.5, lineHeight: 20 }}>
+          {segments.map((segment, index) => (
+            <Text
+              key={index}
+              accessibilityRole={seekable ? "button" : undefined}
+              accessibilityLabel={seekable ? segment.text : undefined}
+              onPress={seekable ? () => seekPlayback.current?.(segment.start) : undefined}
+              style={
+                index === activeSegment
+                  ? { color: tokens.foreground, fontWeight: "600" }
+                  : undefined
+              }
+            >
+              {index > 0 ? " " : ""}
+              {segment.text}
+            </Text>
+          ))}
+        </Text>
+      ) : block.transcript?.text ? (
+        <Text style={{ color: tokens.mutedForeground, fontSize: 13.5, lineHeight: 20 }}>
+          {block.transcript.text}
+        </Text>
       ) : null}
     </View>
   );
@@ -2773,6 +2966,7 @@ const MessageBubble = memo(function MessageBubble({
   const tokens = mobileTokens();
   const { t } = useI18n();
   const [peerExpanded, setPeerExpanded] = useState(false);
+  const router = useRouter();
   const artifactTarget: MobileArtifactTarget = groupId ? { groupId } : { botId };
   const cardBotId = message.botId ?? botId;
   const appConnectBlocks = message.blocks.filter(
@@ -2786,6 +2980,9 @@ const MessageBubble = memo(function MessageBubble({
   const draftActionBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "draft_action" }> =>
       block.kind === "draft_action",
+  );
+  const deckBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "deck" }> => block.kind === "deck",
   );
   const projectBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "project" }> => block.kind === "project",
@@ -3100,6 +3297,159 @@ const MessageBubble = memo(function MessageBubble({
       </View>
     );
   }
+  const richCards = (
+    <>
+      {draftActionBlocks.map((block) => (
+        <View
+          key={block.draftId}
+          style={{
+            width: "100%",
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            backgroundColor: tokens.muted,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            gap: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text
+              style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600", flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {block.title}
+            </Text>
+            <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
+              {block.provider} · {block.action}
+            </Text>
+          </View>
+          {block.fields.map((field) => (
+            <View key={field.key} style={{ gap: 2 }}>
+              <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>{field.label}</Text>
+              <Text style={{ color: tokens.foreground, fontSize: 13.5 }} selectable>
+                {field.value}
+              </Text>
+            </View>
+          ))}
+          <Text
+            style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
+          >
+            {block.status}
+          </Text>
+          {block.status === "draft" && onDraftSubmit ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("Send draft")}
+              onPress={() => void onDraftSubmit(message, block)}
+              style={{
+                alignSelf: "flex-start",
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: tokens.border,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                backgroundColor: tokens.background,
+              }}
+            >
+              <Text style={{ color: tokens.foreground, fontSize: 13.5, fontWeight: "600" }}>
+                {t("Send")}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ))}
+      {projectBlocks.map((block) => (
+        <Pressable
+          key={block.projectId}
+          accessibilityRole="button"
+          accessibilityLabel={`${block.title}, ${projectStatusLabel(block.status, t)}`}
+          onPress={() =>
+            router.push({
+              pathname: "/project",
+              params: { botId: cardBotId, projectId: block.projectId, botName },
+            })
+          }
+          style={({ pressed }) => ({
+            width: "100%",
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            backgroundColor: tokens.muted,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            gap: 6,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text
+            style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}
+            numberOfLines={1}
+          >
+            {block.title}
+          </Text>
+          <Text style={{ color: projectStatusColor(block.status, tokens), fontSize: 12 }}>
+            {t("Project")} · {projectStatusLabel(block.status, t)}
+            {block.progress && block.progress.total > 0
+              ? ` · ${t("{completed} of {total} tasks done", {
+                  completed: block.progress.done,
+                  total: block.progress.total,
+                })}`
+              : ""}
+          </Text>
+          {block.objective ? (
+            <Text style={{ color: tokens.foreground, fontSize: 13.5 }} numberOfLines={3}>
+              {block.objective}
+            </Text>
+          ) : null}
+        </Pressable>
+      ))}
+      {deckBlocks.map((block) => (
+        <View
+          key={block.artifactId}
+          accessibilityRole="summary"
+          accessibilityLabel={`${block.title}, ${t("{count} slides", { count: block.slideCount })}`}
+          style={{
+            width: "100%",
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            backgroundColor: tokens.muted,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}
+            numberOfLines={1}
+          >
+            {block.title}
+          </Text>
+          <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
+            {t("{count} slides", { count: block.slideCount })}
+          </Text>
+          {block.slides.slice(0, 5).map((slide, index) => (
+            <Text
+              key={index}
+              style={{ color: tokens.foreground, fontSize: 13.5 }}
+              numberOfLines={1}
+            >
+              {index + 1}. {slide.title}
+            </Text>
+          ))}
+        </View>
+      ))}
+      {voiceMemoBlocks.map((block) => (
+        <VoiceMemoRow
+          key={block.artifactId}
+          target={artifactTarget}
+          block={block}
+          userSent={message.role === "user"}
+        />
+      ))}
+    </>
+  );
   const askBlock = message.blocks.find(
     (block) => block.kind === "ask" && Boolean(block.actions?.length),
   );
@@ -3126,18 +3476,12 @@ const MessageBubble = memo(function MessageBubble({
             </Text>
           ) : null}
           {askBlock.detail ? (
-            <Text
-              {...(askBlock.text ? {} : actionProps)}
-              style={{
-                color: tokens.mutedForeground,
-                marginTop: askBlock.text ? 8 : 0,
-                fontSize: 12.5,
-                fontFamily: "Menlo",
-                lineHeight: 20,
-              }}
-            >
-              {askBlock.detail}
-            </Text>
+            <ApprovalDetail
+              detail={askBlock.detail}
+              collapsible={isApprovalAskBlock(askBlock)}
+              topGap={askBlock.text ? 8 : 0}
+              actionProps={askBlock.text ? {} : actionProps}
+            />
           ) : null}
           {askBlock.status === "answered" ? (
             <Text
@@ -3190,108 +3534,15 @@ const MessageBubble = memo(function MessageBubble({
             onAccessibilityAction={actionProps.onAccessibilityAction}
           />
         ))}
-        {draftActionBlocks.map((block) => (
-          <View
-            key={block.draftId}
-            style={{
-              width: "100%",
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: tokens.muted,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              gap: 8,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text
-                style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600", flexShrink: 1 }}
-                numberOfLines={1}
-              >
-                {block.title}
-              </Text>
-              <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
-                {block.provider} · {block.action}
-              </Text>
-            </View>
-            {block.fields.map((field) => (
-              <View key={field.key} style={{ gap: 2 }}>
-                <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>{field.label}</Text>
-                <Text style={{ color: tokens.foreground, fontSize: 13.5 }} selectable>
-                  {field.value}
-                </Text>
-              </View>
-            ))}
-            <Text
-              style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
-            >
-              {block.status}
-            </Text>
-            {block.status === "draft" && onDraftSubmit ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("Send draft")}
-                onPress={() => void onDraftSubmit(message, block)}
-                style={{
-                  alignSelf: "flex-start",
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: tokens.border,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  backgroundColor: tokens.background,
-                }}
-              >
-                <Text style={{ color: tokens.foreground, fontSize: 13.5, fontWeight: "600" }}>
-                  {t("Send")}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ))}
-        {projectBlocks.map((block) => (
-          <View
-            key={block.projectId}
-            style={{
-              width: "100%",
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: tokens.muted,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              gap: 6,
-            }}
-          >
-            <Text
-              style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}
-              numberOfLines={1}
-            >
-              {block.title}
-            </Text>
-            <Text
-              style={{ color: tokens.mutedForeground, fontSize: 12, textTransform: "capitalize" }}
-            >
-              {t("Project")} · {block.status}
-            </Text>
-            {block.objective ? (
-              <Text style={{ color: tokens.foreground, fontSize: 13.5 }} numberOfLines={3}>
-                {block.objective}
-              </Text>
-            ) : null}
-          </View>
-        ))}
-        {voiceMemoBlocks.map((block) => (
-          <VoiceMemoRow
-            key={block.artifactId}
-            target={artifactTarget}
-            block={block}
-            userSent={message.role === "user"}
-          />
-        ))}
+        {richCards}
       </View>
     );
+  }
+  if (
+    draftActionBlocks.length + projectBlocks.length + deckBlocks.length + voiceMemoBlocks.length >
+    0
+  ) {
+    return <View style={{ gap: 8, width: "100%" }}>{richCards}</View>;
   }
   const attachments = message.blocks.filter(
     (block) => block.kind === "image" || block.kind === "file",
@@ -3604,6 +3855,53 @@ function AgentEventLabel({
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+/** Approval requests lead with the summary; the full request opens on demand. */
+function ApprovalDetail({
+  detail,
+  collapsible,
+  topGap,
+  actionProps,
+}: {
+  detail: string;
+  collapsible: boolean;
+  topGap: number;
+  actionProps: MessageActionProps;
+}) {
+  const tokens = useMobileTokens();
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const body = (
+    <Text
+      {...actionProps}
+      style={{
+        color: tokens.mutedForeground,
+        marginTop: topGap,
+        fontSize: 12.5,
+        fontFamily: "Menlo",
+        lineHeight: 20,
+      }}
+    >
+      {detail}
+    </Text>
+  );
+  if (!collapsible) return body;
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        style={{ marginTop: topGap, alignSelf: "flex-start", paddingVertical: 4 }}
+      >
+        <Text style={{ color: tokens.mutedForeground, fontSize: 13, fontWeight: "600" }}>
+          {open ? t("Hide the full request") : t("View the full request")}
+        </Text>
+      </Pressable>
+      {open ? body : null}
+    </View>
   );
 }
 

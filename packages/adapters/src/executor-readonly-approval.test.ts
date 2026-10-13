@@ -60,7 +60,10 @@ function fixture({
   builtin = false,
   existingSharedMemory,
   advanceRevisionAfterRead = false,
+  approvedEmail,
 }: {
+  /** Start the run as if the user had just submitted this email draft card. */
+  approvedEmail?: { to: string; subject: string; body: string };
   builtin?: boolean;
   existingSharedMemory?: string;
   /** Simulates another writer landing between the save's read and its commit. */
@@ -121,6 +124,7 @@ function fixture({
     status: "queued",
     trigger,
     leaseFence: 0,
+    sourceMessageId: approvedEmail ? "message-2" : null,
   };
   const externalEffect = {
     findMany: vi.fn(
@@ -188,7 +192,33 @@ function fixture({
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     thread: { findUniqueOrThrow: vi.fn(async () => ({ id: run.threadId, groupId: null })) },
-    message: { findMany: vi.fn(async () => []) },
+    message: {
+      findMany: vi.fn(async () => []),
+      findUnique: vi.fn(async () => ({
+        clientNonce: approvedEmail ? "draft-action:draft-1" : null,
+      })),
+      findFirst: vi.fn(async ({ where }: { where: { role?: string } }) => {
+        if (!approvedEmail) return null;
+        if (where.role === "user") return { clientNonce: "draft-action:draft-1" };
+        return {
+          blocks: [
+            {
+              kind: "draft_action",
+              draftId: "draft-1",
+              provider: "gmail",
+              action: "send_email",
+              title: "Hello",
+              status: "submitted",
+              fields: [
+                { key: "to", label: "To", value: approvedEmail.to },
+                { key: "subject", label: "Subject", value: approvedEmail.subject },
+                { key: "body", label: "Body", value: approvedEmail.body, multiline: true },
+              ],
+            },
+          ],
+        };
+      }),
+    },
     task: { findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt })) },
     connection: { findMany: vi.fn(async () => []) },
     spaceModelPreference: { findFirst: vi.fn(async () => null) },
@@ -673,5 +703,39 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.execute).not.toHaveBeenCalled();
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("email sent from a submitted draft", () => {
+  const approvedEmail = { to: "client@example.test", subject: "Hello", body: "Hi there" };
+  const send = (args: Record<string, unknown>) => [{ args, executionId: "send-1" }];
+
+  it("sends the approved email unchanged", async () => {
+    const f = fixture({ name: "GMAIL_SEND_EMAIL", readOnly: false, approvedEmail });
+    f.setCalls(
+      send({ recipient_email: "client@example.test", subject: "Hello", body: "Hi there" }),
+    );
+    await f.run();
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a changed recipient or body before anything is sent", async () => {
+    const f = fixture({ name: "GMAIL_SEND_EMAIL", readOnly: false, approvedEmail });
+    f.setCalls(
+      send({ recipient_email: "someone-else@example.test", subject: "Hello", body: "Changed" }),
+    );
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({
+      error: expect.stringContaining("exactly as the user approved it"),
+    });
+    expect(JSON.stringify(f.results[0])).toContain("to, body");
+  });
+
+  it("does not constrain email sends in ordinary runs", async () => {
+    const f = fixture({ name: "GMAIL_SEND_EMAIL", readOnly: false });
+    f.setCalls(send({ recipient_email: "anyone@example.test", subject: "Free", body: "Free" }));
+    await f.run();
+    expect(f.execute).toHaveBeenCalledOnce();
   });
 });

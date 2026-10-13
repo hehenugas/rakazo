@@ -143,7 +143,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
   await captureScreenshot(page, testInfo, "10-routine-created");
 
   await page.getByRole("button", { name: "Connect apps" }).click();
-  await expect(page.getByPlaceholder("Search apps")).toBeVisible();
+  await expect(page.getByPlaceholder("Search plugins")).toBeVisible();
   const featured = page.getByTestId("featured-connectors");
   await expect(featured).toContainText(
     /Gmail[\s\S]*Google Calendar[\s\S]*Google Drive[\s\S]*Slack[\s\S]*Notion/,
@@ -190,7 +190,7 @@ test("takeover, routine, plugins, and export are reachable", async ({ page }, te
 
   await page.getByRole("button", { name: "Close apps" }).click();
   await page.getByRole("button", { name: "Connect apps" }).click();
-  await expect(page.getByPlaceholder("Search apps")).toBeVisible();
+  await expect(page.getByPlaceholder("Search plugins")).toBeVisible();
   const gmailTileAgain = page.getByTestId("connection-tile-gmail");
   await expect(gmailTileAgain.getByRole("button", { name: "Added", exact: true })).toBeVisible();
   await gmailTileAgain.click();

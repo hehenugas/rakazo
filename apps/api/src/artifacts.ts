@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import type { ArtifactStore } from "@rakazo/adapter-kit";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor, VoiceTranscript } from "@rakazo/contracts";
 import { ATTACHMENT_MAX_COUNT } from "@rakazo/contracts";
 import {
   AttachmentValidationError,
+  attachmentKindForMimeType,
   decodeAttachmentBase64,
   messageBlockForArtifact,
   promptTextForAttachments,
@@ -36,17 +38,52 @@ export async function createOwnedArtifact(
     description?: string;
     mimeType: string;
     contentBase64: string;
+    transcript?: VoiceTranscript;
   },
 ) {
   validateAttachmentMimeType(input.mimeType);
   const bytes = decodeAttachmentBase64(input.contentBase64);
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const isMemoSubmission = /^voice-memo-send-[a-zA-Z0-9_-]{1,64}\.m4a$/.test(input.name);
+  const memoScope = {
+    spaceId: actor.spaceId,
+    userId: actor.userId,
+    botId: input.botId,
+    groupId: input.groupId ?? null,
+    name: input.name,
+  };
+  const existingMemo = isMemoSubmission
+    ? await deps.prisma.artifact.findFirst({
+        where: memoScope,
+        orderBy: { version: "asc" },
+      })
+    : null;
+  if (existingMemo) {
+    if (existingMemo.hash !== hash || existingMemo.mimeType !== input.mimeType) {
+      throw new ORPCError("CONFLICT", {
+        message: "This voice memo submission key was already used.",
+      });
+    }
+    return {
+      id: existingMemo.id,
+      botId: existingMemo.botId,
+      groupId: existingMemo.groupId,
+      runId: existingMemo.runId,
+      name: existingMemo.name,
+      description: existingMemo.description,
+      mimeType: existingMemo.mimeType,
+      size: existingMemo.size,
+      version: existingMemo.version,
+      createdAt: existingMemo.createdAt.toISOString(),
+    };
+  }
   const context = adapterContext(actor, input.botId, `artifact-create:${input.botId}`);
   const stored = await deps.artifacts.put(
     { name: input.name, mimeType: input.mimeType, bytes },
     context,
   );
-  const hash = createHash("sha256").update(bytes).digest("hex");
-  const row = await withResolvedArtifactVersion(
+  let existingStorageKey: string | undefined;
+  const result = await withResolvedArtifactVersion(
     deps.prisma,
     {
       spaceId: actor.spaceId,
@@ -55,8 +92,23 @@ export async function createOwnedArtifact(
       groupId: input.groupId,
       name: input.name,
     },
-    (tx, { rootArtifactId, version }) =>
-      tx.artifact.create({
+    async (tx, { rootArtifactId, version }) => {
+      if (isMemoSubmission) {
+        const existing = await tx.artifact.findFirst({
+          where: memoScope,
+          orderBy: { version: "asc" },
+        });
+        if (existing) {
+          existingStorageKey = existing.storageKey;
+          if (existing.hash !== hash || existing.mimeType !== input.mimeType) {
+            throw new ORPCError("CONFLICT", {
+              message: "This voice memo submission key was already used.",
+            });
+          }
+          return { row: existing, reused: true };
+        }
+      }
+      const row = await tx.artifact.create({
         data: {
           spaceId: actor.spaceId,
           userId: actor.userId,
@@ -68,14 +120,27 @@ export async function createOwnedArtifact(
           size: bytes.byteLength,
           hash,
           storageKey: stored.id,
+          // Only audio carries a transcript; ignored for other types.
+          transcript:
+            input.transcript && attachmentKindForMimeType(input.mimeType) === "voice_memo"
+              ? input.transcript
+              : undefined,
           rootArtifactId,
           version,
         },
-      }),
+      });
+      return { row, reused: false };
+    },
   ).catch(async (error) => {
-    await deps.artifacts.remove(stored.id, context).catch(() => undefined);
+    if (stored.id !== existingStorageKey) {
+      await deps.artifacts.remove(stored.id, context).catch(() => undefined);
+    }
     throw error;
   });
+  if (result.reused && result.row.storageKey !== stored.id) {
+    await deps.artifacts.remove(stored.id, context).catch(() => undefined);
+  }
+  const row = result.row;
   return {
     id: row.id,
     botId: row.botId,
@@ -488,6 +553,7 @@ type SendAttachmentRow = {
   mimeType: string;
   size: number;
   storageKey: string;
+  transcript?: unknown;
 };
 
 function normalizeAttachmentIds(artifactIds: string[] | undefined) {
@@ -508,6 +574,7 @@ function toAttachmentResolution<T extends SendAttachmentRow>(ids: string[], rows
       name: row.name,
       mimeType: row.mimeType,
       size: row.size,
+      transcript: row.transcript,
     }),
   );
   return { blocks, artifacts };

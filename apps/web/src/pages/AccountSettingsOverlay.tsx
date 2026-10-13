@@ -16,6 +16,7 @@ import { SuccessPop } from "../components/ai/primitives";
 import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
 import { SoftwareUpdateSection } from "../components/SoftwareUpdateSection";
+import { getAccentToBlack, setAccentToBlack } from "../lib/accent-to-black";
 import { authClient } from "../lib/auth";
 import { getActiveUiLocale, setUiLocale } from "../lib/i18n";
 import {
@@ -62,6 +63,8 @@ export function GeneralSettingsPanels({
     () => getResponseStreamingPreference() === "on",
   );
   const streamRepliesId = useId();
+  const [accentToBlack, setAccentToBlackState] = useState(() => getAccentToBlack());
+  const accentToBlackId = useId();
   const [showToolActivity, setShowToolActivity] = useState(
     () => getToolActivityPreference() === "on",
   );
@@ -129,6 +132,21 @@ export function GeneralSettingsPanels({
             setUiAppearance(next);
           }}
         />
+        <div className="flex items-start gap-3 pt-4">
+          <Switch
+            id={accentToBlackId}
+            data-testid="accent-to-black-toggle"
+            className="mt-0.5"
+            checked={accentToBlack}
+            onCheckedChange={(checked) => {
+              setAccentToBlackState(checked);
+              setAccentToBlack(checked);
+            }}
+          />
+          <Label htmlFor={accentToBlackId} className="text-[14px] font-normal text-foreground/75">
+            <Trans>Accent to Black</Trans>
+          </Label>
+        </div>
       </section>
 
       <section className="rounded-xl border border-border px-4 py-4">

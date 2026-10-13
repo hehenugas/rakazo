@@ -26,6 +26,7 @@ import type {
   ThreadMessage,
   ThreadSnapshot,
   VoiceStatus,
+  VoiceTranscript,
 } from "@rakazo/contracts";
 import {
   ATTACHMENT_ALLOWED_MIME_TYPES,
@@ -38,10 +39,14 @@ import {
 } from "@rakazo/contracts";
 import {
   attachmentsForThread,
+  botBubbleColors,
   buildComposerMentionOptions,
   type ComposerMention,
   clampMentionHighlightIndex,
   cronFromPreset,
+  FEATURED_CONNECTOR_IDS,
+  type FeaturedConnectorId,
+  type GrokColorDef,
   groupBotsForSidebar,
   groupVoiceChats,
   inferAttachmentMimeType,
@@ -58,6 +63,7 @@ import {
   reorderBotTo,
   resolveComposerListKey,
   resolveComposerSendPlan,
+  resolveFeaturedCatalogItem,
   resolveMentionPickerKey,
   runThreadSubscription,
   SLASH_ACTIONS,
@@ -128,6 +134,7 @@ import {
 } from "lucide-react";
 import {
   type ClipboardEvent,
+  type CSSProperties,
   type DragEvent,
   lazy,
   type MutableRefObject,
@@ -158,6 +165,7 @@ import { ComputerUpdateProgress } from "../components/ComputerUpdateProgress";
 import { CallCard } from "../components/call/CallCard";
 import { VoiceChatCard } from "../components/call/VoiceChatCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
+import { DeckCard } from "../components/DeckCard";
 import { DraftActionCard } from "../components/DraftActionCard";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import {
@@ -173,6 +181,7 @@ import { TeachComputerOverlayControl } from "../components/teach/TeachComputerOv
 import { TeachRecordingChrome, TeachStopButton } from "../components/teach/TeachRecordingChrome";
 import { VoiceMemoButton } from "../components/VoiceMemoButton";
 import { VoiceMemoCard } from "../components/VoiceMemoCard";
+import { useAccentToBlack } from "../lib/accent-to-black";
 import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { authClient } from "../lib/auth";
@@ -196,6 +205,7 @@ import {
 } from "../lib/computer-screen";
 import { publishComputerCommand } from "../lib/computer-workspace";
 import { desktopBridge } from "../lib/desktop";
+import { readFailedSends, writeFailedSends } from "../lib/failed-send-storage";
 import { scheduleFocusPrompt } from "../lib/focus-prompt";
 import { copyableMessageText } from "../lib/message-text";
 import { messageProviderLabel } from "../lib/messaging";
@@ -206,7 +216,6 @@ import {
   revokePendingAttachmentPreviews,
 } from "../lib/pending-attachments";
 import { markAfterPaint, markOnce } from "../lib/performance";
-import { readFailedSends, writeFailedSends } from "../lib/failed-send-storage";
 import { quoteDraftForSelection } from "../lib/quote-selection";
 import { getResponseStreamingEnabled, subscribeResponseStreaming } from "../lib/response-streaming";
 import type { Panel, RightPanelState } from "../lib/right-panel-state";
@@ -291,6 +300,7 @@ import {
   ChoiceCard,
   McpApprovalCard,
 } from "./shell/message-cards";
+import { RoutineContextMenu, type RoutineMenuPosition } from "./shell/routine-context-menu";
 import { SharedSetupForm, SharePanel } from "./shell/team-bot-panel";
 import { WindowChrome } from "./WindowChrome";
 
@@ -401,6 +411,9 @@ function readCollapsedSidebarSections(userId: string | null | undefined): Set<st
 function readCollapsedRosterParents(userId: string | null | undefined): Set<string> {
   return readCollapsedIdSet(collapsedRosterParentsStorageKey(userId));
 }
+
+/** Stable reference so the palette fetches the catalog once, not on every render. */
+const loadPluginCatalog = () => rpc.connections.catalog({});
 
 export function ShellPage() {
   const { t } = useLingui();
@@ -604,6 +617,12 @@ export function ShellPage() {
     commitSnapshot(update(snapshotRef.current));
   }
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [pluginsDetail, setPluginsDetail] = useState<{ connectorId: string; slug: string } | null>(
+    null,
+  );
+  const [featuredLogos, setFeaturedLogos] = useState<Partial<Record<FeaturedConnectorId, string>>>(
+    {},
+  );
   const [mcpOpen, setMcpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
@@ -707,6 +726,10 @@ export function ShellPage() {
   const [routineWebhookSecret, setRoutineWebhookSecret] = useState<string | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState<Routine | null>(null);
+  const [routineMenu, setRoutineMenu] = useState<{
+    routine: Routine;
+    position: RoutineMenuPosition;
+  } | null>(null);
   const [savingRoutine, setSavingRoutine] = useState(false);
   const [runningRoutine, setRunningRoutine] = useState(false);
   const [routineError, setRoutineError] = useState<string | null>(null);
@@ -778,6 +801,19 @@ export function ShellPage() {
     });
   const routineSaveRequest = useRef(0);
   const routineRunPending = useRef(false);
+  /** Row-menu actions reuse the editor's endpoints; a failure shows in the routines list. */
+  async function runRoutineMenuAction(routine: Routine, action: () => Promise<unknown>) {
+    setRoutineMenu(null);
+    setRoutineError(null);
+    try {
+      await action();
+      await refreshThread(routine.botId);
+    } catch (error) {
+      if (activeBotId.current === routine.botId) {
+        setRoutineError(error instanceof Error ? error.message : t`Could not update routine`);
+      }
+    }
+  }
   const bootstrappedThread = useRef<ThreadSnapshot | null>(null);
   const expandedHistoryThread = useRef<string | null>(null);
   const historyEpoch = useRef(0);
@@ -1899,6 +1935,10 @@ export function ShellPage() {
     () => userVisibleMessages(activeSnapshot?.messages ?? [], { includePeerReceipts: true }),
     [activeSnapshot?.messages],
   );
+  const chatAccent = useMemo(
+    () => (!inGroup && active ? resolvePersonaColorDef(active.id, active.color) : null),
+    [active, inGroup],
+  );
   const transcriptArtifactTarget = useMemo<ArtifactTarget>(
     () => (inGroup ? { groupId: groupId ?? "" } : { botId: active?.id ?? "" }),
     [active?.id, groupId, inGroup],
@@ -2372,6 +2412,26 @@ export function ShellPage() {
     setDraftRestore({ text: send.text, nonce: Date.now() });
   }, []);
 
+  // Featured plugin logos beside the sidebar's Connect apps entry (v0.60.0).
+  useEffect(() => {
+    let cancelled = false;
+    void rpc.connections
+      .catalog({})
+      .then((items) => {
+        if (cancelled) return;
+        const logos: Partial<Record<FeaturedConnectorId, string>> = {};
+        for (const id of FEATURED_CONNECTOR_IDS) {
+          const logo = resolveFeaturedCatalogItem(id, items)?.logo;
+          if (logo) logos[id] = logo;
+        }
+        setFeaturedLogos(logos);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Failed sends survive reloads: load the persisted set for this user…
   const failedSendUserId = bootstrapMe?.userId ?? null;
   useEffect(() => {
@@ -2401,7 +2461,7 @@ export function ShellPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-applies per snapshot commit
   }, [snapshot, failedSends]);
   const sendVoiceMemo = useCallback(
-    async (file: File, transcript: string) => {
+    async (file: File, transcript: VoiceTranscript | null) => {
       const botTarget = activeBotId.current;
       const groupTarget = activeGroupId.current;
       if ((!botTarget && !groupTarget) || sendingRef.current) return;
@@ -2417,10 +2477,22 @@ export function ShellPage() {
         const contentBase64 = await readFileAsBase64(file);
         const artifact = await rpc.artifacts.create(
           groupTarget
-            ? { groupId: groupTarget, name: file.name, mimeType, contentBase64 }
-            : { botId: botTarget!, name: file.name, mimeType, contentBase64 },
+            ? {
+                groupId: groupTarget,
+                name: file.name,
+                mimeType,
+                contentBase64,
+                transcript: transcript ?? undefined,
+              }
+            : {
+                botId: botTarget!,
+                name: file.name,
+                mimeType,
+                contentBase64,
+                transcript: transcript ?? undefined,
+              },
         );
-        const text = transcript.trim() || "Voice memo";
+        const text = transcript?.text.trim() || "Voice memo";
         const clientNonce = newClientNonce();
         if (groupTarget) {
           await rpc.threads.send({
@@ -2811,6 +2883,38 @@ export function ShellPage() {
     // Run-status changes are the only signal that project/task state moved;
     // they are rare, so refetching on them stays storm-free.
   }, [panel, active, activeSnapshot?.run?.status]);
+
+  // Delegated child runs live on other threads, so open projects are re-read while the panel shows them.
+  const hasOpenProject = projects.some((project) =>
+    ["planned", "running", "waiting"].includes(project.status),
+  );
+  useEffect(() => {
+    if (panel !== "tasks" || !active || !hasOpenProject) return;
+    const botId = active.id;
+    const timer = setInterval(() => {
+      void rpc.projects
+        .list({ botId })
+        .then((projectList) => setProjects(projectList))
+        .catch(() => undefined);
+    }, 5_000);
+    return () => clearInterval(timer);
+  }, [panel, active, hasOpenProject]);
+
+  const changeProject = useCallback(
+    async (action: "stop" | "retry", projectId: string) => {
+      try {
+        const updated = await rpc.projects[action]({ projectId });
+        setProjects((current) =>
+          current.map((project) => (project.id === updated.id ? updated : project)),
+        );
+      } catch {
+        setSendError(
+          action === "stop" ? t`Could not stop the project` : t`Could not retry the project`,
+        );
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (panel !== "library" || !active) return;
@@ -3826,6 +3930,21 @@ export function ShellPage() {
           <span className="text-[14px] font-medium text-foreground/90">
             <Trans>Connect apps</Trans>
           </span>
+          {FEATURED_CONNECTOR_IDS.some((id) => featuredLogos[id]) ? (
+            <span className="ms-auto flex items-center gap-1" aria-hidden>
+              {FEATURED_CONNECTOR_IDS.map((id) => {
+                const logo = featuredLogos[id];
+                return logo ? (
+                  <img
+                    key={id}
+                    src={logo}
+                    alt=""
+                    className="h-4 w-4 rounded-[4px] object-contain"
+                  />
+                ) : null;
+              })}
+            </span>
+          ) : null}
         </button>
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger
@@ -4047,6 +4166,7 @@ export function ShellPage() {
             scrollRequest={scrollRequest}
             onScrollRequestHandled={clearScrollRequest}
             artifactTarget={transcriptArtifactTarget}
+            chatAccent={chatAccent}
             messages={transcriptMessages}
             showToolActivity={showToolActivity}
             olderCursor={activeSnapshot?.olderCursor ?? null}
@@ -4565,13 +4685,40 @@ export function ShellPage() {
                       <ChevronLeft size={14} strokeWidth={1.8} aria-hidden="true" />
                       <Trans>Tasks</Trans>
                     </button>
-                    <div>
-                      <div className="text-[17px] font-semibold text-foreground" dir="auto">
-                        {selectedProject.title}
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[17px] font-semibold text-foreground" dir="auto">
+                          {selectedProject.title}
+                        </div>
+                        <div
+                          data-testid="project-status"
+                          className="mt-1 text-[12px] capitalize text-muted-foreground"
+                        >
+                          {selectedProject.status}
+                        </div>
                       </div>
-                      <div className="mt-1 text-[12px] capitalize text-muted-foreground">
-                        {selectedProject.status}
-                      </div>
+                      {["planned", "running", "waiting"].includes(selectedProject.status) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={t`Stop project`}
+                          data-testid="project-stop"
+                          onClick={() => void changeProject("stop", selectedProject.id)}
+                        >
+                          <Trans>Stop</Trans>
+                        </Button>
+                      ) : null}
+                      {["failed", "cancelled"].includes(selectedProject.status) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={t`Retry project`}
+                          data-testid="project-retry"
+                          onClick={() => void changeProject("retry", selectedProject.id)}
+                        >
+                          <Trans>Retry</Trans>
+                        </Button>
+                      ) : null}
                     </div>
                     <div className="rounded-xl border border-border bg-card px-3 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
@@ -4632,8 +4779,16 @@ export function ShellPage() {
                                 dir="auto"
                               >
                                 {task.prompt}
+                                {task.botId && task.botId !== selectedProject.botId ? (
+                                  <span className="block text-[11px] text-muted-foreground">
+                                    {task.botName}
+                                  </span>
+                                ) : null}
                               </span>
-                              <span className="shrink-0 text-[11px] capitalize text-muted-foreground">
+                              <span
+                                data-testid="project-task-status"
+                                className="shrink-0 text-[11px] capitalize text-muted-foreground"
+                              >
                                 {task.status}
                               </span>
                             </div>
@@ -4909,6 +5064,11 @@ export function ShellPage() {
                     setPanel("routine");
                   }}
                 />
+                {routineError ? (
+                  <div role="alert" className="mt-2 text-[12.5px] text-destructive">
+                    {routineError}
+                  </div>
+                ) : null}
                 {activeRoutines.length === 0 ? (
                   <div className="mt-3 rounded-xl border border-dashed border-border px-4 py-8 text-center">
                     <Clock size={22} strokeWidth={1.6} className="mx-auto text-muted-foreground" />
@@ -4936,6 +5096,13 @@ export function ShellPage() {
                         setPanel("routine");
                       }}
                       onStop={() => void stopRun()}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        setRoutineMenu({
+                          routine,
+                          position: { x: event.clientX, y: event.clientY },
+                        });
+                      }}
                     />
                   );
                 })}
@@ -5581,6 +5748,11 @@ export function ShellPage() {
             setMobileSidebarOpen(false);
             navigate(`/app/${id}`);
           }}
+          loadPlugins={loadPluginCatalog}
+          onSelectPlugin={(item) => {
+            setPluginsDetail({ connectorId: item.connectorId, slug: item.slug });
+            setPluginsOpen(true);
+          }}
         />
 
         {newSpaceOpen ? (
@@ -5629,6 +5801,39 @@ export function ShellPage() {
           />
         ) : null}
 
+        {routineMenu ? (
+          <RoutineContextMenu
+            routine={routineMenu.routine}
+            position={routineMenu.position}
+            onClose={() => setRoutineMenu(null)}
+            onToggleActive={() => {
+              const routine = routineMenu.routine;
+              void runRoutineMenuAction(routine, () =>
+                rpc.routines.update({ routineId: routine.id, active: !routine.active }),
+              );
+            }}
+            onTestRun={() => {
+              const routine = routineMenu.routine;
+              void runRoutineMenuAction(routine, () =>
+                rpc.routines.testRun({ routineId: routine.id }),
+              );
+            }}
+            onEdit={() => {
+              const routine = routineMenu.routine;
+              setRoutineMenu(null);
+              setRoutineDraft(draftFromRoutine(routine));
+              setRoutineWebhookSecret(null);
+              setEditingRoutine(routine);
+              setRoutineError(null);
+              setPanel("routine");
+            }}
+            onDelete={() => {
+              setDeleteRoutineTarget(routineMenu.routine);
+              setRoutineMenu(null);
+            }}
+          />
+        ) : null}
+
         {deleteRoutineTarget ? (
           <DeleteItemDialog
             item={deleteRoutineTarget}
@@ -5649,7 +5854,11 @@ export function ShellPage() {
         {pluginsOpen ? (
           <PluginsOverlay
             activeBotId={activeBotId.current}
-            onClose={() => setPluginsOpen(false)}
+            initialDetail={pluginsDetail}
+            onClose={() => {
+              setPluginsOpen(false);
+              setPluginsDetail(null);
+            }}
             onOpenMcp={() => {
               setPluginsOpen(false);
               setMcpOpen(true);
@@ -5924,12 +6133,15 @@ const Transcript = memo(function Transcript({
   speakingMessageId,
   onSpeak,
   onOpenComputer,
+  chatAccent,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
   scrollRequest: { messageId: string; nonce: number } | null;
   onScrollRequestHandled: () => void;
   artifactTarget: ArtifactTarget;
   messages: ThreadMessage[];
+  /** The Bot's identity color in a 1:1 chat; user bubbles take it unless Accent to Black is on. */
+  chatAccent: GrokColorDef | null;
   showToolActivity: boolean;
   olderCursor: number | null;
   loadingOlder: boolean;
@@ -6286,6 +6498,7 @@ const Transcript = memo(function Transcript({
                 >
                   <MessageView
                     artifactTarget={artifactTarget}
+                    chatAccent={chatAccent}
                     message={message}
                     failedSends={failedSends}
                     onResendFailed={onResendFailed}
@@ -6544,7 +6757,7 @@ const Composer = memo(function Composer({
   onDraftRestoreHandled: () => void;
   onStop: () => Promise<void>;
   onVoice?: () => void;
-  onVoiceMemo?: (file: File, transcript: string) => Promise<void>;
+  onVoiceMemo?: (file: File, transcript: VoiceTranscript | null) => Promise<void>;
   voiceMemoTranscribe?: boolean;
   replyTarget?: ThreadMessage | null;
   replyQuote?: string | null;
@@ -6559,6 +6772,7 @@ const Composer = memo(function Composer({
   const [draft, setDraft] = useState("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
+  const [slashHighlightIndex, setSlashHighlightIndex] = useState(0);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<AgentSkillCatalogEntry | null>(null);
   const [selectedMentions, setSelectedMentions] = useState<ComposerMention[]>([]);
@@ -6571,6 +6785,7 @@ const Composer = memo(function Composer({
   const runErrorRef = useRef<HTMLDivElement>(null);
   const presentedRunErrorIdRef = useRef<string | null>(null);
   const mentionListboxId = useId();
+  const slashListId = useId();
   const dragDepth = useRef(0);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const canSend =
@@ -6767,6 +6982,14 @@ const Composer = memo(function Composer({
     slashQuery !== null &&
     mentionQuery === null &&
     (slashSkillOptions.length > 0 || slashActionOptions.length > 0);
+  // Skills first, then actions: the same order they are drawn in.
+  const slashItemCount = showSlashPicker ? slashSkillOptions.length + slashActionOptions.length : 0;
+  const activeSlashIndex = clampMentionHighlightIndex(slashHighlightIndex, slashItemCount);
+  const slashItemId = (index: number) => `${slashListId}-item-${index}`;
+
+  useEffect(() => {
+    setSlashHighlightIndex(0);
+  }, [slashQuery]);
 
   function send() {
     if (!canSend || sending || disabled) return;
@@ -7037,13 +7260,15 @@ const Composer = memo(function Composer({
           data-testid="slash-picker"
           className="mb-2 overflow-hidden rounded-[14px] border border-border bg-muted"
         >
-          {slashSkillOptions.map((skill) => (
+          {slashSkillOptions.map((skill, index) => (
             <button
               key={skill.id}
+              id={slashItemId(index)}
               type="button"
               aria-label={t`Skill ${skill.name}`}
+              data-highlighted={index === activeSlashIndex ? "" : undefined}
               onClick={() => insertSkill(skill)}
-              className="flex w-full items-start gap-3 px-4 py-2.5 text-start hover:bg-accent"
+              className="flex w-full items-start gap-3 px-4 py-2.5 text-start hover:bg-accent data-highlighted:bg-accent"
             >
               <Box size={16} strokeWidth={1.7} className="mt-0.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0">
@@ -7056,15 +7281,18 @@ const Composer = memo(function Composer({
               </span>
             </button>
           ))}
-          {slashActionOptions.map((action) => {
+          {slashActionOptions.map((action, actionIndex) => {
             const label = slashActionLabel(action.id);
+            const index = slashSkillOptions.length + actionIndex;
             return (
               <button
                 key={action.id}
+                id={slashItemId(index)}
                 type="button"
                 aria-label={label}
+                data-highlighted={index === activeSlashIndex ? "" : undefined}
                 onClick={() => runSlashAction(action.id)}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-accent"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-accent data-highlighted:bg-accent"
               >
                 <Settings size={16} strokeWidth={1.7} className="shrink-0 text-muted-foreground" />
                 <span className="text-[14px] text-foreground">{label}</span>
@@ -7157,6 +7385,37 @@ const Composer = memo(function Composer({
                 removeLastChip();
                 return;
               }
+              if (mentionOptions.length === 0 && slashItemCount > 0) {
+                // The "/" picker is open: arrows move, Enter/Tab pick, Escape closes.
+                const slashAction = resolveMentionPickerKey({
+                  key: event.key,
+                  shiftKey: event.shiftKey,
+                  isComposing: event.nativeEvent.isComposing || event.keyCode === 229,
+                  optionCount: slashItemCount,
+                  highlightedIndex: activeSlashIndex,
+                });
+                if (slashAction.type === "complete") {
+                  event.preventDefault();
+                  const skill = slashSkillOptions[slashAction.index];
+                  if (skill) {
+                    insertSkill(skill);
+                    return;
+                  }
+                  const picked = slashActionOptions[slashAction.index - slashSkillOptions.length];
+                  if (picked) runSlashAction(picked.id);
+                  return;
+                }
+                if (slashAction.type === "move") {
+                  event.preventDefault();
+                  setSlashHighlightIndex(slashAction.index);
+                  return;
+                }
+                if (slashAction.type === "dismiss") {
+                  event.preventDefault();
+                  setSlashQuery(null);
+                  return;
+                }
+              }
               const action = resolveMentionPickerKey({
                 key: event.key,
                 shiftKey: event.shiftKey,
@@ -7219,9 +7478,13 @@ const Composer = memo(function Composer({
             role="combobox"
             aria-autocomplete="list"
             aria-haspopup="listbox"
-            aria-expanded={mentionPickerOpen}
+            aria-expanded={mentionPickerOpen || slashItemCount > 0}
             aria-controls={mentionPickerOpen ? mentionListboxId : undefined}
-            aria-activedescendant={activeMentionOptionId}
+            aria-activedescendant={
+              slashItemCount > 0 && !mentionPickerOpen
+                ? slashItemId(activeSlashIndex)
+                : activeMentionOptionId
+            }
             name="chat-message"
             autoComplete="off"
             dir="auto"
@@ -7583,7 +7846,9 @@ const MessageView = memo(function MessageView({
   onResendFailed,
   onDeleteFailed,
   optimisticPending,
+  chatAccent,
 }: {
+  chatAccent: GrokColorDef | null;
   failedSends: OptimisticSend[];
   onResendFailed: (send: OptimisticSend) => void;
   onDeleteFailed: (send: OptimisticSend) => void;
@@ -7625,6 +7890,18 @@ const MessageView = memo(function MessageView({
     () => resolvePersonaColorDef(message.botId ?? "bot", speakerBot?.color),
     [message.botId, speakerBot?.color],
   );
+  const accentToBlack = useAccentToBlack();
+  const bubbleAccent = useMemo(() => {
+    if (!chatAccent || accentToBlack) return null;
+    const light = botBubbleColors(chatAccent, "light");
+    const dark = botBubbleColors(chatAccent, "dark");
+    return {
+      "--bot-bubble-light": light.background,
+      "--bot-bubble-light-foreground": light.foreground,
+      "--bot-bubble-dark": dark.background,
+      "--bot-bubble-dark-foreground": dark.foreground,
+    } as CSSProperties;
+  }, [chatAccent, accentToBlack]);
   const messageContext = (
     <>
       {speakerName ? (
@@ -7947,6 +8224,7 @@ const MessageView = memo(function MessageView({
                 artifactId={block.artifactId}
                 mimeType={block.mimeType}
                 name={block.name}
+                transcript={block.transcript}
               />
             </div>
           );
@@ -7968,6 +8246,14 @@ const MessageView = memo(function MessageView({
           );
         }
         if (block.kind === "text" && message.role === "user") {
+          // The memo card already renders its transcript; skip the duplicate caption.
+          if (
+            message.blocks.some(
+              (other) => other.kind === "voice_memo" && other.transcript?.text === block.text,
+            )
+          ) {
+            return null;
+          }
           // User bubbles stay literal text on web and mobile. Only explicit URLs
           // and email addresses are links, so a sent address is tappable without
           // formatting bold or headings.
@@ -7983,7 +8269,11 @@ const MessageView = memo(function MessageView({
                   data-testid="message-user-bubble"
                   data-optimistic={message.id.startsWith("local:") ? "" : undefined}
                   data-quote-message-id={quoteMessageId}
-                  className="max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] bg-chat-user px-[18px] py-3 text-[15.5px] leading-[1.45] text-chat-user-foreground"
+                  data-accent={bubbleAccent ? "bot" : undefined}
+                  style={bubbleAccent ?? undefined}
+                  className={`max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] px-[18px] py-3 text-[15.5px] leading-[1.45] ${
+                    bubbleAccent ? "bot-bubble" : "bg-chat-user text-chat-user-foreground"
+                  }`}
                   dir="auto"
                 >
                   <LinkifiedText>{block.text}</LinkifiedText>
@@ -8091,6 +8381,13 @@ const MessageView = memo(function MessageView({
             </div>
           );
         }
+        if (block.kind === "deck") {
+          return (
+            <div key={i} className="flex justify-start">
+              <DeckCard block={block} target={artifactTarget} />
+            </div>
+          );
+        }
         if (block.kind === "project") {
           return (
             <div key={i} className="flex justify-start">
@@ -8120,7 +8417,13 @@ const MessageView = memo(function MessageView({
                   </p>
                 ) : null}
                 <div className="mt-3 text-[11.5px] text-muted-foreground">
-                  <Trans>Project · Open Tasks to see progress</Trans>
+                  {block.progress && block.progress.total > 0 ? (
+                    <Trans>
+                      {block.progress.done} of {block.progress.total} done
+                    </Trans>
+                  ) : (
+                    <Trans>Project · Open Tasks to see progress</Trans>
+                  )}
                 </div>
               </div>
             </div>

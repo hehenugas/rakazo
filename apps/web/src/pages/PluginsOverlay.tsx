@@ -72,10 +72,13 @@ export function PluginsOverlay({
   onClose,
   onOpenMcp,
   activeBotId,
+  initialDetail,
 }: {
   onClose: () => void;
   onOpenMcp?: () => void;
   activeBotId?: string;
+  /** Open straight onto one plugin's page (e.g. from the command palette). */
+  initialDetail?: { connectorId: string; slug: string } | null;
 }) {
   const { t } = useLingui();
   const [setupOpen, setSetupOpen] = useState(false);
@@ -102,7 +105,9 @@ export function PluginsOverlay({
   const [catalogFeedPending, setCatalogFeedPending] = useState(false);
   const [catalogFeedSearched, setCatalogFeedSearched] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [detailKey, setDetailKey] = useState<{ connectorId: string; slug: string } | null>(null);
+  const [detailKey, setDetailKey] = useState<{ connectorId: string; slug: string } | null>(
+    initialDetail ?? null,
+  );
   const [tools, setTools] = useState<ConnectionTool[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(true);
@@ -692,8 +697,8 @@ export function PluginsOverlay({
                 setQuery(event.target.value);
                 setVisibleCount(CONNECTION_CATALOG_PAGE_SIZE);
               }}
-              aria-label={t`Search apps`}
-              placeholder={t`Search apps`}
+              aria-label={t`Search plugins`}
+              placeholder={t`Search plugins`}
               className="h-11 rounded-xl px-4 md:text-[15px]"
             />
           </div>

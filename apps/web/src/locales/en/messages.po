@@ -74,6 +74,12 @@ msgstr "{0} KB"
 msgid "{0} MB"
 msgstr "{0} MB"
 
+#. placeholder {0}: block.progress.done
+#. placeholder {1}: block.progress.total
+#: src/pages/Shell.tsx
+msgid "{0} of {1} done"
+msgstr "{0} of {1} done"
+
 #. placeholder {0}: sender.name
 #: src/pages/ExternalConversationSettings.tsx
 msgid "{0} rollup hours"
@@ -84,6 +90,11 @@ msgstr "{0} rollup hours"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "{0} runs · {1} tokens"
 msgstr "{0} runs · {1} tokens"
+
+#. placeholder {0}: block.slideCount
+#: src/components/DeckCard.tsx
+msgid "{0} slides"
+msgstr "{0} slides"
 
 #. placeholder {0}: bot.name
 #: src/pages/ExternalConversationSettings.tsx
@@ -184,6 +195,10 @@ msgstr "About groups"
 msgid "About spaces"
 msgstr "About spaces"
 
+#: src/pages/AccountSettingsOverlay.tsx
+msgid "Accent to Black"
+msgstr "Accent to Black"
+
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Access token"
 msgstr "Access token"
@@ -214,9 +229,10 @@ msgstr "Action confirmations"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: group.spaceName
-#. placeholder {0}: sectionMenu.section.name
+#. placeholder {0}: routine.name
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Actions for {0}"
 msgstr "Actions for {0}"
 
@@ -315,6 +331,10 @@ msgstr "Add server"
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Add server URL"
 msgstr "Add server URL"
+
+#: src/pages/Shell.tsx
+msgid "Add to prompt"
+msgstr "Add to prompt"
 
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Add to routine"
@@ -833,6 +853,7 @@ msgstr "Client secret"
 #: src/pages/PeerMessagesOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
+#: src/pages/shell/team-bot-panel.tsx
 #: src/pages/WindowChrome.tsx
 msgid "Close"
 msgstr "Close"
@@ -1003,6 +1024,7 @@ msgstr "Connect API key"
 
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/command-palette.tsx
 msgid "Connect apps"
 msgstr "Connect apps"
 
@@ -1101,6 +1123,10 @@ msgstr "Copied"
 #: src/pages/Shell.tsx
 msgid "Copy"
 msgstr "Copy"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Copy Bot"
+msgstr "Copy Bot"
 
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not add"
@@ -1363,6 +1389,10 @@ msgstr "Could not open terminal"
 msgid "Could not play a test clip"
 msgstr "Could not play a test clip"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Could not publish to team"
+msgstr "Could not publish to team"
+
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "Could not reach the server"
@@ -1409,6 +1439,10 @@ msgstr "Could not render chart"
 msgid "Could not reset password"
 msgstr "Could not reset password"
 
+#: src/pages/Shell.tsx
+msgid "Could not retry the project"
+msgstr "Could not retry the project"
+
 #: src/pages/PluginsOverlay.tsx
 msgid "Could not revoke connection"
 msgstr "Could not revoke connection"
@@ -1447,6 +1481,10 @@ msgstr "Could not save routine"
 msgid "Could not save rule"
 msgstr "Could not save rule"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Could not save shared setup"
+msgstr "Could not save shared setup"
+
 #: src/pages/KnowledgeSection.tsx
 msgid "Could not save skill"
 msgstr "Could not save skill"
@@ -1483,6 +1521,10 @@ msgstr "Could not send reset email"
 msgid "Could not send that"
 msgstr "Could not send that"
 
+#: src/components/DeckCard.tsx
+msgid "Could not send to Google Slides"
+msgstr "Could not send to Google Slides"
+
 #: src/pages/McpServersOverlay.tsx
 msgid "Could not start OAuth"
 msgstr "Could not start OAuth"
@@ -1490,6 +1532,10 @@ msgstr "Could not start OAuth"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not start teaching"
 msgstr "Could not start teaching"
+
+#: src/pages/Shell.tsx
+msgid "Could not stop the project"
+msgstr "Could not stop the project"
 
 #: src/components/DraftActionCard.tsx
 msgid "Could not submit draft"
@@ -1518,6 +1564,10 @@ msgstr "Could not update computer"
 #: src/pages/Shell.tsx
 msgid "Could not update reaction"
 msgstr "Could not update reaction"
+
+#: src/pages/Shell.tsx
+msgid "Could not update routine"
+msgstr "Could not update routine"
 
 #: src/pages/MemorySettingsOverlay.tsx
 msgid "Could not update the default memory scope"
@@ -1688,6 +1738,7 @@ msgstr "Default scope"
 #: src/pages/RoutineEditor.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Delete"
 msgstr "Delete"
 
@@ -1753,6 +1804,7 @@ msgid "Describe what this bot does"
 msgstr "Describe what this bot does"
 
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Description"
 msgstr "Description"
 
@@ -1853,9 +1905,21 @@ msgstr "Download as markdown"
 msgid "Download Executor"
 msgstr "Download Executor"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Download template"
+msgstr "Download template"
+
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
 msgstr "Downloading…"
+
+#: src/pages/shell/bot-picker.tsx
+msgid "Draft"
+msgstr "Draft"
+
+#: src/pages/Shell.tsx
+msgid "Draft — only you"
+msgstr "Draft — only you"
 
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Draft skill"
@@ -1878,6 +1942,7 @@ msgid "Earlier message"
 msgstr "Earlier message"
 
 #: src/components/DraftActionCard.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Edit"
 msgstr "Edit"
 
@@ -1888,6 +1953,10 @@ msgstr "Edit first"
 #: src/pages/BotContextMenu.tsx
 msgid "Edit Profile"
 msgstr "Edit Profile"
+
+#: src/pages/Shell.tsx
+msgid "Edit shared setup"
+msgstr "Edit shared setup"
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -1971,6 +2040,10 @@ msgstr "Expand {0}"
 msgid "Export"
 msgstr "Export"
 
+#: src/components/DeckCard.tsx
+msgid "Export failed"
+msgstr "Export failed"
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Export this week's list from the CRM and drop it in the shared folder"
 msgstr "Export this week's list from the CRM and drop it in the shared folder"
@@ -1997,6 +2070,10 @@ msgstr "failed"
 #: src/pages/ActivityList.tsx
 msgid "Failed"
 msgstr "Failed"
+
+#: src/pages/Shell.tsx
+msgid "Failed to send"
+msgstr "Failed to send"
 
 #: src/pages/Shell.tsx
 msgid "Failed to send message"
@@ -2112,6 +2189,10 @@ msgstr "Git event"
 msgid "Goal"
 msgstr "Goal"
 
+#: src/components/DeckCard.tsx
+msgid "Google Slides"
+msgstr "Google Slides"
+
 #: src/pages/MessagingSettingsOverlay.tsx
 #: src/pages/Shell.tsx
 msgid "Group"
@@ -2179,6 +2260,10 @@ msgstr "Hide bots"
 msgid "Hide password"
 msgstr "Hide password"
 
+#: src/components/AskCard.tsx
+msgid "Hide the full request"
+msgstr "Hide the full request"
+
 #: src/components/call/VoiceChatCard.tsx
 msgid "Hide transcript"
 msgstr "Hide transcript"
@@ -2213,6 +2298,10 @@ msgstr "How to check"
 #: src/pages/Shell.tsx
 msgid "I’m done"
 msgstr "I’m done"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Identity and routines as a shareable file. No history or credentials."
+msgstr "Identity and routines as a shareable file. No history or credentials."
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "If you heard that, voice is ready."
@@ -2250,6 +2339,10 @@ msgstr "Instance API key"
 msgid "Instruction"
 msgstr "Instruction"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Instructions"
+msgstr "Instructions"
+
 #: src/pages/PluginsOverlay.tsx
 msgid "Integration domain"
 msgstr "Integration domain"
@@ -2270,6 +2363,10 @@ msgstr "Interval amount"
 #: src/pages/RoutineSchedule.tsx
 msgid "Interval unit"
 msgstr "Interval unit"
+
+#: src/components/DraftActionCard.tsx
+msgid "Invalid address"
+msgstr "Invalid address"
 
 #: src/pages/MemorySettingsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -2716,6 +2813,7 @@ msgstr "Mute"
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/bot-panel.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Name"
 msgstr "Name"
 
@@ -2833,6 +2931,10 @@ msgstr "No credentials saved for this bot."
 msgid "No group chats yet."
 msgstr "No group chats yet."
 
+#: src/components/DraftActionCard.tsx
+msgid "No line breaks"
+msgstr "No line breaks"
+
 #: src/components/AskCard.tsx
 msgid "No longer active"
 msgstr "No longer active"
@@ -2913,6 +3015,10 @@ msgstr "No trigger"
 #: src/pages/ScratchpadSection.tsx
 msgid "None yet"
 msgstr "None yet"
+
+#: src/components/DraftActionCard.tsx
+msgid "Not an allowed address"
+msgstr "Not an allowed address"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Not in the plugin catalog"
@@ -3002,6 +3108,10 @@ msgstr "Once"
 #: src/pages/Shell.tsx
 msgid "Only empty spaces can be deleted. Delete its bots and groups first."
 msgstr "Only empty spaces can be deleted. Delete its bots and groups first."
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Only you can change this setup, and every change reaches all teammates."
+msgstr "Only you can change this setup, and every change reaches all teammates."
 
 #: src/pages/ScratchpadSection.tsx
 #: src/pages/Shell.tsx
@@ -3142,6 +3252,10 @@ msgstr "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if
 msgid "Paste your API key"
 msgstr "Paste your API key"
 
+#: src/pages/shell/routine-context-menu.tsx
+msgid "Pause"
+msgstr "Pause"
+
 #: src/pages/RoutineEditor.tsx
 msgid "Paused"
 msgstr "Paused"
@@ -3162,9 +3276,17 @@ msgstr "Playing…"
 msgid "POST to"
 msgstr "POST to"
 
+#: src/components/DeckCard.tsx
+msgid "PowerPoint"
+msgstr "PowerPoint"
+
 #: src/components/VoiceMemoButton.tsx
 msgid "Preparing voice memo"
 msgstr "Preparing voice memo"
+
+#: src/components/DraftActionCard.tsx
+msgid "Preview"
+msgstr "Preview"
 
 #. placeholder {0}: props.name
 #: src/components/ArtifactFileCard.tsx
@@ -3220,6 +3342,18 @@ msgstr "Provider"
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Providers"
 msgstr "Providers"
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Publish <0>{botName}</0> as a Team Bot. Shared: identity and setup. Private: chats, memory, and credentials."
+msgstr "Publish <0>{botName}</0> as a Team Bot. Shared: identity and setup. Private: chats, memory, and credentials."
+
+#: src/pages/Shell.tsx
+msgid "Publish to team"
+msgstr "Publish to team"
+
+#: src/pages/Shell.tsx
+msgid "Published to team"
+msgstr "Published to team"
 
 #: src/components/CloudAgentCard.tsx
 msgid "Pull request"
@@ -3448,9 +3582,17 @@ msgstr "Replying to {replyName}"
 msgid "Replying to {replyName}: “{replyQuote}”"
 msgstr "Replying to {replyName}: “{replyQuote}”"
 
+#: src/components/DraftActionCard.tsx
+msgid "Required"
+msgstr "Required"
+
 #: src/pages/shell/message-cards.tsx
 msgid "Research & writing"
 msgstr "Research & writing"
+
+#: src/pages/Shell.tsx
+msgid "Resend"
+msgstr "Resend"
 
 #: src/components/ComputerMaintenanceActions.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -3497,10 +3639,22 @@ msgstr "Restore the last saved workspace. Unsaved work on the computer is lost."
 msgid "Restoring your workspace"
 msgstr "Restoring your workspace"
 
+#: src/pages/shell/routine-context-menu.tsx
+msgid "Resume"
+msgstr "Resume"
+
+#: src/pages/Shell.tsx
+msgid "Retry"
+msgstr "Retry"
+
 #: src/App.tsx
 #: src/pages/PeerMessagesOverlay.tsx
 msgid "Retry now"
 msgstr "Retry now"
+
+#: src/pages/Shell.tsx
+msgid "Retry project"
+msgstr "Retry project"
 
 #: src/pages/Shell.tsx
 msgid "Retry screen"
@@ -3584,6 +3738,7 @@ msgstr "Runs when this bot receives a verified message from this provider."
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-panel.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Save"
 msgstr "Save"
 
@@ -3632,6 +3787,7 @@ msgstr "Saving..."
 #: src/pages/RoutineEditor.tsx
 #: src/pages/shell/bot-credentials.tsx
 #: src/pages/shell/dialogs.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -3648,7 +3804,6 @@ msgid "Search"
 msgstr "Search"
 
 #: src/components/integrations/IntegrationSetup.tsx
-#: src/pages/PluginsOverlay.tsx
 msgid "Search apps"
 msgstr "Search apps"
 
@@ -3675,6 +3830,10 @@ msgstr "Search messages, files, and routines"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search models"
 msgstr "Search models"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Search plugins"
+msgstr "Search plugins"
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search providers"
@@ -3709,6 +3868,10 @@ msgstr "Send it"
 #: src/pages/Auth.tsx
 msgid "Send reset link"
 msgstr "Send reset link"
+
+#: src/pages/Shell.tsx
+msgid "Sending"
+msgstr "Sending"
 
 #: src/components/AskCard.tsx
 msgid "Sending…"
@@ -3764,6 +3927,7 @@ msgid "Shape"
 msgstr "Shape"
 
 #: src/pages/Shell.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Share"
 msgstr "Share"
 
@@ -3783,6 +3947,10 @@ msgstr "Shared documents"
 #: src/pages/shell/bot-panel.tsx
 msgid "Shared identity and setup, with a private conversation and private computer for each teammate."
 msgstr "Shared identity and setup, with a private conversation and private computer for each teammate."
+
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Shared setup"
+msgstr "Shared setup"
 
 #: src/components/computer/TerminalApp.tsx
 msgid "Shell"
@@ -3899,6 +4067,10 @@ msgstr "Speak this reply"
 msgid "Speech model"
 msgstr "Speech model"
 
+#: src/pages/shell/team-bot-panel.tsx
+msgid "Start fresh"
+msgstr "Start fresh"
+
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Start recording"
 msgstr "Start recording"
@@ -3921,6 +4093,10 @@ msgstr "Steps"
 #: src/pages/Shell.tsx
 msgid "Stop"
 msgstr "Stop"
+
+#: src/pages/Shell.tsx
+msgid "Stop project"
+msgstr "Stop project"
 
 #: src/pages/Shell.tsx
 msgid "Stop speaking"
@@ -4032,6 +4208,7 @@ msgid "Test"
 msgstr "Test"
 
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/routine-context-menu.tsx
 msgid "Test run"
 msgstr "Test run"
 
@@ -4136,6 +4313,7 @@ msgid "Timezone"
 msgstr "Timezone"
 
 #: src/pages/shell/bot-panel.tsx
+#: src/pages/shell/team-bot-panel.tsx
 msgid "Title"
 msgstr "Title"
 
@@ -4211,6 +4389,14 @@ msgstr "Unmute"
 #: src/pages/BotContextMenu.tsx
 msgid "Unpin"
 msgstr "Unpin"
+
+#: src/pages/Shell.tsx
+msgid "Unpublish"
+msgstr "Unpublish"
+
+#: src/pages/Shell.tsx
+msgid "Unpublished"
+msgstr "Unpublished"
 
 #. placeholder {0}: pending.file.name
 #: src/pages/Shell.tsx
@@ -4333,6 +4519,10 @@ msgstr "Version"
 #: src/pages/RoutineRunHistory.tsx
 msgid "View chat"
 msgstr "View chat"
+
+#: src/components/AskCard.tsx
+msgid "View the full request"
+msgstr "View the full request"
 
 #: src/pages/SettingsOverlay.tsx
 #: src/pages/Shell.tsx

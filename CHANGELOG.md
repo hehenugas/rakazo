@@ -20,6 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Bots with more than 20 MCP tools failed on every Claude model behind a Claude Pro/Max/Team sign-in with "You're out of extra usage": Anthropic rejects Claude Code OAuth requests that carry a tool named `mcp_*`. The lazy catalog wrappers are now `connectors_search_tools`, `connectors_load_tool` and `connectors_execute_tool`.
 - Changing a bot's model, thinking level or voice failed with a validation error once its instructions outgrew the description limit, and saving any other setting overwrote those instructions with the shorter description text. Bot settings now put the description and instructions on the wire only when that field was edited, clamped to each field's own limit.
 
+- Stopping a Project now also cancels the cloud agents its tasks launched; before, only runs were stopped and the cloud agents kept going.
+- A Project's transcript card stopped updating once more than 200 newer bot messages followed it; it is now found directly in the database however far back it is.
+- A submitted or discarded draft card can no longer be edited, and the mobile Send now uses the same server-side submit as the web.
+- On mobile, draft, project and voice-memo cards only appeared next to an approval request; they now render on their own.
+
 ### Changed
 
 - Message bubbles in the web/PWA transcript use more of a wide window's width (70%/74% caps raised to 84%/88%, still leaving room for the hover-actions gutter), instead of leaving a quarter to a third of a long message's row empty.
@@ -48,6 +53,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Disconnect connected Composio plugins.
 - Routines in plain language instead of raw cron.
 
+- Voice memo transcripts: a memo keeps its transcript (and segment timing when the speech provider returns it, currently Fish Audio and ElevenLabs). The web voice card shows the transcript under playback, highlights the segment being played, and jumps playback to a clicked segment; without timing it shows plain text.
+- Approval requests lead with a one-line summary; the command and reasoning open behind View the full request on web and mobile.
+- The plugin search box reads Search plugins, and the sidebar shows the logos of featured plugins next to Connect apps when the catalog has them.
+- Bots can ask you to sign in to an app they need (`request_app_connection`). The run pauses with an authorization card and continues on its own once the app is connected.
+- Projects orchestrate work: `project_task_add` now starts the task as its own run (on the bot or a named assignee), `project_status` reads progress, and a Project's status is derived from its tasks' runs. The project card shows progress, Stop and Retry controls exist on web and mobile, and telling a bot to stop also stops the Projects it started without touching unrelated work.
+- A waiting, failed, or completed Project is surfaced once in the Main Bot's chat when it is not already the place you are looking.
+
+- Command palette (Cmd/Ctrl-K) also finds Connect apps by name; Enter opens that app's page.
+- Right-click a routine in Conversation Details for Pause, Resume, Test run, Edit and Delete. A plain click still opens the editor.
+- Your messages in a 1:1 chat take the Bot's color (text color chosen for AA contrast); Settings → Accent to Black turns it off. Web only for now.
+- The composer's `/` picker works from the keyboard: arrows move, Enter or Tab picks, Escape closes, so Enter no longer sends the literal `/…` text while it is open.
+- Email drafts: To, Cc, Bcc, Subject and Body are validated (recipient syntax, no line breaks in the subject), the body renders a safe formatted preview (headings, bold, lists), and Send is disabled until the draft is valid. Sending goes through the server, which freezes the approved fields and starts one run; sending twice does nothing, and a run started from a draft can only send that exact email.
+- Slide decks: a Bot can build a deck with `presentation_save`; it appears as a card with slide previews and downloads as an editable PowerPoint file. Saving the same title again is a new version of the same artifact. Google Slides is not offered.
+- Mobile: voice memo transcripts follow playback (highlighting the current segment when the speech provider returned timing); the project card in the thread shows progress and opens the project.
+- Slack: a Team Bot's message can notify a user group (`<!subteam^GROUPID>`) only if Slack lists that group (the bot token needs `usergroups:read`); `@here`, `@channel` and `@everyone` never notify anyone from a Bot.
+
 ### Removed
 
 - Nonfunctional Grant folder picker in the desktop app.
@@ -56,6 +77,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Migration notes
 
+- M4 adds no database migrations. It adds one dependency, `pptxgenjs` (MIT, exact version pinned) in `packages/adapters`, used only to export slide decks; run `pnpm install` after pulling. To roll back M4, revert the branch: nothing it wrote needs cleaning up, and existing draft cards and artifacts keep working. Deck artifacts (`*.deck.json`, mime `application/vnd.rakazo.deck+json`) created in the meantime would show as a generic file on an older build.
+- Two additive migrations: `voice_memo_transcript` (nullable `artifacts.transcript`) and `project_orchestrator_run` (nullable `projects.orchestratorRunId`). `prisma migrate deploy` applies them on upgrade; existing rows are untouched.
 - Three additive Prisma migrations ship with this milestone (`space_main_bot`, `team_bots`, `projects`). `prisma migrate deploy` applies them automatically on upgrade; existing rows and bots are untouched, and no manual SQL or new environment variables are required.
 
 - Webhooks use `/api/v1/messaging/webhook/<provider>`; the previous Sendblue path remains supported.

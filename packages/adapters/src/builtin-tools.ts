@@ -293,6 +293,30 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "presentation_save",
+    description:
+      "Create or update a slide deck for the user. Give a title and the slides (each a title and a few short bullets, optional speaker notes). The deck appears in the chat as a card the user can preview and download as PowerPoint. To revise a deck you already made, call this again with the same title: it becomes a new version of that deck. Keep slides concise; a deck has at most 60 slides and 12 bullets per slide.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Deck title; the same title updates the same deck." },
+        slides: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              bullets: { type: "array", items: { type: "string" } },
+              notes: { type: "string", description: "Optional speaker notes." },
+            },
+            required: ["title"],
+          },
+        },
+      },
+      required: ["title", "slides"],
+    },
+  },
+  {
     name: "shell",
     description:
       "Run a command inside this bot's computer. cwd defaults to the bot's folder on a Team Computer and the workspace root on a Private Computer. Output can arrive while the command is still running; tell the user any one-time code or sign-in URL in that output.",
@@ -355,6 +379,19 @@ export const builtinAgentTools: ConnectorTool[] = [
         },
       },
       required: ["question", "options"],
+    },
+  },
+  {
+    name: "request_app_connection",
+    description:
+      "Ask the user to sign in to an app (plugin) you need that is not connected yet. Posts an authorization card and waits; you resume automatically once they connect, or when they skip. Use the app's plain name. Do not use for apps that are already connected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        app: { type: "string", minLength: 1, maxLength: 80 },
+        reason: { type: "string", maxLength: 240 },
+      },
+      required: ["app"],
     },
   },
   {
@@ -872,7 +909,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "draft_action_create",
     description:
-      "Create an editable draft for an outbound action such as an email or message. Drafting does not execute the external action; the user can edit, submit, or discard the card.",
+      "Create an editable draft for an outbound action such as an email or message. Drafting does not execute the external action; the user can edit, submit, or discard the card. For email use the fields to, cc, bcc, subject, and body (plain text; # headings, **bold**, and - lists are formatted when sent). When the user sends the card, the email must go out exactly as approved.",
     inputSchema: {
       type: "object",
       properties: {
@@ -891,6 +928,12 @@ export const builtinAgentTools: ConnectorTool[] = [
               label: { type: "string" },
               value: { type: "string" },
               multiline: { type: "boolean" },
+              options: {
+                type: "array",
+                items: { type: "string" },
+                description:
+                  "Closed set of allowed values; the user picks one. Use for an email sender (field key from) only with addresses the connected account's provider reports as authorized send-as addresses; leave it out when no provider tool lists them.",
+              },
             },
             required: ["key", "label", "value"],
           },
@@ -902,7 +945,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "project_create",
     description:
-      "Create a durable Project for multi-step work that should be visible in the user's Tasks view. Use when the user asks for a project, plan with tracked stages, or longer-running coordinated work.",
+      "Create a durable Project for multi-step work that should be visible in the user's Tasks view. Use when the user asks for a project, plan with tracked stages, or longer-running coordinated work. You orchestrate it: record the plan, then start child tasks with project_task_add.",
     inputSchema: {
       type: "object",
       properties: {
@@ -920,14 +963,28 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "project_task_add",
     description:
-      "Add a planned child task to an existing Project. This tracks the task in the Project; use normal tools/subagents/cloud agents to actually perform the work.",
+      "Start a child task of a Project. It runs now as its own run, on your thread or on another bot's thread when you name an assignee, under the same approvals as any run. Add independent tasks together; check progress with project_status instead of waiting.",
     inputSchema: {
       type: "object",
       properties: {
         project_id: { type: "string", description: "Project id returned by project_create." },
         prompt: { type: "string", description: "Concrete task or deliverable." },
+        assignee: {
+          type: "string",
+          description: "Optional bot name or id to delegate to. Defaults to you.",
+        },
       },
       required: ["project_id", "prompt"],
+    },
+  },
+  {
+    name: "project_status",
+    description:
+      "Read a Project's current status and each child task's status (running, waiting for the user, failed, completed). Use it to decide what to do next; do not poll in a loop.",
+    inputSchema: {
+      type: "object",
+      properties: { project_id: { type: "string" } },
+      required: ["project_id"],
     },
   },
   {

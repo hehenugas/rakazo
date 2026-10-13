@@ -7,6 +7,7 @@ import { OpenAIVoiceProvider } from "./openai-voice.js";
 import {
   SCRIPTED_MPEG,
   SCRIPTED_TRANSCRIPT,
+  SCRIPTED_TRANSCRIPT_SEGMENTS,
   SCRIPTED_VOICE_ID,
   ScriptedVoiceProvider,
 } from "./scripted-voice.js";
@@ -629,7 +630,37 @@ describe("FishAudioVoiceProvider", () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const form = init.body as FormData;
     expect((form.get("audio") as File).name).toBe("speech.ogg");
-    expect(form.get("ignore_timestamps")).toBe("true");
+    expect(form.get("ignore_timestamps")).toBe("false");
+  });
+
+  it("returns Fish Audio segment timing when present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            text: "hello there",
+            segments: [
+              { text: "hello", start: 0, end: 0.5 },
+              { text: "there", start: 0.5, end: 1 },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    await expect(
+      new FishAudioVoiceProvider().transcribe!(
+        { audio: new Uint8Array([1]), mimeType: "audio/webm", apiKey: "sk-test" },
+        ctx,
+      ),
+    ).resolves.toEqual({
+      text: "hello there",
+      segments: [
+        { start: 0, end: 0.5, text: "hello" },
+        { start: 0.5, end: 1, text: "there" },
+      ],
+    });
   });
 });
 
@@ -688,6 +719,9 @@ describe("ScriptedVoiceProvider", () => {
         },
         ctx,
       ),
-    ).resolves.toEqual({ text: SCRIPTED_TRANSCRIPT });
+    ).resolves.toEqual({
+      text: SCRIPTED_TRANSCRIPT,
+      segments: SCRIPTED_TRANSCRIPT_SEGMENTS,
+    });
   });
 });

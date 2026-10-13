@@ -57,6 +57,7 @@ import {
   connectorKindFromToolName,
   containsSecret,
   createStreamingRedactor,
+  emailProviderMatches,
   endsSentence,
   expandSkillReferencesInPrompt,
   formatSkillRunPrompt,
@@ -64,6 +65,8 @@ import {
   humanizeToolName,
   inferAttachmentMimeType,
   isCallClientNonce,
+  isEmailDraftAction,
+  isEmailSendTool,
   isMessagingChannelRun,
   isOneShotRoutineCrons,
   isTerminal,
@@ -72,6 +75,7 @@ import {
   messagingDmSurfaceNote,
   nextCronDateAcross,
   nextFence,
+  parseDeck,
   planActionGate,
   promptInvokesSkill,
   redactSecrets,
@@ -118,6 +122,7 @@ import {
   respondAgentConnection,
 } from "./agent-connections.js";
 import { decryptAgentEnvironment, formatAgentEnvironmentInstruction } from "./agent-environment.js";
+import { resolveAppConnectBlock } from "./app-connect-card.js";
 import { buildApprovalAskBlock } from "./approval-ask.js";
 import {
   approvalPausedToolResult,
@@ -219,6 +224,9 @@ import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
 import { formatCurrentTimeInstruction } from "./current-time.js";
 import { resolveDeploymentModel } from "./deployment-model.js";
+import type { ApprovedEmailDraft } from "./draft-binding.js";
+import { approvedEmailBindingError, loadApprovedEmailDraft } from "./draft-binding.js";
+import { normalizeDraftFields } from "./draft-fields.js";
 import { handoffToGroupBot, loadGroupContext } from "./group-handoff.js";
 import {
   COMPACTION_BATCH_SIZE,
@@ -280,7 +288,13 @@ import {
   renderPlotSpecToSvg,
   searchChartCatalog,
 } from "./plot-tool.js";
+import { saveDeckArtifact } from "./presentation-artifacts.js";
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
+import {
+  loadProjectSummaries,
+  projectTaskContext,
+  startProjectTask,
+} from "./project-orchestration.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { assertSafeRemoteUrl } from "./remote-mcp.js";
 import { loadReplyContext, messageToAgentHistoryText } from "./reply-context.js";
@@ -2605,7 +2619,10 @@ export interface ExecutorDeps {
   home: AgentHomeStore;
   artifacts?: ArtifactStore;
   connector?: ConnectorProvider;
-  connectors?: { managed(id: string): ManagedConnectorProvider | undefined };
+  connectors?: {
+    managed(id: string): ManagedConnectorProvider | undefined;
+    managedProviders?(): ManagedConnectorProvider[];
+  };
   secrets: string[];
   secretStore: EncryptedSecretStore;
   deploymentModelKey?: string;
@@ -3688,6 +3705,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const connectorTools = new Map(
           exposedConnectorTools.map((tool) => [tool.name, tool] as const),
         );
+        let approvedEmailPromise: Promise<ApprovedEmailDraft | null> | undefined;
+        const loadApprovedEmail = () => {
+          approvedEmailPromise ??= loadApprovedEmailDraft(deps.prisma, run);
+          return approvedEmailPromise;
+        };
         let approvalRulesPromise: Promise<ActionApprovalRule[]> | undefined;
         const loadApprovalRules = () => {
           approvalRulesPromise ??= deps.prisma.actionApprovalRule
@@ -4097,12 +4119,42 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const requiresApprovalByDefault =
             requiresUnattendedApproval ||
             toolRequiresApproval(name, viaConnector, declaredReadOnly);
-          const requiresMandatoryApproval =
-            requiresUnattendedApproval || toolRequiresExplicitApproval(name);
           const connectorKind = connectorKindFromToolName(
-            name,
+            connectorCall.route?.toolName ?? name,
             connectedPlugins.map((plugin) => plugin.provider),
           );
+          let approvedEmail: ApprovedEmailDraft | null;
+          try {
+            approvedEmail = await loadApprovedEmail();
+          } catch {
+            return { error: "The submitted draft could not be verified. No action was taken." };
+          }
+          if (
+            approvedEmail &&
+            !context.connectedConnections.some(
+              (connection) =>
+                connection.id === approvedEmail.connectionId &&
+                emailProviderMatches(approvedEmail.provider, connection.externalId),
+            )
+          ) {
+            return {
+              error: "The approved email account is no longer available. No action was taken.",
+            };
+          }
+          // A run started by submitting a draft may only send that exact email. Any other
+          // consequential route, including browser/computer/shell, needs a fresh approval.
+          const bindingError = approvedEmailBindingError(approvedEmail, name, connectorKind, args);
+          if (bindingError) return { error: bindingError };
+          const exactDraftEmailSend =
+            Boolean(approvedEmail) && viaConnector && isEmailSendTool(name, connectorKind);
+          const unverifiedDraftAction =
+            Boolean(approvedEmail) &&
+            !exactDraftEmailSend &&
+            (viaConnector ? requiresApprovalByDefault : !READ_ONLY_AGENT_TOOLS.has(name));
+          const requiresMandatoryApproval =
+            requiresUnattendedApproval ||
+            toolRequiresExplicitApproval(name) ||
+            unverifiedDraftAction;
           const approvalResolved = requiresMandatoryApproval
             ? { decision: "ask" as const, source: "default" as const, matchingRules: [] }
             : resolveActionApprovalDetail({
@@ -4689,6 +4741,36 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return finish({
                 error: message,
                 hint: 'Call render_plot with {"charts": true} for runnable example specs, or {"help": true} for the full guide.',
+              });
+            }
+          }
+          if (name === "presentation_save") {
+            if (!deps.artifacts) return finish({ error: "artifact storage unavailable" });
+            const parsedDeck = parseDeck(args);
+            if ("error" in parsedDeck) return finish({ error: parsedDeck.error });
+            try {
+              const saved = await saveDeckArtifact(
+                { prisma: deps.prisma, artifacts: deps.artifacts },
+                {
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                  groupId: thread.groupId ?? undefined,
+                  runId: run.id,
+                  operationId: executionId,
+                  deck: parsedDeck.deck,
+                },
+              );
+              await publishMessage(deps, run, "bot", [saved.block]);
+              return finish({
+                ok: true,
+                artifactId: saved.artifactId,
+                version: saved.version,
+                slides: parsedDeck.deck.slides.length,
+              });
+            } catch (error) {
+              return finish({
+                error: error instanceof Error ? error.message : "could not save the deck",
               });
             }
           }
@@ -5690,37 +5772,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const title = String(args.title ?? "")
               .trim()
               .slice(0, 240);
-            const rawFields = Array.isArray(args.fields) ? args.fields : [];
-            const fields = rawFields
-              .map((value) => {
-                if (!value || typeof value !== "object") return null;
-                const field = value as Record<string, unknown>;
-                const key = String(field.key ?? "")
-                  .trim()
-                  .slice(0, 120);
-                const label = String(field.label ?? "")
-                  .trim()
-                  .slice(0, 160);
-                const fieldValue = String(field.value ?? "").slice(0, 20_000);
-                if (!key || !label) return null;
-                return {
-                  key,
-                  label,
-                  value: fieldValue,
-                  multiline: field.multiline === true,
-                };
-              })
-              .filter(
-                (
-                  field,
-                ): field is {
-                  key: string;
-                  label: string;
-                  value: string;
-                  multiline: boolean;
-                } => field !== null,
-              )
-              .slice(0, 30);
+            const fields = normalizeDraftFields(args.fields, {
+              email: isEmailDraftAction(action),
+            });
             if (!provider || !action || !title || fields.length === 0) {
               return finish({
                 error: "provider, action, title, and at least one field are required.",
@@ -5761,6 +5815,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 spaceId: run.spaceId,
                 userId: run.userId,
                 botId: bot.id,
+                orchestratorRunId: run.id,
                 title,
                 objective,
                 plan,
@@ -5775,6 +5830,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   title: project.title,
                   objective: project.objective,
                   status: "planned",
+                  progress: { done: 0, total: 0 },
                 },
               ]);
             } catch (error) {
@@ -5800,25 +5856,47 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 userId: run.userId,
                 botId: bot.id,
               },
-              select: { id: true },
+              select: { id: true, spaceId: true, userId: true, botId: true, status: true },
             });
             if (!project) return finish({ error: "Project not found." });
-            const task = await deps.prisma.task.create({
-              data: {
-                spaceId: run.spaceId,
-                userId: run.userId,
-                botId: bot.id,
-                threadId: run.threadId,
-                projectId: project.id,
-                prompt: prompt.slice(0, 8_000),
-                status: "planned",
-              },
+            if (project.status === "cancelled" || project.status === "completed") {
+              return finish({ error: `Project is ${project.status}; ask the user to reopen it.` });
+            }
+            const started = await startProjectTask(deps, project, {
+              prompt,
+              assignee: args.assignee == null ? undefined : String(args.assignee),
             });
-            await deps.prisma.project.update({
-              where: { id: project.id },
-              data: { status: "running" },
+            if ("error" in started) return finish({ error: started.error });
+            return finish({
+              ok: true,
+              projectId: project.id,
+              taskId: started.taskId,
+              assignee: started.botName,
+              status: "running",
             });
-            return finish({ ok: true, projectId: project.id, taskId: task.id });
+          }
+          if (name === "project_status") {
+            const projectId = String(args.project_id ?? "").trim();
+            if (!projectId) return finish({ error: "project_id is required." });
+            const found = await deps.prisma.project.findFirst({
+              where: { id: projectId, spaceId: run.spaceId, userId: run.userId, botId: bot.id },
+              select: { id: true },
+            });
+            if (!found) return finish({ error: "Project not found." });
+            const [row] = await loadProjectSummaries(deps.prisma, [found.id]);
+            if (!row) return finish({ error: "Project not found." });
+            return finish({
+              ok: true,
+              projectId: row.project.id,
+              status: row.derived,
+              progress: row.progress,
+              tasks: row.children.map((child) => ({
+                taskId: child.task.id,
+                assignee: child.task.bot.name,
+                status: child.status,
+                prompt: child.task.prompt.slice(0, 200),
+              })),
+            });
           }
           if (name === "project_update") {
             const projectId = String(args.project_id ?? "").trim();
@@ -5832,6 +5910,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               "cancelled",
             ]);
             const statusArg = args.status == null ? undefined : String(args.status);
+            if (statusArg === "cancelled") {
+              return finish({ error: "Use the Stop control to cancel the Project and its work." });
+            }
             if (statusArg !== undefined && !allowed.has(statusArg)) {
               return finish({ error: "Invalid project status." });
             }
@@ -5851,8 +5932,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
             });
             if (!existing) return finish({ error: "Project not found." });
-            const updated = await deps.prisma.project.update({
-              where: { id: existing.id },
+            if (existing.status === "cancelled" || existing.status === "completed") {
+              return finish({ error: `Project is ${existing.status}; reopen it before updating.` });
+            }
+            const changed = await deps.prisma.project.updateMany({
+              where: {
+                id: existing.id,
+                status: { notIn: ["cancelled", "completed"] },
+              },
               data: {
                 ...(statusArg ? { status: statusArg } : {}),
                 ...(plan ? { plan } : {}),
@@ -5864,6 +5951,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       : undefined,
               },
             });
+            if (changed.count !== 1) {
+              return finish({ error: "Project stopped before the update could be saved." });
+            }
+            const updated = await deps.prisma.project.findUnique({ where: { id: existing.id } });
+            if (!updated) return finish({ error: "Project not found." });
             try {
               await publishMessage(deps, run, "bot", [
                 {
@@ -6170,9 +6262,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (deps.connector) {
             let result: unknown = { error: `unknown tool ${name}` };
+            const connectorContext = approvedEmail
+              ? {
+                  ...context,
+                  connectedConnections: context.connectedConnections.filter(
+                    (connection) =>
+                      !emailProviderMatches(approvedEmail.provider, connection.externalId) ||
+                      connection.id === approvedEmail.connectionId,
+                  ),
+                }
+              : context;
             for await (const event of deps.connector.execute(
               { ...connectorCall, tool: name, args, executionId: effectKey },
-              context,
+              connectorContext,
             )) {
               if (event.type === "result") {
                 result = event.data;
@@ -6217,8 +6319,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           turnBlocks,
           currentTurnImages,
         );
+        const projectContext = await projectTaskContext(deps.prisma, task, bot.name);
         const taskPrompt = expandSkillReferencesInPrompt(
-          [task.prompt, attachedFilesPrompt, missingImagesInstruction].filter(Boolean).join("\n\n"),
+          [projectContext, task.prompt, attachedFilesPrompt, missingImagesInstruction]
+            .filter(Boolean)
+            .join("\n\n"),
           agentSkills,
         );
         const invokedSkill = savedSkills.find((skill) =>
@@ -6545,6 +6650,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 label: redactSecrets(action.label, runSecrets),
               }));
               await workspaceCheckpoint.flush();
+              const appCard = event.appConnect
+                ? await resolveAppConnectBlock(
+                    deps.connectors?.managedProviders?.() ?? [],
+                    event.appConnect.app,
+                    context,
+                  )
+                : null;
               const paused = await deps.events.pauseRunForInput({
                 spaceId: run.spaceId,
                 threadId: run.threadId,
@@ -6561,6 +6673,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     status: "pending",
                     actions: safeActions,
                   },
+                  ...(appCard ? [appCard] : []),
                 ],
                 // Keep unredacted labels on the run for resume; message blocks stay redacted.
                 offeredActions: event.actions,

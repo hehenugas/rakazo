@@ -69,6 +69,7 @@ import {
   listBotSecretMetadata,
   listPiCatalog,
   listScratchpadItems,
+  loadProjectSummaries,
   McpOAuthBroker,
   mapScratchpadItem,
   modelCredentialAuthKindsForSpace,
@@ -89,6 +90,7 @@ import {
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
+  retryProjectWork,
   revokeScreenControl,
   routineConfirmLines,
   sanitizeComposioError,
@@ -128,7 +130,6 @@ import {
   ComputerCommandSchema,
   foldComputerCommands,
   IntegrationProviderIdSchema,
-  MessageBlock as MessageBlockSchema,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   usableModelId,
 } from "@rakazo/contracts";
@@ -206,6 +207,7 @@ import {
   resolveBusyBotName,
   toComputerStatus,
 } from "./computer-status.js";
+import { submitDraftAction, updateDraftAction } from "./draft-actions.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
 import {
   dismissMcpServerApprovals,
@@ -226,6 +228,8 @@ import {
   promptFocus,
   startOnboarding,
 } from "./onboarding.js";
+import { deliverDeck, exportDeck } from "./presentation-export.js";
+import { stopProjectsOwnedByBot, stopProjectWork } from "./project-control.js";
 import { listRoutineRuns } from "./routine-runs.js";
 import { listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
@@ -700,7 +704,12 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
 export function createRouter(deps: RouterDeps) {
   const os = implement(appContract).$context<{ actor: Actor | null; signal?: AbortSignal }>();
   const repos = createRepos(deps.prisma);
-  const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
+  const onboardingDeps = {
+    prisma: deps.prisma,
+    events: deps.events,
+    connectors: deps.connectors,
+    jobs: deps.jobs,
+  };
   const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
   const refreshExpiredCredential =
@@ -2056,44 +2065,16 @@ export function createRouter(deps: RouterDeps) {
             userId: context.actor.userId,
             botId: input.botId,
           },
-          include: {
-            tasks: {
-              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-              select: {
-                id: true,
-                prompt: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-            },
-          },
-          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          select: { id: true },
         });
-        return rows.map(projectDto);
+        const summaries = await loadProjectSummaries(
+          deps.prisma,
+          rows.map((row) => row.id),
+        );
+        return summaries.map(projectDto);
       }),
       get: authed.projects.get.handler(async ({ context, input }) => {
-        const row = await deps.prisma.project.findFirst({
-          where: {
-            id: input.projectId,
-            spaceId: context.actor.spaceId,
-            userId: context.actor.userId,
-          },
-          include: {
-            tasks: {
-              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-              select: {
-                id: true,
-                prompt: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-            },
-          },
-        });
-        if (!row) throw new IsolationError();
-        return projectDto(row);
+        return projectForActor(deps.prisma, context.actor, input.projectId);
       }),
       create: authed.projects.create.handler(async ({ context, input }) => {
         await repos.getBot(context.actor, input.botId);
@@ -2107,9 +2088,9 @@ export function createRouter(deps: RouterDeps) {
             plan: input.plan,
             status: "planned",
           },
-          include: { tasks: true },
+          select: { id: true },
         });
-        return projectDto(row);
+        return projectForActor(deps.prisma, context.actor, row.id);
       }),
       update: authed.projects.update.handler(async ({ context, input }) => {
         const existing = await deps.prisma.project.findFirst({
@@ -2122,7 +2103,7 @@ export function createRouter(deps: RouterDeps) {
         });
         if (!existing) throw new IsolationError();
         const nextStatus = input.status ?? existing.status;
-        const row = await deps.prisma.project.update({
+        await deps.prisma.project.update({
           where: { id: existing.id },
           data: {
             ...(input.title === undefined ? {} : { title: input.title }),
@@ -2136,20 +2117,25 @@ export function createRouter(deps: RouterDeps) {
                   : new Date()
                 : null,
           },
-          include: {
-            tasks: {
-              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-              select: {
-                id: true,
-                prompt: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-            },
-          },
         });
-        return projectDto(row);
+        return projectForActor(deps.prisma, context.actor, existing.id);
+      }),
+      stop: authed.projects.stop.handler(async ({ context, input }) => {
+        await stopProjectWork(deps, context.actor, input.projectId);
+        return projectForActor(deps.prisma, context.actor, input.projectId);
+      }),
+      retry: authed.projects.retry.handler(async ({ context, input }) => {
+        const project = await deps.prisma.project.findFirst({
+          where: {
+            id: input.projectId,
+            spaceId: context.actor.spaceId,
+            userId: context.actor.userId,
+          },
+          select: { id: true, spaceId: true, userId: true, botId: true },
+        });
+        if (!project) throw new IsolationError();
+        await retryProjectWork(deps, project);
+        return projectForActor(deps.prisma, context.actor, project.id);
       }),
     },
     groups: {
@@ -2366,30 +2352,29 @@ export function createRouter(deps: RouterDeps) {
       }),
       updateDraftAction: authed.threads.updateDraftAction.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        const message = await deps.prisma.message.findFirst({
-          where: { id: input.messageId, threadId: target.threadId, role: "bot" },
-          select: { id: true, blocks: true },
-        });
-        if (!message) throw new IsolationError();
-        const parsed = MessageBlockSchema.array().safeParse(message.blocks);
-        if (!parsed.success) {
-          throw new ORPCError("BAD_REQUEST", { message: "Message blocks are not editable." });
+        await updateDraftAction(deps.prisma, target, input);
+        return { ok: true as const };
+      }),
+      submitDraftAction: authed.threads.submitDraftAction.handler(async ({ context, input }) => {
+        if ((await modelSetup(deps, context.actor)).needsModel) {
+          throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
         }
-        let changed = false;
-        const blocks = parsed.data.map((block) => {
-          if (block.kind !== "draft_action" || block.draftId !== input.draftId) return block;
-          changed = true;
-          return {
-            ...block,
-            fields: input.fields,
-            status: input.status,
-          };
-        });
-        if (!changed) throw new IsolationError();
-        await deps.prisma.message.update({
-          where: { id: message.id },
-          data: { blocks: blocks as Prisma.InputJsonValue },
-        });
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot") {
+          await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
+        }
+        await submitDraftAction(deps, context.actor, target, input);
+        return { ok: true as const };
+      }),
+      deliverDeck: authed.threads.deliverDeck.handler(async ({ context, input }) => {
+        if ((await modelSetup(deps, context.actor)).needsModel) {
+          throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
+        }
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot") {
+          await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
+        }
+        await deliverDeck(deps, context.actor, target, input);
         return { ok: true as const };
       }),
       react: authed.threads.react.handler(async ({ context, input }) => {
@@ -2405,6 +2390,10 @@ export function createRouter(deps: RouterDeps) {
       stop: authed.threads.stop.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await stopThreadRuns(deps, context.actor, target);
+        // Telling a Bot to stop also stops the Projects it started, and only those.
+        if (target.kind === "bot") {
+          await stopProjectsOwnedByBot(deps, context.actor, target.botId);
+        }
         return { ok: true as const };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {
@@ -5821,6 +5810,9 @@ export function createRouter(deps: RouterDeps) {
       getById: authed.artifacts.getById.handler(async ({ context, input }) => {
         return getSpaceArtifactById(deps, context.actor, input);
       }),
+      exportDeck: authed.artifacts.exportDeck.handler(async ({ context, input }) => {
+        return exportDeck(deps, context.actor, input);
+      }),
       remove: authed.artifacts.remove.handler(async ({ context, input }) => {
         return deleteArtifactFamily(deps, context.actor, { familyId: input.artifactId });
       }),
@@ -6065,41 +6057,38 @@ function updaterConfig(deps: RouterDeps): UpdaterProxyConfig {
   };
 }
 
-function projectDto(row: {
-  id: string;
-  botId: string;
-  title: string;
-  objective: string;
-  plan: unknown;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  completedAt: Date | null;
-  tasks: Array<{ id: string; prompt: string; status: string; createdAt: Date; updatedAt: Date }>;
-}) {
+async function projectForActor(prisma: PrismaClient, actor: Actor, projectId: string) {
+  const owned = await prisma.project.findFirst({
+    where: { id: projectId, spaceId: actor.spaceId, userId: actor.userId },
+    select: { id: true },
+  });
+  if (!owned) throw new IsolationError();
+  const [summary] = await loadProjectSummaries(prisma, [owned.id]);
+  if (!summary) throw new IsolationError();
+  return projectDto(summary);
+}
+
+function projectDto({
+  project: row,
+  children,
+  derived,
+}: Awaited<ReturnType<typeof loadProjectSummaries>>[number]) {
   const plan = Array.isArray(row.plan)
     ? row.plan.filter((step): step is string => typeof step === "string")
     : [];
-  const allowedStatuses = new Set([
-    "planned",
-    "running",
-    "waiting",
-    "completed",
-    "failed",
-    "cancelled",
-  ]);
-  const status = allowedStatuses.has(row.status) ? row.status : "planned";
   return {
     id: row.id,
     botId: row.botId,
     title: row.title,
     objective: row.objective,
     plan,
-    status: status as "planned" | "running" | "waiting" | "completed" | "failed" | "cancelled",
-    tasks: row.tasks.map((task) => ({
+    status: derived,
+    tasks: children.map(({ task, status }) => ({
       id: task.id,
       prompt: task.prompt,
-      status: task.status,
+      status,
+      botId: task.botId,
+      botName: task.bot.name,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
     })),

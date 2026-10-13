@@ -466,7 +466,12 @@ export interface AgentRunRequest {
 export interface ScriptedTurn {
   assistant?: string;
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-  ask?: { text: string; detail?: string; actions?: Array<{ id: string; label: string }> };
+  ask?: {
+    text: string;
+    detail?: string;
+    actions?: Array<{ id: string; label: string }>;
+    appConnect?: { app: string };
+  };
   takeover?: { reason: string };
   files?: Array<{ path: string; content: string }>;
   memory?: Array<{ scope: "bot" | "user"; path: string; content: string }>;
@@ -487,6 +492,8 @@ export type AgentRuntimeEvent =
       text: string;
       detail?: string;
       actions?: Array<{ id: string; label: string }>;
+      /** Also post an authorization card for this app; the run resumes when it connects. */
+      appConnect?: { app: string };
     }
   | { type: "takeover"; reason: string }
   | {
@@ -554,6 +561,12 @@ export interface VoiceTranscribeRequest {
   mimeType: string;
   apiKey: string;
   signal?: AbortSignal;
+}
+
+/** Providers without timing return `text` only; `segments` are in seconds. */
+export interface VoiceTranscribeResult {
+  text: string;
+  segments?: Array<{ start: number; end: number; text: string }>;
 }
 
 export interface BackgroundJobPayloads {

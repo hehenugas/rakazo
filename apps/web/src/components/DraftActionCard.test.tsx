@@ -8,13 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DraftActionCard } from "./DraftActionCard";
 
 const updateDraftAction = vi.fn().mockResolvedValue({ ok: true });
-const send = vi.fn().mockResolvedValue({ runId: "run-1", taskId: null });
+const submitDraftAction = vi.fn().mockResolvedValue({ ok: true });
 
 vi.mock("../lib/rpc", () => ({
   rpc: {
     threads: {
       updateDraftAction: (...args: unknown[]) => updateDraftAction(...(args as [])),
-      send: (...args: unknown[]) => send(...(args as [])),
+      submitDraftAction: (...args: unknown[]) => submitDraftAction(...(args as [])),
     },
   },
 }));
@@ -30,6 +30,8 @@ vi.mock("@rakazo/ui-web", () => ({
     </button>
   ),
   Input: (props: ComponentProps<"input">) => <input {...props} />,
+  NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
+  NativeSelectOption: (props: ComponentProps<"option">) => <option {...props} />,
   Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
 }));
 
@@ -43,6 +45,7 @@ const draftBlock: DraftBlock = {
   title: "Intro call follow-up",
   fields: [
     { key: "to", label: "To", value: "client@example.test" },
+    { key: "subject", label: "Subject", value: "Intro call" },
     { key: "body", label: "Body", value: "Thanks!", multiline: true },
   ],
   status: "draft",
@@ -103,25 +106,60 @@ describe("DraftActionCard", () => {
         fields: draftBlock.fields,
       }),
     );
-    expect(send).not.toHaveBeenCalled();
+    expect(submitDraftAction).not.toHaveBeenCalled();
   });
 
-  it("submits by persisting the submitted status, then sends the execution prompt", async () => {
+  it("submits through the server, which freezes and sends the approved fields", async () => {
     render();
 
     await act(async () => button("Send").click());
 
-    expect(updateDraftAction).toHaveBeenCalledWith(
-      expect.objectContaining({ draftId: "draft-1", status: "submitted" }),
-    );
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        botId: "bot-1",
-        text: expect.stringContaining("Execute this submitted draft action now."),
-        clientNonce: expect.stringContaining("draft-action:draft-1:"),
-      }),
-    );
+    expect(submitDraftAction).toHaveBeenCalledTimes(1);
+    expect(submitDraftAction).toHaveBeenCalledWith({
+      botId: "bot-1",
+      messageId: "message-1",
+      draftId: "draft-1",
+      fields: draftBlock.fields,
+    });
+    expect(updateDraftAction).not.toHaveBeenCalled();
+  });
+
+  it("blocks Send and names the problem when an email draft is incomplete", async () => {
+    render({
+      ...draftBlock,
+      fields: [
+        { key: "to", label: "To", value: "not-an-address" },
+        { key: "subject", label: "Subject", value: "" },
+        { key: "body", label: "Body", value: "Hi", multiline: true },
+      ],
+    });
+
+    expect(button("Send").disabled).toBe(true);
+    expect(container.textContent).toContain("Invalid address");
+    expect(container.textContent).toContain("Required");
+    await act(async () => button("Send").click());
+    expect(submitDraftAction).not.toHaveBeenCalled();
+  });
+
+  it("previews formatting as elements, never raw HTML", () => {
+    render({
+      ...draftBlock,
+      fields: [
+        { key: "to", label: "To", value: "client@example.test" },
+        { key: "subject", label: "Subject", value: "Intro call" },
+        {
+          key: "body",
+          label: "Body",
+          value: "# Plan\n\nSee **notes** <img src=x onerror=alert(1)>\n\n- one\n- two",
+          multiline: true,
+        },
+      ],
+    });
+    const preview = container.querySelector('[data-testid="draft-email-preview"]')!;
+    expect(preview.querySelector("strong")?.textContent).toBe("notes");
+    expect(preview.querySelectorAll("li")).toHaveLength(2);
+    expect(preview.querySelector("img")).toBeNull();
+    expect(preview.textContent).toContain("<img src=x onerror=alert(1)>");
   });
 
   it("discards without sending a message", async () => {
@@ -132,7 +170,7 @@ describe("DraftActionCard", () => {
     expect(updateDraftAction).toHaveBeenCalledWith(
       expect.objectContaining({ status: "discarded" }),
     );
-    expect(send).not.toHaveBeenCalled();
+    expect(submitDraftAction).not.toHaveBeenCalled();
   });
 
   it("locks a non-draft card: read-only fields and no action row", () => {
@@ -144,5 +182,34 @@ describe("DraftActionCard", () => {
     expect([...container.querySelectorAll("button")].map((b) => b.textContent)).not.toContain(
       "Discard",
     );
+  });
+
+  it("offers a sender picker only when the card carries allowed addresses", async () => {
+    render();
+    expect(container.querySelector("select")).toBeNull();
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    render({
+      ...draftBlock,
+      fields: [
+        {
+          key: "from",
+          label: "From",
+          value: "me@example.test",
+          options: ["me@example.test", "alias@example.test"],
+        },
+        ...draftBlock.fields,
+      ],
+    });
+    const select = container.querySelector("select") as HTMLSelectElement;
+    expect([...select.options].map((option) => option.value)).toEqual([
+      "me@example.test",
+      "alias@example.test",
+    ]);
+    expect(select.disabled).toBe(true);
+
+    await act(async () => button("Edit").click());
+    expect((container.querySelector("select") as HTMLSelectElement).disabled).toBe(false);
   });
 });

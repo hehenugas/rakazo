@@ -7,9 +7,11 @@ import type {
   VoiceProvider,
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
+  VoiceTranscribeResult,
   VoiceVerifyResult,
 } from "@rakazo/adapter-kit";
 import { getLogger } from "@rakazo/logging";
+import { parseTranscriptSegments } from "./transcript-segments.js";
 import {
   readVoiceAudio,
   readVoiceJson,
@@ -101,14 +103,14 @@ export class FishAudioVoiceProvider implements VoiceProvider {
   async transcribe(
     request: VoiceTranscribeRequest,
     context: AdapterContext,
-  ): Promise<{ text: string }> {
+  ): Promise<VoiceTranscribeResult> {
     const form = new FormData();
     form.set(
       "audio",
       new Blob([new Uint8Array(request.audio)], { type: request.mimeType || "audio/webm" }),
       speechUploadName(request.mimeType),
     );
-    form.set("ignore_timestamps", "true");
+    form.set("ignore_timestamps", "false");
     const res = await fetch(`${API}/v1/asr`, {
       method: "POST",
       headers: fishAudioHeaders(request.apiKey),
@@ -117,7 +119,10 @@ export class FishAudioVoiceProvider implements VoiceProvider {
     });
     const body = await readFishResponse(res);
     if (!res.ok) rejectFish(res.status, "transcribing", body, request.apiKey);
-    return { text: String((body as { text?: unknown } | null)?.text ?? "").trim() };
+    const parsed = body as { text?: unknown; segments?: unknown } | null;
+    const text = String(parsed?.text ?? "").trim();
+    const segments = parseTranscriptSegments(parsed?.segments);
+    return segments.length > 0 ? { text, segments } : { text };
   }
 }
 

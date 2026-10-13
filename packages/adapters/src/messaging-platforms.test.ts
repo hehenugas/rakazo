@@ -8,6 +8,7 @@ import {
   messagingEnvFromProcess,
   messagingPlatformsFromEnv,
   parseSendblueStatus,
+  slackOutboundSanitizer,
 } from "./messaging-platforms.js";
 
 // Fake credentials: adapters are constructed offline, never called.
@@ -334,5 +335,12 @@ describe("enrichSlackTeamRoom", () => {
       base,
     );
     expect(enrichment.kind).toBe("mention");
+  });
+});
+
+describe("slackOutboundSanitizer", () => {
+  it("never pings the channel, and does not call Slack when no group is mentioned", async () => {
+    const sanitize = slackOutboundSanitizer("xoxb-test");
+    expect(await sanitize("hello <!channel> and <!here>")).toBe("hello @channel and @here");
   });
 });

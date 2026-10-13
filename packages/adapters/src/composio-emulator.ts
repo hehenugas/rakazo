@@ -127,6 +127,10 @@ const GMAIL_TOOLS: ConnectorTool[] = [
         cc: { type: "array", items: { type: "string" } },
         bcc: { type: "array", items: { type: "string" } },
         is_html: { type: "boolean" },
+        from_email: {
+          type: "string",
+          description: "Verified send-as address to send from; defaults to the primary address",
+        },
       },
       required: ["subject"],
     },
@@ -157,6 +161,47 @@ const GMAIL_TOOLS: ConnectorTool[] = [
         include_details: { type: "boolean" },
       },
     },
+  },
+  {
+    name: "GMAIL_LIST_SEND_AS",
+    description: "List the send-as addresses the connected Gmail account may send from",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "GMAIL_ADD_LABEL_TO_EMAIL",
+    description: "Add and/or remove labels on a Gmail message, for example to move it out of spam",
+    inputSchema: {
+      type: "object",
+      properties: {
+        message_id: { type: "string", description: "Gmail message id" },
+        add_label_ids: { type: "array", items: { type: "string" } },
+        remove_label_ids: { type: "array", items: { type: "string" } },
+      },
+      required: ["message_id"],
+    },
+  },
+];
+
+/** The primary address of the emulated account, and the aliases it may send from. */
+const PRIMARY_ADDRESS = "me@example.test";
+const SEND_AS_ALIASES = [
+  {
+    sendAsEmail: PRIMARY_ADDRESS,
+    displayName: "Me",
+    isPrimary: true,
+    verificationStatus: "accepted",
+  },
+  {
+    sendAsEmail: "team@example.test",
+    displayName: "Team",
+    isPrimary: false,
+    verificationStatus: "accepted",
+  },
+  {
+    sendAsEmail: "pending@example.test",
+    displayName: "Pending",
+    isPrimary: false,
+    verificationStatus: "pending",
   },
 ];
 
@@ -216,6 +261,17 @@ function seedMailbox(): Mailbox {
         messageText: "Thanks — I'll update the timeline today.",
         labelIds: ["SENT"],
         internalDate: String(base + 90_000_000),
+      },
+      {
+        messageId: "18c5f5d1a2b3c4d8",
+        threadId: "18c5f5d1a2b3c4d8",
+        subject: "Invoice for last week's call",
+        sender: "billing@vendor.example.test",
+        to: "me@example.test",
+        snippet: "Please find the invoice attached.",
+        messageText: "Please find the invoice attached.",
+        labelIds: ["SPAM"],
+        internalDate: String(base + 95_000_000),
       },
     ],
     drafts: [],
@@ -623,12 +679,25 @@ export class ComposioEmulator implements ComposioProvider {
             data: null,
           };
         }
+        const fromEmail = asString(args.from_email).trim();
+        const alias = fromEmail
+          ? SEND_AS_ALIASES.find(
+              (candidate) => candidate.sendAsEmail.toLowerCase() === fromEmail.toLowerCase(),
+            )
+          : undefined;
+        if (fromEmail && alias?.verificationStatus !== "accepted") {
+          return {
+            successful: false,
+            error: `from_email ${fromEmail} is not a verified send-as address`,
+            data: null,
+          };
+        }
         const ids = this.nextIds(mailbox);
         const message: MailMessage = {
           messageId: ids.messageId,
           threadId: ids.threadId,
           subject: subject || "(no subject)",
-          sender: "me@example.test",
+          sender: alias?.sendAsEmail ?? PRIMARY_ADDRESS,
           to: recipient,
           snippet: body.slice(0, 120),
           messageText: body,
@@ -709,6 +778,33 @@ export class ComposioEmulator implements ComposioProvider {
           };
         });
         return { successful: true, data: { labels } };
+      }
+      case "GMAIL_LIST_SEND_AS":
+        return {
+          successful: true,
+          data: { sendAs: SEND_AS_ALIASES.map((alias) => ({ ...alias })) },
+        };
+      case "GMAIL_ADD_LABEL_TO_EMAIL": {
+        const messageId = asString(args.message_id);
+        const message = mailbox.messages.find((item) => item.messageId === messageId);
+        if (!message) {
+          return { successful: false, error: `Message not found: ${messageId}`, data: null };
+        }
+        const known = new Set<string>(SYSTEM_LABELS.map((label) => label.id));
+        const add = asStringArray(args.add_label_ids);
+        const remove = asStringArray(args.remove_label_ids);
+        const unknown = [...add, ...remove].find((id) => !known.has(id));
+        if (unknown) {
+          return { successful: false, error: `Unknown label: ${unknown}`, data: null };
+        }
+        message.labelIds = [
+          ...message.labelIds.filter((id) => !remove.includes(id)),
+          ...add,
+        ].filter((id, index, all) => all.indexOf(id) === index);
+        return {
+          successful: true,
+          data: { messageId: message.messageId, labelIds: [...message.labelIds] },
+        };
       }
       default:
         return {

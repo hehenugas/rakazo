@@ -1,7 +1,12 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SCRIPTED_MPEG, SCRIPTED_TRANSCRIPT, SCRIPTED_VOICE_ID } from "@rakazo/adapters";
+import {
+  SCRIPTED_MPEG,
+  SCRIPTED_TRANSCRIPT,
+  SCRIPTED_TRANSCRIPT_SEGMENTS,
+  SCRIPTED_VOICE_ID,
+} from "@rakazo/adapters";
 import type { PrismaClient } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { BotIntroHarness } from "./discard-bot-intro.js";
@@ -114,7 +119,10 @@ describeVoice("voice credentials and speech HTTP", () => {
       }),
     });
     expect(transcribed.status).toBe(200);
-    expect(await transcribed.json()).toEqual({ text: SCRIPTED_TRANSCRIPT });
+    expect(await transcribed.json()).toEqual({
+      text: SCRIPTED_TRANSCRIPT,
+      segments: SCRIPTED_TRANSCRIPT_SEGMENTS,
+    });
 
     const bot = await rpc<{ id: string }>(app, cookie, "bots/create", {
       name: "Speaker",

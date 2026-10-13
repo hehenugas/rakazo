@@ -8,7 +8,22 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 
 ## Current Phase
 
-**Phase 21 — Transcript, Voice, Approvals & Connect Apps Parity (TODO — next up)**
+**Phase 23 — Cross-Platform Experience Release Gate (DOING — Claude Code; CI, Electron, device, and maintainer items open)**
+
+## M4 (in progress; parity work integrated into fork `main` on 2026-10-13; release gate open)
+
+M4 follows `.planning/M4-EXECUTION-PLAN.md`. M3 Phase 23 is still DOING; the maintainer directed M4 to proceed anyway (recorded in `phases/24-reference-lock-baseline/SPEC.md`). M4 status is tracked in this table only; no M4 phase is DONE unless its checklist says so.
+
+| Phase | Status | Last Update |
+|---|---|---|
+| 24 Reference lock & baseline | DONE (audit deliverables; P24-04 open) | 2026-10-12 |
+| 25 M3 completion & runtime reliability | DOING (P25-01, P25-04 open) | 2026-10-12 |
+| 26 Daily UX parity | DOING (P26-05 open; web only) | 2026-10-12 |
+| 27 Email action parity | DOING (P27-04/05 provider-dependent, not done) | 2026-10-12 |
+| 28 Slide decks & export | DOING (P28-05 Google Slides not offered) | 2026-10-12 |
+| 29 Mobile capability & voice | DOING (device items blocked) | 2026-10-12 |
+| 30 Messaging & integration edge parity | DOING (P30-03 open) | 2026-10-12 |
+| 31 M4 release & upstream gate | DOING (CI, Electron, devices, maintainer approval open) | 2026-10-12 |
 
 ## Previous Milestones
 
@@ -40,12 +55,9 @@ M1 and M2 remain completed historical milestones. M3 does not pursue pixel-perfe
 | 18 Routines & Scheduling Experience Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 19 Team Bot Publish & Shared Setup Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
 | 20 Composer & Message Delivery Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
-| 20 Composer & Message Delivery Parity | DONE | ZCode (GLM) | main (fork) | 2026-10-06 |
-| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
-| 21 Transcript/Voice/Approvals/Connect Apps Parity | TODO | — | — | 2026-10-06 |
-| 22 Projects/Delegation/Main Bot Parity | TODO | — | — | 2026-10-06 |
-| 23 Cross-Platform Experience Release Gate | TODO | — | — | 2026-10-06 |
+| 21 Transcript/Voice/Approvals/Connect Apps Parity | DONE | Claude Code (Sonnet 5.5) | main (fork) | 2026-10-11 |
+| 22 Projects/Delegation/Main Bot Parity | DONE | Claude Code (Sonnet 5.5) | main (fork) | 2026-10-11 |
+| 23 Cross-Platform Experience Release Gate | DOING | Claude Code (Sonnet 5.5) | main (fork) | 2026-10-11 |
 
 ## Active Blockers
 

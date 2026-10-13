@@ -9,7 +9,7 @@ test("advanced GraphQL install shows Add GraphQL in MCP, OpenAPI, GraphQL, Execu
   await completeOnboarding(page);
 
   await page.getByRole("button", { name: "Connect apps" }).click();
-  await expect(page.getByPlaceholder("Search apps")).toBeVisible();
+  await expect(page.getByPlaceholder("Search plugins")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add GraphQL", exact: true })).toBeHidden();
 
   const advanced = page.getByTestId("integrations-advanced");

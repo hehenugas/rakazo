@@ -7,6 +7,7 @@ import type {
   VoiceProvider,
   VoiceSynthesizeRequest,
   VoiceTranscribeRequest,
+  VoiceTranscribeResult,
   VoiceVerifyResult,
 } from "@rakazo/adapter-kit";
 import {
@@ -83,7 +84,7 @@ export class OpenAIVoiceProvider implements VoiceProvider {
   async transcribe(
     request: VoiceTranscribeRequest,
     context: AdapterContext,
-  ): Promise<{ text: string }> {
+  ): Promise<VoiceTranscribeResult> {
     const form = new FormData();
     form.set("model", STT_MODEL);
     form.set(

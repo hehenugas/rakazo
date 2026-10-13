@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { VoiceTranscript } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { LoaderCircle, Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -33,7 +34,7 @@ export function VoiceMemoButton({
 }: {
   disabled?: boolean;
   transcribe: boolean;
-  onReady: (file: File, transcript: string) => Promise<void>;
+  onReady: (file: File, transcript: VoiceTranscript | null) => Promise<void>;
 }) {
   const { t } = useLingui();
   const [state, setState] = useState<RecorderState>("idle");
@@ -53,7 +54,7 @@ export function VoiceMemoButton({
   async function finish(blob: Blob) {
     setState("transcribing");
     try {
-      let transcript = "";
+      let transcript: VoiceTranscript | null = null;
       if (transcribe) {
         const audioBase64 = await blobToBase64(blob);
         const response = await fetch("/api/voice/transcribe", {
@@ -62,9 +63,15 @@ export function VoiceMemoButton({
           credentials: "include",
           body: JSON.stringify({ audioBase64, mimeType: blob.type || "audio/webm" }),
         });
-        const body = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+        const body = (await response.json().catch(() => ({}))) as {
+          text?: string;
+          segments?: VoiceTranscript["segments"];
+          error?: string;
+        };
         if (!response.ok) throw new Error(body.error ?? "Could not transcribe voice memo.");
-        transcript = body.text?.trim() ?? "";
+        const text = body.text?.trim() ?? "";
+        if (text)
+          transcript = { text, ...(body.segments?.length ? { segments: body.segments } : {}) };
       }
       const extension = blob.type.includes("ogg") ? "ogg" : "webm";
       const file = new File([blob], `voice-memo-${Date.now()}.${extension}`, {

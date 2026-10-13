@@ -69,6 +69,13 @@ describe("connectorToolRequiresApproval", () => {
     expect(connectorToolRequiresApproval("send_message")).toBe(true);
   });
 
+  it("gates moving mail out of spam, and treats a send-as lookup as a send by name", () => {
+    // The name check stays conservative: "send" in a read tool's name still asks first.
+    expect(connectorToolRequiresApproval("GMAIL_LIST_SEND_AS")).toBe(true);
+    expect(connectorToolRequiresApproval("GMAIL_ADD_LABEL_TO_EMAIL")).toBe(true);
+    expect(connectorToolRequiresApproval("GMAIL_MOVE_TO_INBOX")).toBe(true);
+  });
+
   it("requires approval for a declared write whatever its name says", () => {
     expect(connectorToolRequiresApproval("read_profile_card", false)).toBe(true);
     expect(connectorToolRequiresApproval("find_validator_record", false)).toBe(true);

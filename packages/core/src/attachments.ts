@@ -6,6 +6,7 @@ import {
   isAttachmentAudioMimeType,
   isAttachmentImageMimeType,
   type MessageBlock,
+  VoiceTranscriptSchema,
 } from "@rakazo/contracts";
 
 export class AttachmentValidationError extends Error {
@@ -73,6 +74,8 @@ export function messageBlockForArtifact(artifact: {
   name: string;
   mimeType: string;
   size: number;
+  /** Stored JSON; invalid shapes are dropped so a bad row never breaks a thread. */
+  transcript?: unknown;
 }): Extract<MessageBlock, { kind: "image" | "voice_memo" | "file" }> {
   if (attachmentKindForMimeType(artifact.mimeType) === "image") {
     return {
@@ -83,12 +86,15 @@ export function messageBlockForArtifact(artifact: {
     };
   }
   if (attachmentKindForMimeType(artifact.mimeType) === "voice_memo") {
+    const parsed = VoiceTranscriptSchema.safeParse(artifact.transcript);
+    const transcript = parsed.success ? parsed.data : undefined;
     return {
       kind: "voice_memo",
       artifactId: artifact.id,
       mimeType: artifact.mimeType,
       name: artifact.name,
       size: artifact.size,
+      ...(transcript ? { transcript } : {}),
     };
   }
   return {
@@ -120,6 +126,7 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       if (block.kind === "text") return block.text;
       if (block.kind === "chart") return `[chart: ${block.name}]`;
       if (block.kind === "image") return `[image: ${block.name}]`;
+      if (block.kind === "deck") return `[slide deck: ${block.title} (${block.slideCount} slides)]`;
       if (block.kind === "file") {
         return `[file: ${block.name} (${block.mimeType}, ${block.size} bytes)]`;
       }

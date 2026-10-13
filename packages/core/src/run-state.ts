@@ -1,4 +1,5 @@
 import type { RunStatus } from "@rakazo/contracts";
+import { PROJECT_TASK_RUN_TRIGGER } from "./project-status.js";
 
 export const ACTIVE_RUN_STATUSES = [
   "queued",
@@ -13,7 +14,12 @@ const TERMINAL: RunStatus[] = ["completed", "failed", "cancelled"];
  * Routine and webhook runs are not the conversation. The creation intro has no tools;
  * a message that lands during it waits, and the continuation after the intro finishes answers it.
  */
-const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set(["routine", "webhook", "created"]);
+const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
+  "routine",
+  "webhook",
+  "created",
+  PROJECT_TASK_RUN_TRIGGER,
+]);
 
 const allowed: Record<RunStatus, RunStatus[]> = {
   queued: ["leased", "cancelled"],

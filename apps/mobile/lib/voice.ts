@@ -145,32 +145,69 @@ async function renderUtterance(
   }
 }
 
-export async function playMpeg(bytes: Uint8Array): Promise<void> {
+export type PlaybackOptions = {
+  /** Called with the playback position in seconds, for highlighting a timed transcript. */
+  onProgress?: (seconds: number) => void;
+  /** Provides a seek control while a player is active. */
+  onSeekReady?: (seek: (seconds: number) => void) => void;
+};
+
+export async function playMpeg(bytes: Uint8Array, options: PlaybackOptions = {}): Promise<void> {
   const AudioCtor = (globalThis as { Audio?: typeof Audio }).Audio;
   if (typeof AudioCtor === "function") {
-    await playWithHtmlAudio(AudioCtor, bytes);
+    await playWithHtmlAudio(AudioCtor, bytes, options);
     return;
   }
-  await playWithNativeAudio(bytes);
+  await playWithNativeAudio(bytes, options);
 }
 
-async function playWithHtmlAudio(AudioCtor: typeof Audio, bytes: Uint8Array): Promise<void> {
+async function playWithHtmlAudio(
+  AudioCtor: typeof Audio,
+  bytes: Uint8Array,
+  options: PlaybackOptions,
+): Promise<void> {
   const blob = new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" });
   const url = URL.createObjectURL(blob);
   try {
     const audio = new AudioCtor(url);
     await new Promise<void>((resolve, reject) => {
       let settled = false;
+      let pendingSeek: number | null = null;
       const finish = (error?: Error) => {
         if (settled) return;
         settled = true;
         audio.onended = null;
         audio.onerror = null;
+        audio.ontimeupdate = null;
+        audio.onloadedmetadata = null;
         if (error) reject(error);
         else resolve();
       };
       audio.onended = () => finish();
       audio.onerror = () => finish(new Error(t("Could not play that clip.")));
+      audio.onloadedmetadata = () => {
+        if (pendingSeek === null) return;
+        try {
+          audio.currentTime = pendingSeek;
+        } catch {
+          // A browser may not expose a seekable range until playback starts.
+        }
+        pendingSeek = null;
+      };
+      audio.ontimeupdate = () => options.onProgress?.(audio.currentTime);
+      options.onSeekReady?.((seconds) => {
+        if (!Number.isFinite(seconds)) return;
+        const target = Math.max(0, seconds);
+        if (audio.readyState < 1) {
+          pendingSeek = target;
+          return;
+        }
+        try {
+          audio.currentTime = target;
+        } catch {
+          pendingSeek = target;
+        }
+      });
       stopPlayback = () => {
         audio.pause();
         finish();
@@ -191,7 +228,7 @@ async function playWithHtmlAudio(AudioCtor: typeof Audio, bytes: Uint8Array): Pr
   }
 }
 
-async function playWithNativeAudio(bytes: Uint8Array): Promise<void> {
+async function playWithNativeAudio(bytes: Uint8Array, options: PlaybackOptions): Promise<void> {
   const { createAudioPlayer, setAudioModeAsync } = await import("expo-audio");
   await setAudioModeAsync({
     playsInSilentMode: true,
@@ -228,6 +265,7 @@ async function playWithNativeAudio(bytes: Uint8Array): Promise<void> {
           finish();
           return;
         }
+        if (status.playing) options.onProgress?.(status.currentTime);
         if (status.playing && status.duration > 0) {
           clearTimeout(timer);
           timer = setTimeout(
@@ -235,6 +273,10 @@ async function playWithNativeAudio(bytes: Uint8Array): Promise<void> {
             Math.min(120_000, Math.ceil(status.duration * 1000) + 8_000),
           );
         }
+      });
+      options.onSeekReady?.((seconds) => {
+        if (!Number.isFinite(seconds)) return;
+        void player.seekTo(Math.max(0, seconds)).catch(() => undefined);
       });
       stopPlayback = () => {
         try {

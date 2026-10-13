@@ -2041,6 +2041,42 @@ describe("mobile thread event reduction", () => {
     expect(next?.cursor).toBe(4);
   });
 
+  it("converges on the latest card state when a reconnect replays updates, even twice", () => {
+    const project = (status: "running" | "completed", done: number) => ({
+      kind: "project" as const,
+      projectId: "project-1",
+      title: "Launch",
+      status,
+      progress: { done, total: 3 },
+    });
+    const initial = snapshot([mobileMessage("card-1", [project("running", 0)], 1)]);
+    const replay = [
+      {
+        type: "thread.message.updated" as const,
+        seq: 4,
+        payload: { messageId: "card-1", role: "bot", blocks: [project("running", 1)] },
+      },
+      {
+        type: "thread.message.updated" as const,
+        seq: 5,
+        payload: { messageId: "card-1", role: "bot", blocks: [project("completed", 3)] },
+      },
+    ];
+    const apply = (start: MobileSnapshot, events: typeof replay) =>
+      events.reduce<MobileSnapshot>(
+        (view, event) => applyMobileThreadEvent(view, event) ?? view,
+        start,
+      );
+
+    const once = apply(initial, replay);
+    const twice = apply(once, replay.slice(-1));
+
+    expect(once.cursor).toBe(5);
+    expect(once.messages).toHaveLength(1);
+    expect(once.messages[0]?.blocks).toEqual([project("completed", 3)]);
+    expect(twice.messages).toEqual(once.messages);
+  });
+
   it("appends a quoted reply carrying its excerpt", () => {
     const initial = snapshot([mobileMessage("message-1", [{ kind: "text", text: "Done" }])]);
 

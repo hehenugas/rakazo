@@ -14,7 +14,11 @@ function projectsDeps() {
       update: vi.fn(),
       create: vi.fn(),
     },
-    message: { findFirst: vi.fn(), update: vi.fn().mockResolvedValue({}) },
+    message: {
+      findFirst: vi.fn(),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     deploymentSettings: { findUnique: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaClient;
   const deps = {
@@ -117,9 +121,16 @@ describe("projects", () => {
       updatedAt: new Date("2026-01-01T00:00:00Z"),
       completedAt: null,
       tasks: [],
+      spaceId: "workspace-1",
+      userId: "user-1",
+      orchestratorRunId: null,
+      orchestratorRun: null,
+      bot: { name: "Chief", thread: { id: "thread-1" } },
     };
     prisma.project.findFirst = vi.fn().mockResolvedValue({ id: "project-1", status: "planned" });
     prisma.project.update = vi.fn().mockResolvedValue(row);
+    // Reads go through the derived summary, which loads the row with its task runs.
+    prisma.project.findMany = vi.fn().mockImplementation(async () => [row]);
 
     const complete = await rpc(handler, actor, "projects/update", {
       projectId: "project-1",
@@ -179,11 +190,11 @@ describe("threads.updateDraftAction", () => {
       messageId: "message-foreign",
       draftId: "draft-1",
       fields: [{ key: "to", label: "To", value: "a@b.test" }],
-      status: "submitted",
+      status: "draft",
     });
 
     expect(response.status).toBeGreaterThanOrEqual(400);
-    expect(prisma.message.update).not.toHaveBeenCalled();
+    expect(prisma.message.updateMany).not.toHaveBeenCalled();
   });
 
   it("rewrites only the matching draft block and reports ok", async () => {
@@ -205,19 +216,19 @@ describe("threads.updateDraftAction", () => {
       messageId: "message-1",
       draftId: "draft-1",
       fields: [{ key: "to", label: "To", value: "new@b.test" }],
-      status: "submitted",
+      status: "draft",
     });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ json: { ok: true } });
-    expect(prisma.message.update).toHaveBeenCalledWith(
+    expect(prisma.message.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "message-1" },
+        where: expect.objectContaining({ id: "message-1" }),
         data: {
           blocks: [
             expect.objectContaining({
               draftId: "draft-1",
-              status: "submitted",
+              status: "draft",
               fields: [{ key: "to", label: "To", value: "new@b.test" }],
             }),
           ],
