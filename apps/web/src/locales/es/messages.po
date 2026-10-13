@@ -780,6 +780,10 @@ msgstr "Canales"
 msgid "Chart failed to render: {error}"
 msgstr "No se pudo renderizar el gráfico: {error}"
 
+#: src/components/DeckCard.tsx
+msgid "charts"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
 msgstr "Apps de chat"
@@ -833,6 +837,10 @@ msgstr "Elegir archivo"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Elige qué modelo conectado usa Rakazo."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Clean"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -1168,6 +1176,10 @@ msgstr "No se pudo cambiar el modelo predeterminado"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not check teaching status. Refresh the view to continue."
 msgstr "No se pudo comprobar el estado de enseñanza. Actualiza la vista para continuar."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Could not choose a style"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Could not clear conversation"
@@ -1702,6 +1714,7 @@ msgstr "Atención al cliente"
 msgid "Customize bot avatar"
 msgstr "Personalizar avatar del bot"
 
+#: src/components/DeckStyleCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Oscuro"
@@ -1978,6 +1991,10 @@ msgstr "Editar perfil"
 
 #: src/pages/Shell.tsx
 msgid "Edit shared setup"
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Editorial"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -2340,6 +2357,10 @@ msgstr ""
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "Área de carga de imagen"
+
+#: src/components/DeckCard.tsx
+msgid "images"
+msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Import OpenAPI JSON"
@@ -3049,6 +3070,11 @@ msgstr "Ninguno aún"
 
 #: src/components/DraftActionCard.tsx
 msgid "Not an allowed address"
+msgstr ""
+
+#. placeholder {0}: new Intl.ListFormat(undefined, { style: "long", type: "conjunction", }).format(losses.map((loss) => lossLabels[loss]))
+#: src/components/DeckCard.tsx
+msgid "Not carried to Google Slides: {0}"
 msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
@@ -4100,6 +4126,10 @@ msgstr "Solo hablar"
 #: src/pages/Shell.tsx
 msgid "Speak this reply"
 msgstr "Leer esta respuesta"
+
+#: src/components/DeckCard.tsx
+msgid "speaker notes"
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Speech model"

@@ -468,10 +468,12 @@ export function DraftActionCard({
               <Trans>Send</Trans>
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => void discard()}>
-            <Trash2 size={14} aria-hidden="true" />
-            <Trans>Discard</Trans>
-          </Button>
+          {block.status === "draft" ? (
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void discard()}>
+              <Trash2 size={14} aria-hidden="true" />
+              <Trans>Discard</Trans>
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

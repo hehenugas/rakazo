@@ -100,6 +100,7 @@ import {
 import { MessageReactionSchema } from "./reactions.js";
 import {
   ConnectionPresentationDeliverySchema,
+  DeckStyleSchema,
   PresentationDeliveryStatusSchema,
 } from "./presentation.js";
 import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } from "./runs.js";
@@ -412,6 +413,16 @@ export const appContract = {
           draftId: Id,
           fields: DraftActionFieldsInput,
           connectionId: Id.optional(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** Record the style the user picked for a new deck and let the Bot continue with it. */
+    chooseDeckStyle: oc
+      .input(
+        threadTarget.safeExtend({
+          messageId: Id,
+          choiceId: Id,
+          style: DeckStyleSchema,
         }),
       )
       .output(z.object({ ok: z.literal(true) })),

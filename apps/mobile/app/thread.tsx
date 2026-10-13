@@ -79,6 +79,7 @@ import { AppConnectCard } from "../components/AppConnectCard";
 import { AskActions } from "../components/AskActions";
 import { BotAvatar } from "../components/bot-avatar";
 import { DeckCard } from "../components/deck-card";
+import { DeckStyleCard } from "../components/deck-style-card";
 import { McpApprovalCard } from "../components/McpApprovalCard";
 import {
   MarkdownArtifactPreview,
@@ -1990,6 +1991,7 @@ function Thread() {
               onOpenBot={openBot}
               onPreviewMarkdown={setMarkdownPreview}
               onDraftSubmit={submitDraftAction}
+              onRefresh={async () => void (await refresh())}
               actionProps={actionProps}
             />
           </Pressable>
@@ -3107,6 +3109,7 @@ const MessageBubble = memo(function MessageBubble({
   onOpenBot,
   onPreviewMarkdown,
   onDraftSubmit,
+  onRefresh,
   actionProps,
 }: {
   botId: string;
@@ -3124,6 +3127,7 @@ const MessageBubble = memo(function MessageBubble({
     message: MobileMessage,
     block: Extract<MessageBlock, { kind: "draft_action" }>,
   ) => Promise<void>;
+  onRefresh?: () => Promise<void>;
   actionProps: MessageActionProps;
 }) {
   const colorScheme = useResolvedAppearance();
@@ -3147,6 +3151,9 @@ const MessageBubble = memo(function MessageBubble({
   );
   const deckBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "deck" }> => block.kind === "deck",
+  );
+  const deckStyleBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "deck_style" }> => block.kind === "deck_style",
   );
   const projectBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "project" }> => block.kind === "project",
@@ -3572,6 +3579,15 @@ const MessageBubble = memo(function MessageBubble({
           ) : null}
         </Pressable>
       ))}
+      {deckStyleBlocks.map((block) => (
+        <DeckStyleCard
+          key={block.choiceId}
+          block={block}
+          target={artifactTarget}
+          messageId={message.id}
+          onChosen={onRefresh}
+        />
+      ))}
       {deckBlocks.map((block) => (
         <DeckCard key={block.artifactId} block={block} target={artifactTarget} />
       ))}
@@ -3674,7 +3690,11 @@ const MessageBubble = memo(function MessageBubble({
     );
   }
   if (
-    draftActionBlocks.length + projectBlocks.length + deckBlocks.length + voiceMemoBlocks.length >
+    draftActionBlocks.length +
+      projectBlocks.length +
+      deckBlocks.length +
+      deckStyleBlocks.length +
+      voiceMemoBlocks.length >
     0
   ) {
     return <View style={{ gap: 8, width: "100%" }}>{richCards}</View>;

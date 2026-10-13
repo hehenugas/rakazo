@@ -32,6 +32,10 @@ export function deckToGoogleSlidesMarkdown(deck: Deck): string {
         if (column.heading) parts.push(`## ${column.heading}`);
         parts.push(...column.bullets.map((bullet) => `- ${bullet}`));
       }
+    } else if (slide.layout === "image" && slide.image) {
+      // The Markdown import carries no pictures; keep the description so the slide still reads.
+      parts.push(`_Image: ${slide.image.alt}_`);
+      parts.push(...slide.bullets.map((bullet) => `- ${bullet}`));
     } else if (slide.layout === "chart" && slide.chart) {
       parts.push(`_${slide.chart.type} chart${slide.chart.title ? `: ${slide.chart.title}` : ""}_`);
       parts.push(`| Category | ${slide.chart.series.map((series) => series.name.replace(/\|/g, "\\|")).join(" | ")} |`);

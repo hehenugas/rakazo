@@ -13,8 +13,11 @@ import {
   downloadArtifactBytes,
 } from "../lib/artifact-open";
 import { rpc } from "../lib/rpc";
+import { DeckSlideImage } from "./DeckSlideImage";
 
 type DeckBlock = Extract<MessageBlock, { kind: "deck" }>;
+
+const DELIVERY_POLL_MS = 4000;
 
 /** A slide deck in the chat: preview, PowerPoint export, and configured Slides delivery. */
 export function DeckCard({ block, target }: { block: DeckBlock; target: ArtifactTarget }) {
@@ -69,6 +72,33 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: Artifact
     };
   }, [block.artifactId, connectionId]);
 
+  // A pending delivery finishes on the server; follow it until it reaches a final outcome.
+  const deliveryPending = deliveryStatus?.status === "pending";
+  useEffect(() => {
+    if (!deliveryPending || !connectionId) return;
+    let cancelled = false;
+    const refresh = () => {
+      void rpc.artifacts
+        .deckDeliveryStatus({ artifactId: block.artifactId, connectionId })
+        .then((status) => {
+          if (!cancelled && status) setDeliveryStatus(status);
+        })
+        .catch(() => undefined);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = window.setInterval(refresh, DELIVERY_POLL_MS);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refresh);
+    };
+  }, [deliveryPending, block.artifactId, connectionId]);
+
   async function download() {
     if (busy) return;
     setBusy(true);
@@ -117,6 +147,17 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: Artifact
     }
   };
 
+  const lossLabels = {
+    notes: t`speaker notes`,
+    charts: t`charts`,
+    images: t`images`,
+  };
+  const losses = block.googleSlidesLosses ?? [];
+  const showLosses =
+    deliveryOptions !== null &&
+    deliveryOptions.length > 0 &&
+    losses.length > 0 &&
+    (!deliveryStatus || deliveryStatus.status === "failed" || deliveryStatus.status === "unsupported");
   const hidden = block.slideCount - block.slides.length;
   return (
     <div
@@ -213,6 +254,11 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: Artifact
                   </div>
                 ))}
               </div>
+            ) : slide.layout === "image" && slide.image ? (
+              <DeckSlideImage
+                image={slide.image}
+                className="mt-1 h-[calc(100%-1.25rem)] w-full rounded object-contain"
+              />
             ) : slide.layout === "chart" && slide.chart ? (
               <div className="mt-2 min-w-0 text-[8.5px] leading-tight text-muted-foreground">
                 <div className="mb-1 truncate font-medium">
@@ -252,6 +298,14 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: Artifact
         ) : null}
       </ul>
 
+      {showLosses ? (
+        <div className="mt-3 text-[12px] text-muted-foreground">
+          {t`Not carried to Google Slides: ${new Intl.ListFormat(undefined, {
+            style: "long",
+            type: "conjunction",
+          }).format(losses.map((loss) => lossLabels[loss]))}`}
+        </div>
+      ) : null}
       {error ? (
         <div role="alert" className="mt-3 text-[12px] text-destructive">
           {error}

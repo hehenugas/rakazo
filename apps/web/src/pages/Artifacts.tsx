@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { deckSurfaceClass } from "../components/deck-surface";
+import { DeckSlideImage } from "../components/DeckSlideImage";
 import { PdfViewer } from "../components/PdfViewer";
 import { SandboxedHtmlViewer } from "../components/SandboxedHtmlViewer";
 import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
@@ -994,12 +996,7 @@ function DeckArtifactPreview({ bytes }: { bytes: Uint8Array }) {
     );
   }
   const { deck } = parsed;
-  const previewSurface =
-    deck.style === "dark"
-      ? "bg-foreground text-background"
-      : deck.style === "editorial"
-        ? "bg-muted/50 text-foreground"
-        : "bg-card text-foreground";
+  const previewSurface = deckSurfaceClass(deck.style);
   return (
     <div className="h-full overflow-y-auto bg-muted/40 p-4 sm:p-6" data-testid="deck-artifact-preview">
       <div className="mx-auto max-w-5xl space-y-4">
@@ -1076,6 +1073,20 @@ function DeckArtifactPreview({ bytes }: { bytes: Uint8Array }) {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            ) : slide.layout === "image" && slide.image ? (
+              <div className={`grid h-[75%] gap-4 ${slide.bullets.length > 0 ? "grid-cols-2" : ""}`}>
+                <DeckSlideImage
+                  image={slide.image}
+                  className="h-full w-full rounded-lg object-contain"
+                />
+                {slide.bullets.length > 0 ? (
+                  <ul className="list-disc space-y-1.5 ps-5 text-sm text-muted-foreground sm:space-y-3 sm:text-lg">
+                    {slide.bullets.map((bullet, bulletIndex) => (
+                      <li key={bulletIndex}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ) : slide.layout === "section" ? null : (
               <ul className="list-disc space-y-1.5 ps-5 text-sm text-muted-foreground sm:space-y-3 sm:text-lg">

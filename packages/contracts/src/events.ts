@@ -1,7 +1,7 @@
 import * as z from "zod";
 import { botSecretDestinationSchema } from "./bot-secrets.js";
 import { Id } from "./ids.js";
-import { DeckSlidePreviewSchema, DeckStyleSchema } from "./presentation.js";
+import { DeckExportLossSchema, DeckSlidePreviewSchema, DeckStyleSchema } from "./presentation.js";
 import { McpTransportSchema } from "./mcp.js";
 
 /** Voice memo transcript. `segments` (seconds) exist only when the provider returned timing. */
@@ -243,7 +243,15 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     title: z.string(),
     slideCount: z.number().int().nonnegative(),
     style: DeckStyleSchema.optional(),
+    /** Content a Markdown-based Google Slides import cannot keep; shown before delivery. */
+    googleSlidesLosses: z.array(DeckExportLossSchema).optional(),
     slides: z.array(DeckSlidePreviewSchema).max(12),
+  }),
+  z.object({
+    /** Style choice for a new deck. The user's selection, not model text, decides the style. */
+    kind: z.literal("deck_style"),
+    choiceId: Id,
+    selected: DeckStyleSchema.optional(),
   }),
   z.object({
     /** Durable multi-step work surfaced in Conversation Details > Tasks. */

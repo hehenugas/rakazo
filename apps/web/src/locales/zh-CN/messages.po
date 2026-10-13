@@ -780,6 +780,10 @@ msgstr "频道"
 msgid "Chart failed to render: {error}"
 msgstr "图表渲染失败：{error}"
 
+#: src/components/DeckCard.tsx
+msgid "charts"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
 msgstr "聊天应用"
@@ -833,6 +837,10 @@ msgstr "选择文件"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "选择 Rakazo 使用的已连接模型。"
+
+#: src/components/DeckStyleCard.tsx
+msgid "Clean"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -1167,6 +1175,10 @@ msgstr "无法更改默认模型"
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not check teaching status. Refresh the view to continue."
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Could not choose a style"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -1702,6 +1714,7 @@ msgstr "客户支持"
 msgid "Customize bot avatar"
 msgstr "自定义机器人头像"
 
+#: src/components/DeckStyleCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "深色"
@@ -1978,6 +1991,10 @@ msgstr "编辑资料"
 
 #: src/pages/Shell.tsx
 msgid "Edit shared setup"
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Editorial"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -2340,6 +2357,10 @@ msgstr ""
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "图片上传区域"
+
+#: src/components/DeckCard.tsx
+msgid "images"
+msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Import OpenAPI JSON"
@@ -3049,6 +3070,11 @@ msgstr "暂无"
 
 #: src/components/DraftActionCard.tsx
 msgid "Not an allowed address"
+msgstr ""
+
+#. placeholder {0}: new Intl.ListFormat(undefined, { style: "long", type: "conjunction", }).format(losses.map((loss) => lossLabels[loss]))
+#: src/components/DeckCard.tsx
+msgid "Not carried to Google Slides: {0}"
 msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
@@ -4100,6 +4126,10 @@ msgstr "仅朗读"
 #: src/pages/Shell.tsx
 msgid "Speak this reply"
 msgstr "朗读这条回复"
+
+#: src/components/DeckCard.tsx
+msgid "speaker notes"
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Speech model"

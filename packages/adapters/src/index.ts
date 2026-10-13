@@ -99,6 +99,7 @@ export * from "./pi-openai-compatible-provider.js";
 export * from "./pi-runtime.js";
 export * from "./pi-session.js";
 export * from "./pipedream-connector.js";
+export * from "./presentation-images.js";
 export * from "./presentation-pptx.js";
 export * from "./google-slides-delivery.js";
 export * from "./private-endpoint.js";

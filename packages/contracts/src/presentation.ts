@@ -5,7 +5,7 @@ export const DECK_STYLES = ["clean", "editorial", "dark"] as const;
 export const DeckStyleSchema = z.enum(DECK_STYLES);
 export type DeckStyle = z.infer<typeof DeckStyleSchema>;
 
-export const DECK_LAYOUTS = ["title_bullets", "section", "quote", "two_column", "chart"] as const;
+export const DECK_LAYOUTS = ["title_bullets", "section", "quote", "two_column", "chart", "image"] as const;
 export const DeckLayoutSchema = z.enum(DECK_LAYOUTS);
 export type DeckLayout = z.infer<typeof DeckLayoutSchema>;
 
@@ -30,6 +30,22 @@ export const DeckChartSchema = z.object({
 });
 export type DeckChart = z.infer<typeof DeckChartSchema>;
 
+/** Raster formats a deck image may use; SVG is never embedded. */
+export const DECK_IMAGE_MIME_TYPES = ["image/png", "image/jpeg"] as const;
+export const DECK_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+/** An owned image artifact shown on a slide; the bytes stay in artifact storage, not in the deck. */
+export const DeckImageSchema = z.object({
+  artifactId: Id,
+  alt: z.string().max(300),
+});
+export type DeckImage = z.infer<typeof DeckImageSchema>;
+
+/** What the Google Slides Markdown import cannot carry over from a deck. */
+export const DECK_EXPORT_LOSSES = ["notes", "charts", "images"] as const;
+export const DeckExportLossSchema = z.enum(DECK_EXPORT_LOSSES);
+export type DeckExportLoss = z.infer<typeof DeckExportLossSchema>;
+
 export const DeckSlidePreviewSchema = z.object({
   title: z.string(),
   bullets: z.array(z.string()),
@@ -39,6 +55,7 @@ export const DeckSlidePreviewSchema = z.object({
   leftColumn: DeckColumnPreviewSchema.optional(),
   rightColumn: DeckColumnPreviewSchema.optional(),
   chart: DeckChartSchema.optional(),
+  image: DeckImageSchema.optional(),
 });
 
 export type DeckSlidePreview = z.infer<typeof DeckSlidePreviewSchema>;

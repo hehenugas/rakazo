@@ -1,4 +1,10 @@
-import type { DeckChart as DeckChartData, DeckLayout, DeckStyle } from "@rakazo/contracts";
+import type {
+  DeckChart as DeckChartData,
+  DeckExportLoss,
+  DeckImage,
+  DeckLayout,
+  DeckStyle,
+} from "@rakazo/contracts";
 import { DECK_LAYOUTS, DECK_STYLES } from "@rakazo/contracts";
 
 /**
@@ -19,6 +25,8 @@ export const DECK_LIMITS = {
   columnBullets: 6,
   chartCategories: 12,
   chartSeries: 4,
+  imageAlt: 300,
+  images: 12,
 } as const;
 
 export interface DeckColumn {
@@ -38,6 +46,7 @@ export interface DeckSlide {
   leftColumn?: DeckColumn;
   rightColumn?: DeckColumn;
   chart?: DeckChart;
+  image?: DeckImage;
 }
 
 export interface Deck {
@@ -85,6 +94,25 @@ function parseColumn(
     .map((bullet) => text(bullet, DECK_LIMITS.bullet).replace(/\n/g, " "))
     .filter(Boolean);
   return { column: heading || bullets.length ? { ...(heading ? { heading } : {}), bullets } : null };
+}
+
+function parseImage(
+  value: unknown,
+  slideNumber: number,
+): { image: DeckImage | null } | { error: string } {
+  if (value === undefined || value === null) return { image: null };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { error: `Slide ${slideNumber} has invalid image content.` };
+  }
+  const raw = value as { artifactId?: unknown; alt?: unknown };
+  const artifactId = typeof raw.artifactId === "string" ? raw.artifactId.trim() : "";
+  // Ids are opaque storage identifiers; a URL or path is never an image reference.
+  if (!artifactId || artifactId.length > 128 || !/^[A-Za-z0-9_-]+$/.test(artifactId)) {
+    return { error: `Slide ${slideNumber} image must reference one of your image artifacts.` };
+  }
+  const alt = text(raw.alt, DECK_LIMITS.imageAlt).replace(/\n/g, " ");
+  if (!alt) return { error: `Slide ${slideNumber} image needs a short description.` };
+  return { image: { artifactId, alt } };
 }
 
 function parseChart(value: unknown, slideNumber: number): { chart: DeckChart | null } | { error: string } {
@@ -189,6 +217,7 @@ export function parseDeck(input: unknown): { deck: Deck } | { error: string } {
       leftColumn?: unknown;
       rightColumn?: unknown;
       chart?: unknown;
+      image?: unknown;
     };
     const slideTitle = text(slide.title, DECK_LIMITS.title).replace(/\n/g, " ");
     if (!slideTitle) return { error: `Slide ${index + 1} needs a title.` };
@@ -211,6 +240,14 @@ export function parseDeck(input: unknown): { deck: Deck } | { error: string } {
     if ("error" in rightColumn) return rightColumn;
     const chart = parseChart(slide.chart, index + 1);
     if ("error" in chart) return chart;
+    const image = parseImage(slide.image, index + 1);
+    if ("error" in image) return image;
+    if (layout === "image" && !image.image) {
+      return { error: `Slide ${index + 1} needs an image for the image layout.` };
+    }
+    if (layout !== "image" && image.image) {
+      return { error: `Slide ${index + 1} image requires the image layout.` };
+    }
     if (layout === "quote" && !quote) {
       return { error: `Slide ${index + 1} needs quote text for the quote layout.` };
     }
@@ -236,7 +273,11 @@ export function parseDeck(input: unknown): { deck: Deck } | { error: string } {
       ...(leftColumn.column ? { leftColumn: leftColumn.column } : {}),
       ...(rightColumn.column ? { rightColumn: rightColumn.column } : {}),
       ...(chart.chart ? { chart: chart.chart } : {}),
+      ...(image.image ? { image: image.image } : {}),
     });
+  }
+  if (slides.filter((candidate) => candidate.image).length > DECK_LIMITS.images) {
+    return { error: `A deck can have at most ${DECK_LIMITS.images} images.` };
   }
   return { deck: { version: DECK_VERSION, title, style, slides } };
 }
@@ -249,6 +290,20 @@ export function deckArtifactName(title: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
   return `${slug || "deck"}.deck.json`;
+}
+
+/** Distinct image artifacts a deck refers to, in slide order. */
+export function deckImageArtifactIds(deck: Deck): string[] {
+  return [...new Set(deck.slides.flatMap((slide) => (slide.image ? [slide.image.artifactId] : [])))];
+}
+
+/** Content a Markdown-only Google Slides import drops, so the user hears about it before delivery. */
+export function deckGoogleSlidesLosses(deck: Deck): DeckExportLoss[] {
+  const losses: DeckExportLoss[] = [];
+  if (deck.slides.some((slide) => slide.notes)) losses.push("notes");
+  if (deck.slides.some((slide) => slide.chart)) losses.push("charts");
+  if (deck.slides.some((slide) => slide.image)) losses.push("images");
+  return losses;
 }
 
 export const DECK_PREVIEW_SLIDES = 12;
@@ -281,6 +336,7 @@ export function deckPreview(deck: Deck) {
           },
         }
       : {}),
+    ...(slide.image ? { image: slide.image } : {}),
     ...(slide.chart
       ? {
           chart: {

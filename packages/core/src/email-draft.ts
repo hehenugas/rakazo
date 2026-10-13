@@ -31,6 +31,23 @@ export function emailDraftActionNonce(draftId: string, attempt = 1): string {
     : `${EMAIL_DRAFT_ACTION_NONCE_PREFIX}${draftId}:retry:${attempt}`;
 }
 
+/** The draft and attempt a submit nonce names, or null when the nonce is not a draft action's. */
+export function parseEmailDraftActionNonce(
+  nonce: string | null | undefined,
+): { draftId: string; attempt: number } | null {
+  if (!nonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return null;
+  const [draftId, marker, count, ...rest] = nonce
+    .slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length)
+    .split(":");
+  if (!draftId) return null;
+  if (marker === undefined) return { draftId, attempt: 1 };
+  const attempt = Number(count);
+  if (marker !== "retry" || rest.length > 0 || !Number.isInteger(attempt) || attempt < 2) {
+    return null;
+  }
+  return { draftId, attempt };
+}
+
 /** Provider names in draft cards and connection rows may use their display spelling. */
 export function emailProviderMatches(left: string, right: string): boolean {
   const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");

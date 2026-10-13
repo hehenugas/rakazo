@@ -1,4 +1,5 @@
 import type { Deck, DeckColumn } from "@rakazo/core";
+import type { DeckImageBytes } from "./presentation-images.js";
 import type { DeckStyle } from "@rakazo/contracts";
 import PptxGenJSImport from "pptxgenjs";
 
@@ -68,7 +69,10 @@ function addColumn(
 }
 
 /** Render one editable presentation from the canonical deck model. */
-export async function renderDeckPptx(deck: Deck): Promise<Uint8Array> {
+export async function renderDeckPptx(
+  deck: Deck,
+  images: ReadonlyMap<string, DeckImageBytes> = new Map(),
+): Promise<Uint8Array> {
   const pptx = new PptxGenJS();
   const theme = THEMES[deck.style ?? "clean"];
   pptx.layout = "LAYOUT_16x9";
@@ -147,6 +151,31 @@ export async function renderDeckPptx(deck: Deck): Promise<Uint8Array> {
             color: theme.muted,
             align: "right",
             fit: "shrink",
+          });
+        }
+      } else if (layout === "image" && slide.image) {
+        const image = images.get(slide.image.artifactId);
+        const hasText = slide.bullets.length > 0;
+        if (image) {
+          // The picture stays raster; the text beside it stays editable.
+          page.addImage({
+            data: `${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`,
+            x: 0.95,
+            y: 1.55,
+            w: hasText ? 5.6 : 11.1,
+            h: 4.7,
+            sizing: { type: "contain", w: hasText ? 5.6 : 11.1, h: 4.7 },
+            altText: slide.image.alt,
+          });
+        }
+        if (hasText) {
+          addBullets(page, slide.bullets, {
+            x: 6.95,
+            y: 1.65,
+            w: 5.25,
+            h: 4.6,
+            color: theme.text,
+            fontSize: 18,
           });
         }
       } else if (layout === "two_column") {

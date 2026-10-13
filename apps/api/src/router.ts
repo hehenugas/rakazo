@@ -207,6 +207,7 @@ import {
   resolveBusyBotName,
   toComputerStatus,
 } from "./computer-status.js";
+import { chooseDeckStyle } from "./deck-style.js";
 import { submitDraftAction, updateDraftAction } from "./draft-actions.js";
 import { verifiedEmailSenders } from "./email-senders.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
@@ -2377,6 +2378,22 @@ export function createRouter(deps: RouterDeps) {
             listVerifiedEmailSenders: (connectionId) =>
               verifiedEmailSenders(deps, context.actor, connectionId, context.signal),
           },
+          context.actor,
+          target,
+          input,
+        );
+        return { ok: true as const };
+      }),
+      chooseDeckStyle: authed.threads.chooseDeckStyle.handler(async ({ context, input }) => {
+        if ((await modelSetup(deps, context.actor)).needsModel) {
+          throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
+        }
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot") {
+          await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
+        }
+        await chooseDeckStyle(
+          { prisma: deps.prisma, events: deps.events, jobs: deps.jobs },
           context.actor,
           target,
           input,

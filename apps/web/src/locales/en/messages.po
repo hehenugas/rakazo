@@ -780,6 +780,10 @@ msgstr "Channels"
 msgid "Chart failed to render: {error}"
 msgstr "Chart failed to render: {error}"
 
+#: src/components/DeckCard.tsx
+msgid "charts"
+msgstr "charts"
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
 msgstr "Chat apps"
@@ -833,6 +837,10 @@ msgstr "Choose file"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Choose which connected model Rakazo uses."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Clean"
+msgstr "Clean"
 
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -1168,6 +1176,10 @@ msgstr "Could not change the default model"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not check teaching status. Refresh the view to continue."
 msgstr "Could not check teaching status. Refresh the view to continue."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Could not choose a style"
+msgstr "Could not choose a style"
 
 #: src/pages/shell/dialogs.tsx
 msgid "Could not clear conversation"
@@ -1702,6 +1714,7 @@ msgstr "Customer support"
 msgid "Customize bot avatar"
 msgstr "Customize bot avatar"
 
+#: src/components/DeckStyleCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Dark"
@@ -1979,6 +1992,10 @@ msgstr "Edit Profile"
 #: src/pages/Shell.tsx
 msgid "Edit shared setup"
 msgstr "Edit shared setup"
+
+#: src/components/DeckStyleCard.tsx
+msgid "Editorial"
+msgstr "Editorial"
 
 #: src/pages/Auth.tsx
 msgid "Email"
@@ -2340,6 +2357,10 @@ msgstr "Ignore"
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "Image upload area"
+
+#: src/components/DeckCard.tsx
+msgid "images"
+msgstr "images"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Import OpenAPI JSON"
@@ -3050,6 +3071,11 @@ msgstr "None yet"
 #: src/components/DraftActionCard.tsx
 msgid "Not an allowed address"
 msgstr "Not an allowed address"
+
+#. placeholder {0}: new Intl.ListFormat(undefined, { style: "long", type: "conjunction", }).format(losses.map((loss) => lossLabels[loss]))
+#: src/components/DeckCard.tsx
+msgid "Not carried to Google Slides: {0}"
+msgstr "Not carried to Google Slides: {0}"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Not in the plugin catalog"
@@ -4100,6 +4126,10 @@ msgstr "Speak only"
 #: src/pages/Shell.tsx
 msgid "Speak this reply"
 msgstr "Speak this reply"
+
+#: src/components/DeckCard.tsx
+msgid "speaker notes"
+msgstr "speaker notes"
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Speech model"

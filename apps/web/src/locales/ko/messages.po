@@ -780,6 +780,10 @@ msgstr "채널"
 msgid "Chart failed to render: {error}"
 msgstr "차트를 표시하지 못했습니다: {error}"
 
+#: src/components/DeckCard.tsx
+msgid "charts"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
 msgstr "채팅 앱"
@@ -833,6 +837,10 @@ msgstr "파일 선택"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Rakazo에서 기본으로 사용할 연결된 모델을 선택하세요."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Clean"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -1168,6 +1176,10 @@ msgstr "기본 모델을 변경하지 못했습니다."
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not check teaching status. Refresh the view to continue."
 msgstr "가르치기 상태를 확인하지 못했습니다. 화면을 새로고침한 뒤 이어가세요."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Could not choose a style"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Could not clear conversation"
@@ -1702,6 +1714,7 @@ msgstr "고객 지원"
 msgid "Customize bot avatar"
 msgstr "봇 아바타 맞춤설정"
 
+#: src/components/DeckStyleCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "다크"
@@ -1978,6 +1991,10 @@ msgstr "Bot 정보 수정"
 
 #: src/pages/Shell.tsx
 msgid "Edit shared setup"
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Editorial"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -2340,6 +2357,10 @@ msgstr ""
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "이미지 업로드 영역"
+
+#: src/components/DeckCard.tsx
+msgid "images"
+msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Import OpenAPI JSON"
@@ -3049,6 +3070,11 @@ msgstr "아직 없음"
 
 #: src/components/DraftActionCard.tsx
 msgid "Not an allowed address"
+msgstr ""
+
+#. placeholder {0}: new Intl.ListFormat(undefined, { style: "long", type: "conjunction", }).format(losses.map((loss) => lossLabels[loss]))
+#: src/components/DeckCard.tsx
+msgid "Not carried to Google Slides: {0}"
 msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
@@ -4100,6 +4126,10 @@ msgstr "음성 출력만"
 #: src/pages/Shell.tsx
 msgid "Speak this reply"
 msgstr "이 답변 읽기"
+
+#: src/components/DeckCard.tsx
+msgid "speaker notes"
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Speech model"

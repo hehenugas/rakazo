@@ -678,6 +678,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "write_file") return `Writing ${detail(record.path)}`;
   if (toolName === "list_files") return `Listing ${detail(record.path ?? ".")}`;
   if (toolName === "attach_file") return `Attaching ${detail(record.path)}`;
+  if (toolName === "presentation_style") return "Offering slide styles";
   if (toolName === "presentation_save") return `Building slides: ${detail(record.title)}`;
   if (toolName === "open_path") return `Opening ${detail(record.path)}`;
   if (toolName === "render_plot") return "Rendering a chart";

@@ -5,7 +5,12 @@ import type {
   ArtifactStore,
   GoogleSlidesDeliveryResult,
 } from "@rakazo/adapter-kit";
-import { deckToGoogleSlidesMarkdown, PPTX_MIME, renderDeckPptx } from "@rakazo/adapters";
+import {
+  deckToGoogleSlidesMarkdown,
+  loadDeckImages,
+  PPTX_MIME,
+  renderDeckPptx,
+} from "@rakazo/adapters";
 import type { Actor } from "@rakazo/contracts";
 import type { Deck } from "@rakazo/core";
 import { DECK_MIME, parseDeck } from "@rakazo/core";
@@ -44,7 +49,15 @@ export async function exportDeck(
   input: { artifactId: string; format: "pptx" },
 ) {
   const { artifact, deck } = await loadDeck(deps, actor, input.artifactId);
-  const bytes = await renderDeckPptx(deck);
+  // Images are re-read through the owner's scope; a deck can never pull someone else's file.
+  const images = await loadDeckImages(deps, { ...actor, operationId: `deck-export:${artifact.id}` }, deck).catch(
+    (error) => {
+      throw new ORPCError("BAD_REQUEST", {
+        message: error instanceof Error ? error.message : "A slide image could not be read.",
+      });
+    },
+  );
+  const bytes = await renderDeckPptx(deck, images);
   return {
     name: `${artifact.name.replace(/\.deck\.json$/, "")}.${input.format}`,
     mimeType: PPTX_MIME,
@@ -170,9 +183,10 @@ export async function deliverDeck(
       attempt = await deps.prisma.artifactDelivery.findFirst({ where: { idempotencyKey } });
       if (!attempt) throw error;
     }
-  } else if (attempt.status === "failed") {
+  } else if (attempt.status === "failed" || attempt.status === "unsupported") {
+    // Neither outcome created a file, so a new attempt cannot duplicate one. "unknown" never retries.
     const claimed = await deps.prisma.artifactDelivery.updateMany({
-      where: { id: attempt.id, status: "failed", connectionSnapshot },
+      where: { id: attempt.id, status: attempt.status, connectionSnapshot },
       data: { status: "pending", externalFileId: null, externalUrl: null },
     });
     attempt = await deps.prisma.artifactDelivery.findUnique({ where: { id: attempt.id } });
@@ -289,7 +303,7 @@ export async function readDeckDeliveryStatus(
   actor: Actor,
   input: { artifactId: string; connectionId: string },
 ) {
-  await loadDeck(deps, actor, input.artifactId);
+  const { artifact } = await loadDeck(deps, actor, input.artifactId);
   const connection = await deps.prisma.connection.findFirst({
     where: { id: input.connectionId, spaceId: actor.spaceId, userId: actor.userId },
     select: { providerRef: true },
@@ -298,7 +312,8 @@ export async function readDeckDeliveryStatus(
   const connectionSnapshot = createHash("sha256").update(connection.providerRef).digest("hex");
   let row = await deps.prisma.artifactDelivery.findFirst({
     where: {
-      artifactId: input.artifactId,
+      artifactId: artifact.id,
+      version: artifact.version,
       connectionId: input.connectionId,
       connectionSnapshot,
       spaceId: actor.spaceId,

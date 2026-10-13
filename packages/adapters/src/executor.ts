@@ -296,7 +296,7 @@ import {
   renderPlotSpecToSvg,
   searchChartCatalog,
 } from "./plot-tool.js";
-import { saveDeckArtifact } from "./presentation-artifacts.js";
+import { resolveDeckStyle, saveDeckArtifact } from "./presentation-artifacts.js";
 import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import {
   loadProjectSummaries,
@@ -4785,11 +4785,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
+          if (name === "presentation_style") {
+            await publishMessage(deps, run, "bot", [
+              { kind: "deck_style", choiceId: randomUUID() },
+            ]);
+            return finish({
+              ok: true,
+              message:
+                "The style picker is shown. Stop now; the user's choice arrives as their next message, then call presentation_save.",
+            });
+          }
           if (name === "presentation_save") {
             if (!deps.artifacts) return finish({ error: "artifact storage unavailable" });
-            const parsedDeck = parseDeck(args);
-            if ("error" in parsedDeck) return finish({ error: parsedDeck.error });
             try {
+              const title = typeof args.title === "string" ? args.title : "";
+              const resolved = await resolveDeckStyle(
+                { prisma: deps.prisma, artifacts: deps.artifacts },
+                {
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                  groupId: thread.groupId ?? undefined,
+                  threadId: thread.id,
+                  title,
+                  operationId: executionId,
+                },
+              );
+              if ("error" in resolved) return finish({ error: resolved.error });
+              const parsedDeck = parseDeck({ ...args, style: resolved.style });
+              if ("error" in parsedDeck) return finish({ error: parsedDeck.error });
               const saved = await saveDeckArtifact(
                 { prisma: deps.prisma, artifacts: deps.artifacts },
                 {

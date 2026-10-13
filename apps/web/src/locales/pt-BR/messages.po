@@ -780,6 +780,10 @@ msgstr ""
 msgid "Chart failed to render: {error}"
 msgstr "Falha na renderização do gráfico: {error}"
 
+#: src/components/DeckCard.tsx
+msgid "charts"
+msgstr ""
+
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Chat apps"
 msgstr ""
@@ -833,6 +837,10 @@ msgstr "Escolher arquivo"
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Choose which connected model Rakazo uses."
 msgstr "Escolha qual modelo conectado a Rakazo usa."
+
+#: src/components/DeckStyleCard.tsx
+msgid "Clean"
+msgstr ""
 
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -1167,6 +1175,10 @@ msgstr "Não foi possível alterar o modelo padrão"
 
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "Could not check teaching status. Refresh the view to continue."
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Could not choose a style"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -1702,6 +1714,7 @@ msgstr ""
 msgid "Customize bot avatar"
 msgstr "Personalizar avatar do bot"
 
+#: src/components/DeckStyleCard.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Escuro"
@@ -1978,6 +1991,10 @@ msgstr "Editar Perfil"
 
 #: src/pages/Shell.tsx
 msgid "Edit shared setup"
+msgstr ""
+
+#: src/components/DeckStyleCard.tsx
+msgid "Editorial"
 msgstr ""
 
 #: src/pages/Auth.tsx
@@ -2340,6 +2357,10 @@ msgstr ""
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Image upload area"
 msgstr "Área de envio de imagem"
+
+#: src/components/DeckCard.tsx
+msgid "images"
+msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Import OpenAPI JSON"
@@ -3049,6 +3070,11 @@ msgstr "Nenhuma ainda"
 
 #: src/components/DraftActionCard.tsx
 msgid "Not an allowed address"
+msgstr ""
+
+#. placeholder {0}: new Intl.ListFormat(undefined, { style: "long", type: "conjunction", }).format(losses.map((loss) => lossLabels[loss]))
+#: src/components/DeckCard.tsx
+msgid "Not carried to Google Slides: {0}"
 msgstr ""
 
 #: src/pages/PluginsOverlay.tsx
@@ -4100,6 +4126,10 @@ msgstr "Falar apenas"
 #: src/pages/Shell.tsx
 msgid "Speak this reply"
 msgstr "Fale esta resposta"
+
+#: src/components/DeckCard.tsx
+msgid "speaker notes"
+msgstr ""
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Speech model"

@@ -217,6 +217,16 @@ export class PipedreamConnector implements ManagedConnectorProvider {
     );
   }
 
+  /** The concrete Slides tool: discoverTools returns catalog wrappers once an account has many tools. */
+  private async googleSlidesTool(context: AdapterContext): Promise<ConnectorTool | undefined> {
+    return googleSlidesMarkdownTool(
+      (await this.allTools(context)).filter(
+        (tool) =>
+          tool.route?.resourceId?.replace(/[^a-z0-9]/gi, "").toLowerCase() === "googleslides",
+      ),
+    );
+  }
+
   async supportsGoogleSlidesDelivery(context: AdapterContext): Promise<boolean> {
     const accounts = context.connectedConnections?.filter(
       (connection) =>
@@ -224,14 +234,14 @@ export class PipedreamConnector implements ManagedConnectorProvider {
         connection.externalId.replace(/[^a-z0-9]/gi, "").toLowerCase() === "googleslides",
     );
     if (accounts?.length !== 1) return false;
-    return supportsGoogleSlidesMarkdownTool(googleSlidesMarkdownTool(await this.discoverTools(context)));
+    return supportsGoogleSlidesMarkdownTool(await this.googleSlidesTool(context));
   }
 
   async createGoogleSlidesFromMarkdown(
     input: { title: string; markdown: string },
     context: AdapterContext,
   ) {
-    const tool = googleSlidesMarkdownTool(await this.discoverTools(context));
+    const tool = await this.googleSlidesTool(context);
     if (!supportsGoogleSlidesMarkdownTool(tool)) return null;
     return createGoogleSlidesFromMarkdown(this, context, tool, input);
   }

@@ -164,6 +164,7 @@ import { CallCard } from "../components/call/CallCard";
 import { VoiceChatCard } from "../components/call/VoiceChatCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
 import { DeckCard } from "../components/DeckCard";
+import { DeckStyleCard } from "../components/DeckStyleCard";
 import { DraftActionCard } from "../components/DraftActionCard";
 import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
 import {
@@ -8320,6 +8321,18 @@ const MessageView = memo(function MessageView({
           return (
             <div key={i} className="flex justify-start">
               <DeckCard block={block} target={artifactTarget} />
+            </div>
+          );
+        }
+        if (block.kind === "deck_style") {
+          return (
+            <div key={i} className="flex justify-start">
+              <DeckStyleCard
+                block={block}
+                target={artifactTarget}
+                messageId={message.id}
+                onRefresh={onRefresh}
+              />
             </div>
           );
         }

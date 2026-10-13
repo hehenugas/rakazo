@@ -251,6 +251,15 @@ export function inferScript(
   if (lower.includes("build a slide deck")) {
     return [
       {
+        assistant: "pick a style for your deck.",
+        toolCalls: [{ name: "presentation_style", args: {} }],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.includes("style for the presentation")) {
+    return [
+      {
         assistant: "your deck is ready.",
         toolCalls: [
           {

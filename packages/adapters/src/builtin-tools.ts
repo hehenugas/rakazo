@@ -3,7 +3,6 @@ import {
   BotSecretName,
   botSecretDestinationSchema,
   DECK_LAYOUTS,
-  DECK_STYLES,
   SecretAskPurpose,
   SecretHttpRequest,
 } from "@rakazo/contracts";
@@ -295,18 +294,19 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "presentation_style",
+    description:
+      "Show the user the Clean, Editorial, and Dark style choices before you build a NEW slide deck. Call it once, then stop and wait: the user's choice arrives as their next message and decides the deck's style. Do not call it again to revise an existing deck.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
     name: "presentation_save",
     description:
-      "Create or update a slide deck for the user. Before the first version, offer the Clean, Editorial, and Dark styles and ask the user to choose if they have not chosen a style. Save that style as deck metadata. Slides support title_bullets, section, quote, two_column, and chart layouts with optional speaker notes. A chart slide has 1–12 categories and 1–4 named data series with one finite numeric value per category; pie charts use one non-negative series. The deck appears in chat and the Artifact Library, and can be downloaded as PowerPoint. To revise a deck, call this again with the same title. Keep slides concise; a deck has at most 60 slides and 12 bullets per slide.",
+      "Create or update a slide deck for the user. The deck's style is the one the user picked on the style card from presentation_style; it is applied for you, so do not choose it. Slides support title_bullets, section, quote, two_column, chart, and image layouts with optional speaker notes. A chart slide has 1–12 categories and 1–4 named data series with one finite numeric value per category; pie charts use one non-negative series. An image slide references one of the user's own PNG or JPEG image artifacts by artifactId (at most 4 MB, 12 per deck) with a short alt description, and may add bullets. The deck appears in chat and the Artifact Library, and can be downloaded as PowerPoint. To revise a deck, call this again with the same title. Keep slides concise; a deck has at most 60 slides and 12 bullets per slide.",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", description: "Deck title; the same title updates the same deck." },
-        style: {
-          type: "string",
-          enum: [...DECK_STYLES],
-          description: "Style selected by the user before the first version.",
-        },
         slides: {
           type: "array",
           items: {
@@ -331,6 +331,14 @@ export const builtinAgentTools: ConnectorTool[] = [
                   heading: { type: "string" },
                   bullets: { type: "array", items: { type: "string" }, maxItems: 6 },
                 },
+              },
+              image: {
+                type: "object",
+                properties: {
+                  artifactId: { type: "string", description: "An image artifact the user owns." },
+                  alt: { type: "string", description: "Short description of the image." },
+                },
+                required: ["artifactId", "alt"],
               },
               chart: {
                 type: "object",
@@ -359,7 +367,7 @@ export const builtinAgentTools: ConnectorTool[] = [
           },
         },
       },
-      required: ["title", "style", "slides"],
+      required: ["title", "slides"],
     },
   },
   {

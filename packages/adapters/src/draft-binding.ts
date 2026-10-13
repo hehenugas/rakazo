@@ -7,6 +7,7 @@ import {
   isEmailDraftAction,
   isEmailSendTool,
   parseEmailDraft,
+  parseEmailDraftActionNonce,
 } from "@rakazo/core";
 import { emailAccountSnapshot } from "@rakazo/core/node/email-account";
 import type { Prisma, PrismaClient } from "@rakazo/db";
@@ -92,10 +93,9 @@ export async function updateEmailDraftExecutionStatus(
     where: { id: run.sourceMessageId, threadId: run.threadId, role: "user" },
     select: { clientNonce: true },
   });
-  const nonce = source?.clientNonce;
-  if (!nonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return;
-  const draftId = nonce.slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length).split(":", 1)[0];
-  if (!draftId) return;
+  const submitted = parseEmailDraftActionNonce(source?.clientNonce);
+  if (!submitted) return;
+  const { draftId, attempt } = submitted;
   const card = await prisma.message.findFirst({
     where: {
       threadId: run.threadId,
@@ -111,6 +111,8 @@ export async function updateEmailDraftExecutionStatus(
   );
   if (current?.kind !== "draft_action" || current.status !== "submitted") return;
   if (!isEmailDraftAction(current.action)) return;
+  // A worker from an earlier attempt must not touch the card a retry now owns.
+  if (attempt !== (current.executionAttempt ?? 1)) return;
   if (current.executionStatus === "sent" || current.executionStatus === "failed") return;
   if (current.executionStatus === "unknown" && nextStatus !== "sent") return;
   const blocks = parsed.data.map((block) =>
@@ -156,10 +158,10 @@ export async function loadApprovedEmailDraft(
     where: { id: run.sourceMessageId, threadId: run.threadId, role: "user" },
     select: { clientNonce: true },
   });
-  const nonce = source?.clientNonce;
-  if (!nonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return null;
-  const draftId = nonce.slice(EMAIL_DRAFT_ACTION_NONCE_PREFIX.length).split(":", 1)[0];
-  if (!draftId) throw new Error("Submitted draft identity is missing.");
+  if (!source?.clientNonce?.startsWith(EMAIL_DRAFT_ACTION_NONCE_PREFIX)) return null;
+  const submitted = parseEmailDraftActionNonce(source.clientNonce);
+  if (!submitted) throw new Error("Submitted draft identity is missing.");
+  const { draftId, attempt } = submitted;
   const card = await prisma.message.findFirst({
     where: {
       threadId: run.threadId,
@@ -177,6 +179,9 @@ export async function loadApprovedEmailDraft(
     throw new Error("Submitted draft state could not be verified.");
   }
   if (!isEmailDraftAction(block.action)) return null;
+  if (attempt !== (block.executionAttempt ?? 1)) {
+    throw new Error("Submitted draft was retried; this attempt is no longer active.");
+  }
   if (!block.connectionId) throw new Error("Submitted email account could not be verified.");
   if (!block.connectionSnapshot) {
     throw new Error("Submitted email account snapshot could not be verified.");

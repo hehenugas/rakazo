@@ -127,6 +127,9 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       if (block.kind === "chart") return `[chart: ${block.name}]`;
       if (block.kind === "image") return `[image: ${block.name}]`;
       if (block.kind === "deck") return `[slide deck: ${block.title} (${block.slideCount} slides)]`;
+      if (block.kind === "deck_style") {
+        return block.selected ? `[deck style chosen: ${block.selected}]` : "[deck style choice shown]";
+      }
       if (block.kind === "file") {
         return `[file: ${block.name} (${block.mimeType}, ${block.size} bytes)]`;
       }

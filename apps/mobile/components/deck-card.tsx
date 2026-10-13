@@ -6,7 +6,7 @@ import type {
 import { decodeAttachmentBase64 } from "@rakazo/core";
 import { File, Paths } from "expo-file-system";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Sharing from "expo-sharing";
 import type { MobileArtifactTarget } from "../lib/artifact-open";
 import { rpc } from "../lib/api";
@@ -16,6 +16,8 @@ import { useMobileTokens, useResolvedAppearance } from "../lib/native";
 import { NativeSymbol } from "./native-symbol";
 
 type DeckBlock = Extract<MessageBlock, { kind: "deck" }>;
+
+const DELIVERY_POLL_MS = 4000;
 
 export function DeckCard({ block, target }: { block: DeckBlock; target: MobileArtifactTarget }) {
   const tokens = useMobileTokens();
@@ -62,6 +64,32 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: MobileAr
       cancelled = true;
     };
   }, [block.artifactId, connectionId]);
+
+  // A pending delivery finishes on the server; follow it until it reaches a final outcome.
+  const deliveryPending = deliveryStatus?.status === "pending";
+  useEffect(() => {
+    if (!deliveryPending || !connectionId) return;
+    let cancelled = false;
+    const refresh = () => {
+      void rpc<PresentationDeliveryStatus | null>("artifacts/deckDeliveryStatus", {
+        artifactId: block.artifactId,
+        connectionId,
+      })
+        .then((status) => {
+          if (!cancelled && status) setDeliveryStatus(status);
+        })
+        .catch(() => undefined);
+    };
+    const timer = setInterval(refresh, DELIVERY_POLL_MS);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [deliveryPending, block.artifactId, connectionId]);
 
   async function exportPowerPoint() {
     if (busy) return;
@@ -123,6 +151,17 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: MobileAr
       more: t("More"),
     });
   }
+
+  const losses = block.googleSlidesLosses ?? [];
+  const showLosses =
+    accounts.length > 0 &&
+    losses.length > 0 &&
+    (!deliveryStatus || deliveryStatus.status === "failed" || deliveryStatus.status === "unsupported");
+  const lossLabels = {
+    notes: t("speaker notes"),
+    charts: t("charts"),
+    images: t("images"),
+  };
 
   const deliveryLabel = deliveryStatus
     ? deliveryStatus.status === "pending"
@@ -199,6 +238,15 @@ export function DeckCard({ block, target }: { block: DeckBlock; target: MobileAr
           </Pressable>
         ) : null}
       </View>
+      {showLosses ? (
+        <Text style={[styles.meta, { color: tokens.mutedForeground }]}>
+          {t("Not carried to Google Slides: {items}", {
+            items: new Intl.ListFormat(undefined, { style: "long", type: "conjunction" }).format(
+              losses.map((loss) => lossLabels[loss]),
+            ),
+          })}
+        </Text>
+      ) : null}
       {deliveryLabel ? (
         <Text style={[styles.meta, { color: tokens.mutedForeground }]}>{deliveryLabel}</Text>
       ) : null}

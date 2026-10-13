@@ -12,6 +12,9 @@ test("a Bot builds a slide deck that previews in chat and downloads as PowerPoin
   await composer.fill("please build a slide deck about the launch");
   await page.keyboard.press("Enter");
 
+  // The deck is only built once the user picks a style on the card.
+  await page.getByTestId("deck-style-card").getByRole("button", { name: "Clean" }).click();
+
   const card = page.getByTestId("deck-card");
   await expect(card).toBeVisible({ timeout: 30_000 });
   await expect(card.getByText("Launch plan")).toBeVisible();
@@ -43,6 +46,11 @@ test("asking again for the same deck adds a version instead of a second artifact
   for (const round of [1, 2]) {
     await composer.fill(`please build a slide deck about the launch (round ${round})`);
     await page.keyboard.press("Enter");
+    await page
+      .getByTestId("deck-style-card")
+      .nth(round - 1)
+      .getByRole("button", { name: "Clean" })
+      .click();
     await expect(page.getByTestId("deck-card")).toHaveCount(round, { timeout: 30_000 });
   }
 

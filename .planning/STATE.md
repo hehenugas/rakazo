@@ -29,6 +29,10 @@ M4 follows `.planning/M4-EXECUTION-PLAN.md`. M3 Phase 23 is still DOING; the mai
 
 M5 — Grok Bot Feature & Experience Completion is specified in `.planning/M5-EXECUTION-PLAN.md` (phases 32–36). Code is implemented and statically reviewed on `main`; typechecks passed. No runtime, UI, test, CI, device, or provider verification is claimed. See `.planning/M5-HANDOFF.md` for limits and owner checks. M3 Phase 23 and M4 Phase 31 release gates remain open and are not superseded.
 
+## M5.1 (CODE COMPLETE — static-reviewed; runtime/UI/tests NOT VERIFIED)
+
+M5.1 — Post-Implementation Fixes & Presentation Parity (`.planning/M5.1-POST-IMPLEMENTATION-PLAN.md`, phases 37–40) fixes email-retry attempt fencing and receipt precision, Google Slides tool resolution and version-scoped delivery status, and adds the deck style picker and image slides. Code-only by request: no test, app, CI, device or provider run. Changes are uncommitted on `main`. M3 Phase 23 and M4 Phase 31 release gates remain open.
+
 ## Previous Milestones
 
 - **M1 — Grok Bot Parity Foundation — DONE 2026-10-06**
